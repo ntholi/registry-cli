@@ -4,8 +4,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 from registry_cli.models.student import Base
 
 
-class Course(Base):
-    __tablename__ = "courses"
+class Program(Base):
+    __tablename__ = "programs"
 
     id: Mapped[str] = mapped_column(primary_key=True)
     code: Mapped[str] = mapped_column(
@@ -15,4 +15,4 @@ class Course(Base):
     program_id: Mapped[str] = mapped_column(String(10), nullable=False)
 
     def __repr__(self) -> str:
-        return f"Course(id={self.id!r}, code={self.code!r}, name={self.name!r}, program_id={self.program_id!r})"
+        return f"Program(id={self.id!r}, code={self.code!r}, name={self.name!r}, program_id={self.program_id!r})"

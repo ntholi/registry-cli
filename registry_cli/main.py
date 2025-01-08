@@ -1,7 +1,7 @@
 import click
 from sqlalchemy.orm import sessionmaker
 
-from registry_cli.commands.pull.courses import course_pull
+from registry_cli.commands.pull.programs import program_pull
 from registry_cli.commands.pull.students import student_pull
 from registry_cli.commands.push.students import student_push
 from registry_cli.db.config import engine
@@ -31,9 +31,9 @@ def pull() -> None:
 
 
 @pull.command()
-def courses() -> None:
+def programs() -> None:
     db = get_db()
-    course_pull(db)
+    program_pull(db)
 
 
 @cli.command()
