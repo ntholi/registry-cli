@@ -21,10 +21,9 @@ def program_pull(db: Session, school_id: int = 3) -> None:
 
         for program_data in programs_data:
             program = Program(
-                id=str(uuid.uuid4()),
+                id=int(program_data["program_id"]),
                 code=program_data["code"],
                 name=program_data["name"],
-                program_id=program_data["program_id"],
             )
             db.add(program)
 
