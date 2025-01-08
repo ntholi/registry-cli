@@ -1,26 +1,22 @@
 [tool.poetry]
 name = "registry-cli"
 version = "0.1.0"
-description = ""
-authors = ["Ntholi Nkhatho <ntholi@live.com>"]
+description = "CLI tool for managing student records"
+authors = ["Your Name <your.email@example.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "<3.14,>=3.8"
-click = "^8.1.8"
-sqlalchemy-libsql = "^0.1.0"
-python-dotenv = "^1.0.1"
-requests = "^2.32.3"
-lxml = "^5.3.0"
-beautifulsoup4 = "^4.12.3"
+python = "^3.8"
+click = "^8.1.7"
+sqlalchemy = "^2.0.23"
+beautifulsoup4 = "^4.12.2"
+requests = "^2.31.0"
+selenium = "^4.15.2"
+lxml = "^4.9.3"
 
 [tool.poetry.scripts]
 registry = "registry_cli.main:cli"
-build = "scripts.build:main"
-
-[tool.poetry.group.dev.dependencies]
-pyinstaller = "^6.11.1"
 
 [build-system]
-requires = ["poetry-core>=2.0.0,<3.0.0"]
+requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"

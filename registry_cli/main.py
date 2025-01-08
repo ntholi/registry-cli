@@ -1,16 +1,20 @@
 import uuid
 
 import click
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 
 from registry_cli.db.config import engine
+from registry_cli.models.course import Course
 from registry_cli.models.student import Base, Student
+from registry_cli.scrapers.course import CourseScraper
 
 Base.metadata.create_all(bind=engine)
 
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
 
 def get_db():
-    db = Session(engine)
+    db = SessionLocal()
     try:
         return db
     finally:
@@ -23,9 +27,44 @@ def cli() -> None:
     pass
 
 
+@cli.group()
+def pull() -> None:
+    """Pull records from various sources"""
+    pass
+
+
+@pull.command()
+def courses() -> None:
+    """Pull course records from the website"""
+    url = "https://cmslesotho.limkokwing.net/campus/registry/f_programlist.php?showmaster=1&SchoolID=3"
+    scraper = CourseScraper(url)
+
+    try:
+        courses_data = scraper.scrape()
+        if not courses_data:
+            click.echo("No courses found.")
+            return
+
+        db = get_db()
+        for course_data in courses_data:
+            course = Course(
+                id=str(uuid.uuid4()),
+                code=course_data["code"],
+                name=course_data["name"],
+                program_id=course_data["program_id"],
+            )
+            db.add(course)
+
+        db.commit()
+        click.echo(f"Successfully added {len(courses_data)} courses to the database.")
+
+    except Exception as e:
+        click.echo(f"Error pulling courses: {str(e)}")
+
+
 @cli.command()
 @click.argument("name", type=str)
-def pull(name: str) -> None:
+def student(name: str) -> None:
     """Pull a student record from the database by name"""
     db = get_db()
     student = db.query(Student).filter(Student.name == name).first()
