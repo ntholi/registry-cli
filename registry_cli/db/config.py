@@ -11,7 +11,6 @@ TURSO_AUTH_TOKEN = os.getenv("TURSO_AUTH_TOKEN")
 
 
 def get_engine() -> Engine:
-    """Get database engine based on configuration."""
     if TURSO_DATABASE_URL and TURSO_AUTH_TOKEN:
         url = f"{TURSO_DATABASE_URL}?authToken={TURSO_AUTH_TOKEN}"
         return create_engine(

@@ -3,6 +3,7 @@ import uuid
 import click
 from sqlalchemy.orm import Session, sessionmaker
 
+from registry_cli.browser import BASE_URL
 from registry_cli.db.config import engine
 from registry_cli.models.course import Course
 from registry_cli.models.student import Base, Student
@@ -36,7 +37,7 @@ def pull() -> None:
 @pull.command()
 def courses() -> None:
     """Pull course records from the website"""
-    url = "https://cmslesotho.limkokwing.net/campus/registry/f_programlist.php?showmaster=1&SchoolID=3"
+    url = f"{BASE_URL}/f_programlist.php?showmaster=1&SchoolID=3"
     scraper = CourseScraper(url)
 
     try:
