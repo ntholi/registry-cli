@@ -2,7 +2,7 @@ import click
 from sqlalchemy.orm import Session
 
 from registry_cli.browser import BASE_URL
-from registry_cli.models.structure import ProgramStructure
+from registry_cli.models.structure import Structure
 from registry_cli.scrapers.structure import ProgramStructureScraper
 
 
@@ -17,9 +17,10 @@ def structure_pull(db: Session, program_id: int) -> None:
             return
 
         for structure_data in structures_data:
-            structure = ProgramStructure(
+            structure = Structure(
                 id=int(structure_data["id"]),
                 code=structure_data["code"],
+                program_id=program_id,
             )
             db.add(structure)
 
