@@ -2,10 +2,11 @@ import click
 from sqlalchemy.orm import sessionmaker
 
 from registry_cli.commands.pull.programs import program_pull
+from registry_cli.commands.pull.structures import structure_pull
 from registry_cli.commands.pull.students import student_pull
 from registry_cli.commands.push.students import student_push
 from registry_cli.db.config import engine
-from registry_cli.models.student import Base
+from registry_cli.models.base import Base
 
 Base.metadata.create_all(bind=engine)
 
@@ -28,6 +29,13 @@ def cli() -> None:
 @cli.group()
 def pull() -> None:
     pass
+
+
+@pull.command()
+@click.argument("program_id", type=int)
+def structures(program_id: int) -> None:
+    db = get_db()
+    structure_pull(db, program_id)
 
 
 @pull.command()

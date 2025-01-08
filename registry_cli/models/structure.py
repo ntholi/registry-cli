@@ -4,14 +4,10 @@ from sqlalchemy.orm import Mapped, mapped_column
 from registry_cli.models.base import Base
 
 
-class Program(Base):
-    __tablename__ = "programs"
+class ProgramStructure(Base):
+    __tablename__ = "structures"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     code: Mapped[str] = mapped_column(
         String(10), unique=True, index=True, nullable=False
     )
-    name: Mapped[str] = mapped_column(String(200), nullable=False)
-
-    def __repr__(self) -> str:
-        return f"Program(id={self.id!r}, code={self.code!r}, name={self.name!r})"
