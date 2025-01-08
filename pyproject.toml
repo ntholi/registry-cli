@@ -1,15 +1,13 @@
-[project]
+[tool.poetry]
 name = "registry-cli"
 version = "0.1.0"
 description = ""
-authors = [
-    {name = "Ntholi Nkhatho",email = "ntholi@live.com"}
-]
+authors = ["Ntholi Nkhatho <ntholi@live.com>"]
 readme = "README.md"
-requires-python = "<3.14,>=3.8"
-dependencies = [
-    "click (>=8.1.8,<9.0.0)"
-]
+
+[tool.poetry.dependencies]
+python = "<3.14,>=3.8"
+click = "^8.1.8"
 
 [tool.poetry.scripts]
 registry = "registry_cli.main:cli"
