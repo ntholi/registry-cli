@@ -31,9 +31,10 @@ def pull() -> None:
 
 
 @pull.command()
-def programs() -> None:
+@click.argument("school_id", type=int)
+def programs(school_id: int) -> None:
     db = get_db()
-    program_pull(db)
+    program_pull(db, school_id)
 
 
 @cli.command()

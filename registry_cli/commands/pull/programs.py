@@ -8,9 +8,9 @@ from registry_cli.models.program import Program
 from registry_cli.scrapers.program import ProgramScraper
 
 
-def program_pull(db: Session) -> None:
+def program_pull(db: Session, school_id: int = 3) -> None:
     """Pull program records from the website"""
-    url = f"{BASE_URL}/f_programlist.php?showmaster=1&SchoolID=3"
+    url = f"{BASE_URL}/f_programlist.php?showmaster=1&SchoolID={school_id}"
     scraper = ProgramScraper(url)
 
     try:
