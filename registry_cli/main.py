@@ -1,13 +1,11 @@
-import uuid
-
 import click
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import sessionmaker
 
-from registry_cli.browser import BASE_URL
+from registry_cli.commands.pull.courses import course_pull
+from registry_cli.commands.pull.students import student_pull
+from registry_cli.commands.push.students import student_push
 from registry_cli.db.config import engine
-from registry_cli.models.course import Course
-from registry_cli.models.student import Base, Student
-from registry_cli.scrapers.course import CourseScraper
+from registry_cli.models.student import Base
 
 Base.metadata.create_all(bind=engine)
 
@@ -24,71 +22,32 @@ def get_db():
 
 @click.group()
 def cli() -> None:
-    """CLI tool for managing student records"""
     pass
 
 
 @cli.group()
 def pull() -> None:
-    """Pull records from various sources"""
     pass
 
 
 @pull.command()
 def courses() -> None:
-    """Pull course records from the website"""
-    url = f"{BASE_URL}/f_programlist.php?showmaster=1&SchoolID=3"
-    scraper = CourseScraper(url)
-
-    try:
-        courses_data = scraper.scrape()
-        if not courses_data:
-            click.echo("No courses found.")
-            return
-
-        db = get_db()
-        for course_data in courses_data:
-            course = Course(
-                id=str(uuid.uuid4()),
-                code=course_data["code"],
-                name=course_data["name"],
-                program_id=course_data["program_id"],
-            )
-            db.add(course)
-
-        db.commit()
-        click.echo(f"Successfully added {len(courses_data)} courses to the database.")
-
-    except Exception as e:
-        click.echo(f"Error pulling courses: {str(e)}")
+    db = get_db()
+    course_pull(db)
 
 
 @cli.command()
 @click.argument("name", type=str)
 def student(name: str) -> None:
-    """Pull a student record from the database by name"""
     db = get_db()
-    student = db.query(Student).filter(Student.name == name).first()
-    if student:
-        click.echo(f"Found student: {student}")
-    else:
-        click.echo(f"No student found with name: {name}")
+    student_pull(db, name)
 
 
 @cli.command()
 @click.argument("name", type=str)
 def push(name: str) -> None:
-    """Push a new student record to the database"""
     db = get_db()
-
-    student = Student(id=str(uuid.uuid4()), name=name)
-    db.add(student)
-    try:
-        db.commit()
-        click.echo(f"Successfully added student: {student}")
-    except Exception as e:
-        db.rollback()
-        click.echo(f"Error adding student: {str(e)}")
+    student_push(db, name)
 
 
 if __name__ == "__main__":
