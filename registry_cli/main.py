@@ -6,7 +6,6 @@ from sqlalchemy.orm import Session
 from registry_cli.db.config import engine
 from registry_cli.models.student import Base, Student
 
-# Create tables
 Base.metadata.create_all(bind=engine)
 
 
@@ -42,13 +41,6 @@ def push(name: str) -> None:
     """Push a new student record to the database"""
     db = get_db()
 
-    # Check if student already exists
-    existing = db.query(Student).filter(Student.name == name).first()
-    if existing:
-        click.echo(f"Student with name '{name}' already exists!")
-        return
-
-    # Create new student with UUID as string
     student = Student(id=str(uuid.uuid4()), name=name)
     db.add(student)
     try:
