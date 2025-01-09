@@ -1,9 +1,11 @@
 from datetime import date
 from enum import Enum
-from sqlalchemy import String, Date
-from sqlalchemy.orm import Mapped, mapped_column
+
+from sqlalchemy import Date, ForeignKey, String
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from registry_cli.models.base import Base
+from registry_cli.models.structure import Structure
 
 
 class Gender(Enum):
@@ -34,7 +36,9 @@ class Student(Base):
     religion: Mapped[str] = mapped_column(String(100))
 
     structure_id: Mapped[int] = mapped_column(ForeignKey("structures.id"))
-    structure: Mapped["Structure"] = relationship("Structure", back_populates="students")
+    structure: Mapped["Structure"] = relationship(
+        "Structure", back_populates="students"
+    )
 
     def __repr__(self) -> str:
         return f"Student(id={self.id!r}, name={self.name!r})"
