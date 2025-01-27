@@ -12,14 +12,14 @@ if TYPE_CHECKING:
 
 
 class ModuleType(str, Enum):
-    MAJOR = "Major"
-    MINOR = "Minor"
-    CORE = "Core"
+    Major = "Major"
+    Minor = "Minor"
+    Core = "Core"
 
 
 class ModuleStatus(str, Enum):
-    ACTIVE = "Active"
-    INACTIVE = "Inactive"
+    Active = "Active"
+    Inactive = "Inactive"
 
 
 class Module(Base):

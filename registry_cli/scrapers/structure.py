@@ -158,7 +158,7 @@ class SemesterModuleScraper(BaseScraper):
             try:
                 module_type = ModuleType(type_text)
             except ValueError:
-                module_type = ModuleType.CORE
+                module_type = ModuleType.Core
 
             # Get credits
             credits_text = cells[3].get_text(strip=True).replace(",", "")
