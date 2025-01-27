@@ -9,16 +9,16 @@ from registry_cli.models.structure import Structure
 
 
 class Gender(Enum):
-    MALE = "MALE"
-    FEMALE = "FEMALE"
-    OTHER = "OTHER"
+    Male = "Male"
+    Female = "Female"
+    Other = "Other"
 
 
 class MaritalStatus(Enum):
-    SINGLE = "SINGLE"
-    MARRIED = "MARRIED"
-    DIVORCED = "DIVORCED"
-    WIDOWED = "WIDOWED"
+    Single = "Single"
+    Married = "Married"
+    Divorced = "Divorced"
+    Windowed = "Windowed"
 
 
 class Student(Base):

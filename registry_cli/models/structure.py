@@ -26,12 +26,8 @@ class Module(Base):
     __tablename__ = "modules"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    code: Mapped[str] = mapped_column(
-        String(10), index=True, nullable=False
-    )  # eg. DDC112 Creative and Innovation Studies -> Code is DDC112
-    name: Mapped[str] = mapped_column(
-        String(200), nullable=False
-    )  # eg. DDC112 Creative and Innovation Studies -> name is Creative and Innovation Studies
+    code: Mapped[str] = mapped_column(String(10), index=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
     type: Mapped[ModuleType] = mapped_column(nullable=False)
     credits: Mapped[float] = mapped_column(Numeric(3, 1), nullable=False)
 
@@ -46,12 +42,8 @@ class Semester(Base):
     structure_id: Mapped[int] = mapped_column(
         ForeignKey("structures.id"), nullable=False
     )
-    year: Mapped[int] = mapped_column(
-        nullable=False
-    )  # 01 Year 1 Sem 1 -> Here year is: Year 1 Sem 1
-    semester_number: Mapped[int] = mapped_column(
-        nullable=False
-    )  # 01 Year 1 Sem 1 -> Here semester_number is 01
+    year: Mapped[int] = mapped_column(nullable=False)
+    semester_number: Mapped[int] = mapped_column(nullable=False)
     total_credits: Mapped[float] = mapped_column(Numeric(4, 1), nullable=False)
 
     structure: Mapped["Structure"] = relationship(
