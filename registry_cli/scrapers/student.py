@@ -15,30 +15,11 @@ class StudentScraper(BaseScraper):
         super().__init__(f"{BASE_URL}/r_stdpersonalview.php?StudentID={student_id}")
 
     def scrape(self) -> Dict[str, Any]:
-        """Scrape student data from both personal and academic pages.
-
-        Returns:
-            Dictionary containing student data with keys:
-            - std_no: Student number
-            - name: Student name
-            - national_id: National ID/Passport number
-            - date_of_birth: Date of birth
-            - phone1: Primary phone number
-            - phone2: Secondary phone number
-            - gender: Gender (MALE/FEMALE/OTHER)
-            - marital_status: Marital status
-            - religion: Religion
-            - structure_id: Program structure ID
-        """
-        # First get personal data
         personal_data = self._scrape_personal_data()
 
-        # Then get academic data
         academic_url = f"{BASE_URL}/r_studentviewview.php?StudentID={self.student_id}"
         self.url = academic_url
         academic_data = self._scrape_academic_data()
-
-        # Merge the data
         return {**personal_data, **academic_data}
 
     def _scrape_personal_data(self) -> Dict[str, Any]:
