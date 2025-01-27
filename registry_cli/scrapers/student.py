@@ -1,8 +1,11 @@
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any, Dict, List, cast
+
+from bs4 import Tag
+from bs4.element import NavigableString, ResultSet
 
 from registry_cli.browser import BASE_URL
-from registry_cli.models.student import Gender, MaritalStatus
+from registry_cli.models.student import Gender, MaritalStatus, SemesterStatus
 from registry_cli.scrapers.base import BaseScraper
 
 
@@ -127,3 +130,65 @@ class StudentProgramScraper(BaseScraper):
             programs.append(program)
 
         return programs
+
+
+class StudentSemesterScraper(BaseScraper):
+    """Scraper for student semester information."""
+
+    def __init__(self, program_id: int):
+        """Initialize the scraper with program ID."""
+        self.program_id = program_id
+        super().__init__(
+            f"{BASE_URL}/r_stdsemesterlist.php?showmaster=1&StdProgramID={program_id}"
+        )
+
+    def scrape(self) -> List[Dict[str, Any]]:
+        """Scrape student semester data.
+
+        Returns:
+            List of dictionaries containing semester data with keys:
+            - term: Term code (e.g. 2022-08)
+            - status: Semester status (e.g. Active)
+            - credits: Total credits for the semester
+        """
+        soup = self._get_soup()
+        semesters = []
+
+        # Find the main table containing semester data
+        table = soup.find("table", {"id": "ewlistmain"})
+        if not table or not isinstance(table, Tag):
+            return semesters
+
+        # Get all rows except header and footer
+        table_tag = cast(Tag, table)
+        rows: ResultSet[Tag] = table_tag.find_all(
+            "tr", {"class": ["ewTableRow", "ewTableAltRow"]}
+        )
+        for row in rows:
+            cells = row.find_all("td")
+            if len(cells) < 8:  # We need at least 8 cells for the main data
+                continue
+
+            # Parse credits - handle empty or invalid values
+            credits_text = cells[6].get_text(strip=True).replace(",", "")
+            try:
+                credits = float(credits_text) if credits_text else 0.0
+            except ValueError:
+                credits = 0.0
+
+            # Map status to enum value
+            status_text = cells[4].get_text(strip=True)
+            try:
+                status = SemesterStatus(status_text)
+            except ValueError:
+                # Default to Active if status doesn't match any enum value
+                status = SemesterStatus.Active
+
+            semester = {
+                "term": cells[0].get_text(strip=True),
+                "status": status,
+                "credits": credits,
+            }
+            semesters.append(semester)
+
+        return semesters
