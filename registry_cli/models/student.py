@@ -41,6 +41,10 @@ class Student(Base):
         "Structure", back_populates="students"
     )
 
+    programs: Mapped[List["StudentProgram"]] = relationship(
+        "StudentProgram", back_populates="student"
+    )
+
     def __repr__(self) -> str:
         return f"Student(id={self.id!r}, name={self.name!r})"
 
