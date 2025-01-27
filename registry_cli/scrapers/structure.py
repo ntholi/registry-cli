@@ -3,6 +3,7 @@ from typing import Any, Dict, List
 from bs4 import Tag
 from bs4.element import NavigableString
 
+from registry_cli.models.structure import ModuleType
 from registry_cli.scrapers.base import BaseScraper
 
 
@@ -114,3 +115,72 @@ class SemesterScraper(BaseScraper):
             )
 
         return semesters
+
+
+class SemesterModuleScraper(BaseScraper):
+    """Scraper for module information within a semester."""
+
+    def scrape(self) -> List[Dict[str, Any]]:
+        """Scrape module data from the URL.
+
+        Returns:
+            List of dictionaries containing module data with keys:
+            - id: Module ID (extracted from view link)
+            - code: Module code (e.g. DDC112)
+            - name: Module name (e.g. Creative and Innovation Studies)
+            - type: Module type (Core, Major, Minor)
+            - credits: Module credits
+        """
+        soup = self._get_soup()
+        modules = []
+
+        table: Tag | NavigableString | None = soup.find("table", {"id": "ewlistmain"})
+        if not table or isinstance(table, NavigableString):
+            return modules
+
+        for row in table.find_all("tr", {"class": ["ewTableRow", "ewTableAltRow"]}):
+            cells = row.find_all("td")
+            if len(cells) < 7:  # Skip rows without enough cells
+                continue
+
+            # Parse module code and name
+            # Format: "DDC112 Creative and Innovation Studies"
+            module_text = cells[0].get_text(strip=True)
+            code_end = module_text.find(" ")
+            if code_end == -1:
+                continue
+
+            code = module_text[:code_end]
+            name = module_text[code_end + 1 :]
+
+            # Get module type
+            type_text = cells[1].get_text(strip=True)
+            try:
+                module_type = ModuleType(type_text)
+            except ValueError:
+                module_type = ModuleType.CORE
+
+            # Get credits
+            credits_text = cells[3].get_text(strip=True).replace(",", "")
+            try:
+                credits = float(credits_text) if credits_text else 0.0
+            except ValueError:
+                credits = 0.0
+
+            # Get module ID from view link
+            view_link = cells[5].find("a")
+            if not view_link:
+                continue
+            module_id = view_link["href"].split("SemModuleID=")[-1]
+
+            modules.append(
+                {
+                    "id": int(module_id),
+                    "code": code,
+                    "name": name,
+                    "type": module_type,
+                    "credits": credits,
+                }
+            )
+
+        return modules

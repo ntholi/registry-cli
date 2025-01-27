@@ -27,13 +27,12 @@ class Module(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     code: Mapped[str] = mapped_column(
-        String(10), unique=True, index=True, nullable=False
-    )
-    name: Mapped[str] = mapped_column(String(200), nullable=False)
+        String(10), index=True, nullable=False
+    )  # eg. DDC112 Creative and Innovation Studies -> Code is DDC112
+    name: Mapped[str] = mapped_column(
+        String(200), nullable=False
+    )  # eg. DDC112 Creative and Innovation Studies -> name is Creative and Innovation Studies
     type: Mapped[ModuleType] = mapped_column(nullable=False)
-    status: Mapped[ModuleStatus] = mapped_column(
-        nullable=False, default=ModuleStatus.ACTIVE
-    )
     credits: Mapped[float] = mapped_column(Numeric(3, 1), nullable=False)
 
     def __repr__(self) -> str:
