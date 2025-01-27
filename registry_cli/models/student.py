@@ -60,7 +60,8 @@ class ProgramStatus(Enum):
 class StudentProgram(Base):
     __tablename__ = "student_programs"
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(20))
+    code: Mapped[str] = mapped_column(String(10))
+    name: Mapped[str] = mapped_column(String(50))
     status: Mapped[ProgramStatus] = mapped_column()
     student_id: Mapped[int] = mapped_column(ForeignKey("students.id"), nullable=False)
     student: Mapped["Student"] = relationship("Student", back_populates="programs")

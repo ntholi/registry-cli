@@ -34,15 +34,17 @@ def student_pull(db: Session, student_id: int) -> None:
         program_scraper = StudentProgramScraper(student_id)
         try:
             program_data = program_scraper.scrape()
-            
+
             # Get existing programs for this student
-            existing_programs = db.query(StudentProgram).filter(
-                StudentProgram.student_id == student.id
-            ).all()
-            
+            existing_programs = (
+                db.query(StudentProgram)
+                .filter(StudentProgram.student_id == student.id)
+                .all()
+            )
+
             # Create a map of existing programs by name for quick lookup
             existing_program_map = {prog.name: prog for prog in existing_programs}
-            
+
             # Update or create programs
             for prog in program_data:
                 if prog["name"] in existing_program_map:
@@ -52,14 +54,17 @@ def student_pull(db: Session, student_id: int) -> None:
                 else:
                     # Create new program
                     new_program = StudentProgram(
+                        code=prog["code"],
                         name=prog["name"],
                         status=ProgramStatus(prog["status"]),
-                        student_id=student.id
+                        student_id=student.id,
                     )
                     db.add(new_program)
-            
+
             db.commit()
-            click.echo(f"Successfully pulled {len(program_data)} programs for student: {student}")
+            click.echo(
+                f"Successfully pulled {len(program_data)} programs for student: {student}"
+            )
 
         except Exception as e:
             db.rollback()

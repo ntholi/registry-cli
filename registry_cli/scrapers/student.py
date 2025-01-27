@@ -91,7 +91,9 @@ class StudentProgramScraper(BaseScraper):
     def __init__(self, student_id: int):
         """Initialize the scraper with student ID."""
         self.student_id = student_id
-        super().__init__(f"{BASE_URL}/r_stdprogramlist.php?showmaster=1&StudentID={student_id}")
+        super().__init__(
+            f"{BASE_URL}/r_stdprogramlist.php?showmaster=1&StudentID={student_id}"
+        )
 
     def scrape(self) -> List[Dict[str, Any]]:
         """Scrape student program data."""
@@ -110,9 +112,12 @@ class StudentProgramScraper(BaseScraper):
             if len(cells) < 6:  # We need at least 6 cells for the main data
                 continue
 
-            # Extract program data from cells
+            code_name = cells[0].get_text(strip=True)
+            code = code_name.split(" ")[0]
+            name = " ".join(code_name.split(" ")[1:])
             program = {
-                "name": cells[0].get_text(strip=True),
+                "code": code,
+                "name": name,
                 "term": cells[1].get_text(strip=True),
                 "version": cells[2].get_text(strip=True),
                 "stream": cells[3].get_text(strip=True),
