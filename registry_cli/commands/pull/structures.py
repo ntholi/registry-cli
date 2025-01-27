@@ -2,8 +2,8 @@ import click
 from sqlalchemy.orm import Session
 
 from registry_cli.browser import BASE_URL
-from registry_cli.models.structure import Structure
-from registry_cli.scrapers.structure import ProgramStructureScraper
+from registry_cli.models.structure import Semester, Structure
+from registry_cli.scrapers.structure import ProgramStructureScraper, SemesterScraper
 
 
 def structure_pull(db: Session, program_id: int) -> None:
@@ -23,6 +23,21 @@ def structure_pull(db: Session, program_id: int) -> None:
                 program_id=program_id,
             )
             db.add(structure)
+
+            # Scrape semesters for this structure
+            semester_url = f"{BASE_URL}/f_semesterlist.php?showmaster=1&StructureID={structure_data['id']}"
+            semester_scraper = SemesterScraper(semester_url)
+            semesters_data = semester_scraper.scrape()
+
+            for semester_data in semesters_data:
+                semester = Semester(
+                    id=semester_data["id"],
+                    structure_id=structure.id,
+                    year=semester_data["year"],
+                    semester_number=semester_data["semester_number"],
+                    total_credits=semester_data["total_credits"],
+                )
+                db.add(semester)
 
         db.commit()
         click.echo(

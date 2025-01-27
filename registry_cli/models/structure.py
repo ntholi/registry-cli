@@ -1,11 +1,14 @@
 from enum import Enum
-from typing import List
+from typing import TYPE_CHECKING, List
 
 from sqlalchemy import ForeignKey, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from registry_cli.models.base import Base
 from registry_cli.models.program import Program
+
+if TYPE_CHECKING:
+    from registry_cli.models.student import Student
 
 
 class ModuleType(str, Enum):
@@ -44,8 +47,12 @@ class Semester(Base):
     structure_id: Mapped[int] = mapped_column(
         ForeignKey("structures.id"), nullable=False
     )
-    year: Mapped[int] = mapped_column(nullable=False)
-    semester_number: Mapped[int] = mapped_column(nullable=False)
+    year: Mapped[int] = mapped_column(
+        nullable=False
+    )  # 01 Year 1 Sem 1 -> Here year is: Year 1 Sem 1
+    semester_number: Mapped[int] = mapped_column(
+        nullable=False
+    )  # 01 Year 1 Sem 1 -> Here semester_number is 01
     total_credits: Mapped[float] = mapped_column(Numeric(4, 1), nullable=False)
 
     structure: Mapped["Structure"] = relationship(
@@ -85,6 +92,9 @@ class Structure(Base):
     program: Mapped[Program] = relationship("Program", back_populates="structures")
     semesters: Mapped[List[Semester]] = relationship(
         back_populates="structure", cascade="all, delete-orphan"
+    )
+    students: Mapped[List["Student"]] = relationship(
+        "Student", back_populates="structure"
     )
 
     def __repr__(self) -> str:
