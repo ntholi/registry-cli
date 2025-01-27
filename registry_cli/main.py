@@ -3,7 +3,7 @@ from sqlalchemy.orm import sessionmaker
 
 from registry_cli.commands.pull.programs import program_pull
 from registry_cli.commands.pull.structures import structure_pull
-from registry_cli.commands.pull.students import student_pull
+from registry_cli.commands.pull.student import student_pull
 from registry_cli.commands.push.students import student_push
 from registry_cli.db.config import engine
 from registry_cli.models.base import Base
@@ -45,11 +45,11 @@ def programs(school_id: int) -> None:
     program_pull(db, school_id)
 
 
-@cli.command()
-@click.argument("name", type=str)
-def student(name: str) -> None:
+@pull.command()
+@click.argument("student_id", type=int)
+def student(student_id: int) -> None:
     db = get_db()
-    student_pull(db, name)
+    student_pull(db, student_id)
 
 
 @cli.command()
