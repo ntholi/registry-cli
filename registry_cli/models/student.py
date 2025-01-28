@@ -45,7 +45,7 @@ class Student(Base):
     )
 
     def __repr__(self) -> str:
-        return f"Student(std_no={self.std_no!r}, name={self.name!r})"
+        return f"Student(std_no={self.std_no!r}, name={self.name!r}, national_id={self.national_id!r}, date_of_birth={self.date_of_birth!r}, gender={self.gender!r}, marital_status={self.marital_status!r})"
 
 
 class ProgramStatus(Enum):
@@ -69,6 +69,9 @@ class StudentProgram(Base):
         back_populates="student_program",
         cascade="all, delete-orphan",
     )
+
+    def __repr__(self) -> str:
+        return f"StudentProgram(id={self.id!r}, code={self.code!r}, name={self.name!r}, status={self.status!r}, std_no={self.std_no!r})"
 
 
 class SemesterStatus(Enum):
@@ -97,6 +100,9 @@ class StudentSemester(Base):
     modules: Mapped[List["StudentModule"]] = relationship(
         back_populates="student_semester", cascade="all, delete-orphan"
     )
+
+    def __repr__(self) -> str:
+        return f"StudentSemester(id={self.id!r}, term={self.term!r}, status={self.status!r}, student_program_id={self.student_program_id!r})"
 
 
 class ModuleType(str, Enum):
@@ -142,3 +148,6 @@ class StudentModule(Base):
     student_semester: Mapped["StudentSemester"] = relationship(
         "StudentSemester", back_populates="modules"
     )
+
+    def __repr__(self) -> str:
+        return f"StudentModule(id={self.id!r}, code={self.code!r}, name={self.name!r}, type={self.type!r}, status={self.status!r}, credits={self.credits!r}, marks={self.marks!r}, grade={self.grade!r}, student_semester_id={self.student_semester_id!r})"
