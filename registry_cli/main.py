@@ -6,7 +6,7 @@ from registry_cli.commands.pull.structures import structure_pull
 from registry_cli.commands.pull.student import student_pull
 from registry_cli.commands.push.students import student_push
 from registry_cli.db.config import engine
-from registry_cli.models.base import Base
+from registry_cli.models import Base
 
 Base.metadata.create_all(bind=engine)
 

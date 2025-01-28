@@ -3,8 +3,7 @@ from sqlalchemy.orm import Session
 
 from registry_cli.browser import BASE_URL
 from registry_cli.commands.pull.programs import program_pull
-from registry_cli.models.program import Program
-from registry_cli.models.structure import Module, Semester, SemesterModule, Structure
+from registry_cli.models import Module, Program, Semester, SemesterModule, Structure
 from registry_cli.scrapers.structure import (
     ProgramStructureScraper,
     SemesterModuleScraper,

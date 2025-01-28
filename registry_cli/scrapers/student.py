@@ -1,10 +1,10 @@
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any, Dict, List, cast
 
-from bs4 import Tag, ResultSet
+from bs4 import ResultSet, Tag
 
 from registry_cli.browser import BASE_URL
-from registry_cli.models.student import Gender, MaritalStatus, SemesterStatus
+from registry_cli.models import Gender, MaritalStatus, SemesterStatus
 from registry_cli.scrapers.base import BaseScraper
 
 
@@ -43,13 +43,9 @@ class StudentScraper(BaseScraper):
                 if value:
                     data["date_of_birth"] = datetime.strptime(value, "%Y-%m-%d").date()
             elif header == "Sex":
-                data["gender"] = (
-                    Gender.Male
-                    if value == "Male"
-                    else Gender.Female if value == "Female" else Gender.Other
-                )
+                data["gender"] = value
             elif header == "Marital":
-                data["marital_status"] = MaritalStatus(value) if value else None
+                data["marital_status"] = value if value else None
             elif header == "Religion":
                 data["religion"] = value
 
@@ -180,9 +176,9 @@ class StudentSemesterScraper(BaseScraper):
 
             status_text = cells[4].get_text(strip=True)
             try:
-                status = SemesterStatus(status_text)
+                status: SemesterStatus = status_text
             except ValueError:
-                status = SemesterStatus.Active
+                status = "Active"
 
             semester_id = None
             link = cells[-1].find("a")

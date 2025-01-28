@@ -1,7 +1,7 @@
 import click
 from sqlalchemy.orm import Session
 
-from registry_cli.models.student import (
+from registry_cli.models import (
     ModuleStatus,
     ModuleType,
     ProgramStatus,
@@ -53,13 +53,13 @@ def student_pull(db: Session, student_id: int) -> None:
             for prog in program_data:
                 program = existing_program_map.get(prog["name"])
                 if program:
-                    program.status = ProgramStatus(prog["status"])
+                    program.status = prog["status"]
                 else:
                     program = StudentProgram(
                         id=prog["id"],
                         code=prog["code"],
                         name=prog["name"],
-                        status=ProgramStatus(prog["status"]),
+                        status=prog["status"],
                         std_no=student.std_no,
                     )
                     db.add(program)
@@ -82,12 +82,12 @@ def student_pull(db: Session, student_id: int) -> None:
                     for sem in semester_data:
                         semester = existing_semester_map.get(sem["term"])
                         if semester:
-                            semester.status = SemesterStatus(sem["status"])
+                            semester.status = sem["status"]
                         else:
                             semester = StudentSemester(
                                 id=sem["id"],
                                 term=sem["term"],
-                                status=SemesterStatus(sem["status"]),
+                                status=sem["status"],
                                 student_program=program,
                             )
                             db.add(semester)
@@ -112,8 +112,8 @@ def student_pull(db: Session, student_id: int) -> None:
                                 if module:
                                     module.id = mod["id"]
                                     module.name = mod["name"]
-                                    module.type = ModuleType(mod["type"])
-                                    module.status = ModuleStatus(mod["status"])
+                                    module.type = mod["type"]
+                                    module.status = mod["status"]
                                     module.credits = mod["credits"]
                                     module.marks = mod["marks"]
                                     module.grade = mod["grade"]
@@ -122,8 +122,8 @@ def student_pull(db: Session, student_id: int) -> None:
                                         id=mod["id"],
                                         code=mod["code"],
                                         name=mod["name"],
-                                        type=ModuleType(mod["type"]),
-                                        status=ModuleStatus(mod["status"]),
+                                        type=mod["type"],
+                                        status=mod["status"],
                                         credits=mod["credits"],
                                         marks=mod["marks"],
                                         grade=mod["grade"],

@@ -3,7 +3,7 @@ from typing import Any, Dict, List
 from bs4 import Tag
 from bs4.element import NavigableString
 
-from registry_cli.models.structure import ModuleType
+from registry_cli.models import ModuleType
 from registry_cli.scrapers.base import BaseScraper
 
 
@@ -156,9 +156,9 @@ class SemesterModuleScraper(BaseScraper):
             # Get module type
             type_text = cells[1].get_text(strip=True)
             try:
-                module_type = ModuleType(type_text)
+                module_type: ModuleType = type_text
             except ValueError:
-                module_type = ModuleType.Core
+                module_type = "Core"
 
             # Get credits
             credits_text = cells[3].get_text(strip=True).replace(",", "")

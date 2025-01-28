@@ -4,7 +4,7 @@ import click
 from sqlalchemy.orm import Session
 
 from registry_cli.browser import BASE_URL
-from registry_cli.models.program import Program
+from registry_cli.models import Program
 from registry_cli.scrapers.program import ProgramScraper
 
 
