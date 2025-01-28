@@ -106,14 +106,40 @@ class ModuleType(str, Enum):
     Core = "Core"
 
 
+class ModuleStatus(str, Enum):
+    Add = "Add"
+    Compulsory = "Compulsory"
+    Delete = "Delete"
+    Drop = "Drop"
+    Exempted = "Exempted"
+    Ineligible = "Ineligible"
+    Repeat1 = "Repeat1"
+    Repeat2 = "Repeat2"
+    Repeat3 = "Repeat3"
+    Repeat4 = "Repeat4"
+    Repeat5 = "Repeat5"
+    Repeat6 = "Repeat6"
+    Repeat7 = "Repeat7"
+    Resit1 = "Resit1"
+    Resit2 = "Resit2"
+    Resit3 = "Resit3"
+    Resit4 = "Resit4"
+    Supplementary = "Supplementary"
+
+
 class StudentModule(Base):
     __tablename__ = "student_modules"
     id: Mapped[int] = mapped_column(primary_key=True)
-    code: Mapped[str] = mapped_column(String(10), nullable=False)
-    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    code: Mapped[str] = mapped_column(
+        String(10), nullable=False
+    )  # eg. DBBM1106 Introduction to Business Management	-> code is DBBM1106
+    name: Mapped[str] = mapped_column(
+        String(200), nullable=False
+    )  # eg. DBBM1106 Introduction to Business Management -> name is Introduction to Business Management
     type: Mapped[ModuleType] = mapped_column(nullable=False)
+    status: Mapped[ModuleStatus] = mapped_column(nullable=False)
     credits: Mapped[float] = mapped_column(Numeric(3, 1), nullable=False)
-    marks: Mapped[float] = mapped_column(Numeric(4, 1), nullable=False)
+    marks: Mapped[float] = mapped_column(String(10), nullable=False)
     grade: Mapped[str] = mapped_column(String(2), nullable=False)
     student_semester_id: Mapped[int] = mapped_column(
         ForeignKey("student_semesters.id"), nullable=False
