@@ -90,12 +90,12 @@ class StudentScraper(BaseScraper):
 class StudentProgramScraper(BaseScraper):
     """Scraper for student program information."""
 
-    def __init__(self, student_id: int):
-        if not student_id:
-            raise ValueError("student_id must be provided")
-        self.student_id = student_id
+    def __init__(self, std_no: int):
+        if not std_no:
+            raise ValueError("std_no must be provided")
+        self.std_no = std_no
         super().__init__(
-            f"{BASE_URL}/r_stdprogramlist.php?showmaster=1&StudentID={student_id}"
+            f"{BASE_URL}/r_stdprogramlist.php?showmaster=1&StudentID={std_no}"
         )
 
     def scrape(self) -> List[Dict[str, Any]]:
