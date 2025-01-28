@@ -13,14 +13,13 @@ from registry_cli.scrapers.structure import (
 
 
 def structure_pull(db: Session, program_id: int) -> None:
-    # First check if program exists
     program = db.query(Program).filter(Program.id == program_id).first()
     if not program:
         click.echo(
             f"Program {program_id} not found in database. Pulling program data first..."
         )
-        program_pull(db, school_id=3)  # Default school ID is 3
-        # Check again after pulling
+        school_id = click.prompt("Enter the school ID", type=int)
+        program_pull(db, school_id=school_id)
         program = db.query(Program).filter(Program.id == program_id).first()
         if not program:
             click.echo(
