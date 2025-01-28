@@ -64,9 +64,8 @@ def student_pull(db: Session, student_id: int) -> None:
                     db.add(program)
                 db.commit()
 
-                # Pull semesters for this program
                 try:
-                    semester_scraper = StudentSemesterScraper(prog["id"])
+                    semester_scraper = StudentSemesterScraper(program.id)
                     semester_data = semester_scraper.scrape()
 
                     existing_semesters = (
@@ -98,10 +97,14 @@ def student_pull(db: Session, student_id: int) -> None:
                             module_data = module_scraper.scrape()
                             existing_modules = (
                                 db.query(StudentModule)
-                                .filter(StudentModule.student_semester_id == semester.id)
+                                .filter(
+                                    StudentModule.student_semester_id == semester.id
+                                )
                                 .all()
                             )
-                            existing_module_map = {mod.code: mod for mod in existing_modules}
+                            existing_module_map = {
+                                mod.code: mod for mod in existing_modules
+                            }
 
                             for mod in module_data:
                                 module = existing_module_map.get(mod["code"])
