@@ -13,7 +13,8 @@ class StudentScraper(BaseScraper):
     """Scraper for student information."""
 
     def __init__(self, student_id: int):
-        """Initialize the scraper with student ID."""
+        if not student_id:
+            raise ValueError("student_id must be provided")
         self.student_id = student_id
         super().__init__(f"{BASE_URL}/r_stdpersonalview.php?StudentID={student_id}")
 
@@ -90,7 +91,8 @@ class StudentProgramScraper(BaseScraper):
     """Scraper for student program information."""
 
     def __init__(self, student_id: int):
-        """Initialize the scraper with student ID."""
+        if not student_id:
+            raise ValueError("student_id must be provided")
         self.student_id = student_id
         super().__init__(
             f"{BASE_URL}/r_stdprogramlist.php?showmaster=1&StudentID={student_id}"
@@ -144,7 +146,8 @@ class StudentSemesterScraper(BaseScraper):
     """Scraper for student semester information."""
 
     def __init__(self, program_id: int):
-        """Initialize the scraper with program ID."""
+        if not program_id:
+            raise ValueError("program_id must be provided")
         self.program_id = program_id
         super().__init__(
             f"{BASE_URL}/r_stdsemesterlist.php?showmaster=1&StdProgramID={program_id}"
@@ -201,7 +204,8 @@ class StudentModuleScraper(BaseScraper):
     """Scraper for student module information."""
 
     def __init__(self, semester_id: int):
-        """Initialize the scraper with semester ID."""
+        if not semester_id:
+            raise ValueError("semester_id must be provided")
         self.semester_id = semester_id
         super().__init__(
             f"{BASE_URL}/r_stdmodulelist.php?showmaster=1&StdSemesterID={semester_id}"

@@ -91,7 +91,6 @@ def student_pull(db: Session, student_id: int) -> None:
                             db.add(semester)
                         db.commit()
 
-                        # Scrape and save modules for this semester
                         module_scraper = StudentModuleScraper(semester.id)
                         try:
                             module_data = module_scraper.scrape()
