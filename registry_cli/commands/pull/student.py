@@ -88,7 +88,7 @@ def student_pull(db: Session, student_id: int) -> None:
                                 id=sem["id"],
                                 term=sem["term"],
                                 status=sem["status"],
-                                student_program=program,
+                                student_program_id=program.id,
                             )
                             db.add(semester)
                         db.commit()
@@ -127,7 +127,7 @@ def student_pull(db: Session, student_id: int) -> None:
                                         credits=mod["credits"],
                                         marks=mod["marks"],
                                         grade=mod["grade"],
-                                        student_semester=semester,
+                                        semester=semester,
                                     )
                                     db.add(module)
                             db.commit()
