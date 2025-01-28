@@ -45,7 +45,7 @@ def student_pull(db: Session, student_id: int) -> None:
             program_data = program_scraper.scrape()
             existing_programs = (
                 db.query(StudentProgram)
-                .filter(StudentProgram.student_id == student.id)
+                .filter(StudentProgram.std_no == student.std_no)
                 .all()
             )
             existing_program_map = {prog.name: prog for prog in existing_programs}
@@ -59,7 +59,7 @@ def student_pull(db: Session, student_id: int) -> None:
                         code=prog["code"],
                         name=prog["name"],
                         status=ProgramStatus(prog["status"]),
-                        student_id=student.id,
+                        std_no=student.std_no,
                     )
                     db.add(program)
                 db.commit()

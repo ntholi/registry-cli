@@ -25,8 +25,7 @@ class MaritalStatus(Enum):
 class Student(Base):
     __tablename__ = "students"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    std_no: Mapped[int] = mapped_column(unique=True, index=True)
+    std_no: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(100), index=True, nullable=False)
     national_id: Mapped[str] = mapped_column(String(20), nullable=False)
     date_of_birth: Mapped[date] = mapped_column(Date, nullable=False)
@@ -46,7 +45,7 @@ class Student(Base):
     )
 
     def __repr__(self) -> str:
-        return f"Student(id={self.id!r}, name={self.name!r})"
+        return f"Student(std_no={self.std_no!r}, name={self.name!r})"
 
 
 class ProgramStatus(Enum):
@@ -63,7 +62,7 @@ class StudentProgram(Base):
     code: Mapped[str] = mapped_column(String(10))
     name: Mapped[str] = mapped_column(String(50))
     status: Mapped[ProgramStatus] = mapped_column()
-    student_id: Mapped[int] = mapped_column(ForeignKey("students.id"), nullable=False)
+    std_no: Mapped[int] = mapped_column(ForeignKey("students.std_no"), nullable=False)
     student: Mapped["Student"] = relationship("Student", back_populates="programs")
     semesters: Mapped[List["StudentSemester"]] = relationship(
         "StudentSemester",
