@@ -16,7 +16,7 @@ def get_engine() -> Engine:
         return create_engine(
             f"sqlite+{url}",
             connect_args={"check_same_thread": False},
-            echo=True,
+            echo=False,
         )
     else:
         raise ValueError("TURSO_AUTH_TOKEN or TURSO_DATABASE_URL missing")
