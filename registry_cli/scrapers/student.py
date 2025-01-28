@@ -1,8 +1,7 @@
 from datetime import datetime
-from typing import Any, Dict, List, cast
+from typing import Any, Dict, List
 
-from bs4 import Tag
-from bs4.element import NavigableString, ResultSet
+from bs4 import Tag, ResultSet
 
 from registry_cli.browser import BASE_URL
 from registry_cli.models.student import Gender, MaritalStatus, SemesterStatus
@@ -185,7 +184,13 @@ class StudentSemesterScraper(BaseScraper):
             except ValueError:
                 status = SemesterStatus.Active
 
+            semester_id = None
+            link = cells[-1].find("a")
+            if link and "href" in link.attrs:
+                semester_id = link["href"].split("SemesterID=")[-1]
+
             semester = {
+                "id": semester_id,
                 "term": cells[0].get_text(strip=True),
                 "status": status,
                 "credits": credits,
@@ -211,6 +216,7 @@ class StudentModuleScraper(BaseScraper):
 
         Returns:
             List of dictionaries containing module data with keys:
+            - id: Module ID
             - code: Module code (e.g. DBBM1106)
             - name: Module name
             - type: Module type (Major/Minor/Core)
@@ -238,7 +244,13 @@ class StudentModuleScraper(BaseScraper):
             code = code_name[0] if len(code_name) > 0 else ""
             name = code_name[1] if len(code_name) > 1 else module_text
 
+            module_id = None
+            link = cells[-1].find("a")
+            if link and "href" in link.attrs:
+                module_id = link["href"].split("ModuleID=")[-1]
+
             module = {
+                "id": module_id,
                 "code": code,
                 "name": name,
                 "type": cells[1].get_text(strip=True),

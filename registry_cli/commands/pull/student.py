@@ -56,6 +56,7 @@ def student_pull(db: Session, student_id: int) -> None:
                     program.status = ProgramStatus(prog["status"])
                 else:
                     program = StudentProgram(
+                        id=prog["id"],
                         code=prog["code"],
                         name=prog["name"],
                         status=ProgramStatus(prog["status"]),
@@ -84,6 +85,7 @@ def student_pull(db: Session, student_id: int) -> None:
                             semester.status = SemesterStatus(sem["status"])
                         else:
                             semester = StudentSemester(
+                                id=sem["id"],
                                 term=sem["term"],
                                 status=SemesterStatus(sem["status"]),
                                 student_program=program,
@@ -108,6 +110,7 @@ def student_pull(db: Session, student_id: int) -> None:
                             for mod in module_data:
                                 module = existing_module_map.get(mod["code"])
                                 if module:
+                                    module.id = mod["id"]
                                     module.name = mod["name"]
                                     module.type = ModuleType(mod["type"])
                                     module.status = ModuleStatus(mod["status"])
@@ -116,6 +119,7 @@ def student_pull(db: Session, student_id: int) -> None:
                                     module.grade = mod["grade"]
                                 else:
                                     module = StudentModule(
+                                        id=mod["id"],
                                         code=mod["code"],
                                         name=mod["name"],
                                         type=ModuleType(mod["type"]),
