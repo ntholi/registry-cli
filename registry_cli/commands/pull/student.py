@@ -21,17 +21,13 @@ def student_pull(db: Session, student_id: int) -> None:
 
     try:
         student_data = scraper.scrape()
-
-        # Check if student already exists
         student = (
             db.query(Student).filter(Student.std_no == student_data["std_no"]).first()
         )
         if student:
-            # Update existing student
             for key, value in student_data.items():
                 setattr(student, key, value)
         else:
-            # Create new student
             student = Student(**student_data)
             db.add(student)
 
@@ -40,29 +36,21 @@ def student_pull(db: Session, student_id: int) -> None:
             f"Successfully {'updated' if student else 'added'} student: {student}"
         )
 
-        # Pull student programs
         program_scraper = StudentProgramScraper(student_id)
         try:
             program_data = program_scraper.scrape()
-
-            # Get existing programs for this student
             existing_programs = (
                 db.query(StudentProgram)
                 .filter(StudentProgram.student_id == student.id)
                 .all()
             )
-
-            # Create a map of existing programs by name for quick lookup
             existing_program_map = {prog.name: prog for prog in existing_programs}
 
-            # Update or create programs
             for prog in program_data:
                 program = existing_program_map.get(prog["name"])
                 if program:
-                    # Update existing program
                     program.status = ProgramStatus(prog["status"])
                 else:
-                    # Create new program
                     program = StudentProgram(
                         code=prog["code"],
                         name=prog["name"],
@@ -77,26 +65,21 @@ def student_pull(db: Session, student_id: int) -> None:
                     semester_scraper = StudentSemesterScraper(prog["id"])
                     semester_data = semester_scraper.scrape()
 
-                    # Get existing semesters for this program
                     existing_semesters = (
                         db.query(StudentSemester)
                         .filter(StudentSemester.student_program_id == program.id)
                         .all()
                     )
 
-                    # Create a map of existing semesters by term for quick lookup
                     existing_semester_map = {
                         sem.term: sem for sem in existing_semesters
                     }
 
-                    # Update or create semesters
                     for sem in semester_data:
                         if sem["term"] in existing_semester_map:
-                            # Update existing semester
                             existing_sem = existing_semester_map[sem["term"]]
                             existing_sem.status = sem["status"]
                         else:
-                            # Create new semester
                             new_semester = StudentSemester(
                                 term=sem["term"],
                                 status=sem["status"],

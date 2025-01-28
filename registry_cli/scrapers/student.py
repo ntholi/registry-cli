@@ -30,7 +30,6 @@ class StudentScraper(BaseScraper):
         soup = self._get_soup()
         data = {}
 
-        # Find all table rows
         rows = soup.find_all("tr")
         for row in rows:
             cells = row.find_all("td")
@@ -61,7 +60,6 @@ class StudentScraper(BaseScraper):
         soup = self._get_soup()
         data = {}
 
-        # Find all table rows
         rows = soup.find_all("tr")
         for row in rows:
             cells = row.find_all("td")
@@ -103,22 +101,32 @@ class StudentProgramScraper(BaseScraper):
         soup = self._get_soup()
         programs = []
 
-        # Find the main table containing program data
         table = soup.find("table", {"id": "ewlistmain"})
         if not table:
             return programs
 
-        # Get all rows except header
-        rows = table.find_all("tr")[1:]  # Skip header row
+        rows = table.find_all("tr")[1:]
         for row in rows:
             cells = row.find_all("td")
-            if len(cells) < 6:  # We need at least 6 cells for the main data
+            if len(cells) < 6:
                 continue
 
             code_name = cells[0].get_text(strip=True)
             code = code_name.split(" ")[0]
             name = " ".join(code_name.split(" ")[1:])
+
+            program_id = None
+            link = cells[0].find("a")
+            if link and "href" in link.attrs:
+                href = link["href"]
+                import re
+
+                match = re.search(r"StdProgramID=(\d+)", href)
+                if match:
+                    program_id = int(match.group(1))
+
             program = {
+                "id": program_id,
                 "code": code,
                 "name": name,
                 "term": cells[1].get_text(strip=True),
@@ -154,34 +162,29 @@ class StudentSemesterScraper(BaseScraper):
         soup = self._get_soup()
         semesters = []
 
-        # Find the main table containing semester data
         table = soup.find("table", {"id": "ewlistmain"})
         if not table or not isinstance(table, Tag):
             return semesters
 
-        # Get all rows except header and footer
         table_tag = cast(Tag, table)
         rows: ResultSet[Tag] = table_tag.find_all(
             "tr", {"class": ["ewTableRow", "ewTableAltRow"]}
         )
         for row in rows:
             cells = row.find_all("td")
-            if len(cells) < 8:  # We need at least 8 cells for the main data
+            if len(cells) < 8:
                 continue
 
-            # Parse credits - handle empty or invalid values
             credits_text = cells[6].get_text(strip=True).replace(",", "")
             try:
                 credits = float(credits_text) if credits_text else 0.0
             except ValueError:
                 credits = 0.0
 
-            # Map status to enum value
             status_text = cells[4].get_text(strip=True)
             try:
                 status = SemesterStatus(status_text)
             except ValueError:
-                # Default to Active if status doesn't match any enum value
                 status = SemesterStatus.Active
 
             semester = {

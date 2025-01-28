@@ -65,7 +65,6 @@ def structure_pull(db: Session, program_id: int) -> None:
                 modules_data = module_scraper.scrape()
 
                 for module_data in modules_data:
-                    # First check if module exists
                     module = (
                         db.query(Module)
                         .filter(Module.code == module_data["code"])
@@ -81,7 +80,6 @@ def structure_pull(db: Session, program_id: int) -> None:
                         )
                         db.add(module)
 
-                    # Create semester module relationship
                     semester_module = SemesterModule(
                         semester_id=semester.id,
                         module_id=module.id,
