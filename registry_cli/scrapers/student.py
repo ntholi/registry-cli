@@ -118,14 +118,9 @@ class StudentProgramScraper(BaseScraper):
             name = " ".join(code_name.split(" ")[1:])
 
             program_id = None
-            link = cells[0].find("a")
+            link = cells[-1].find("a")
             if link and "href" in link.attrs:
-                href = link["href"]
-                import re
-
-                match = re.search(r"StdProgramID=(\d+)", href)
-                if match:
-                    program_id = int(match.group(1))
+                program_id = link["href"].split("ProgramID=")[-1]
 
             program = {
                 "id": program_id,
