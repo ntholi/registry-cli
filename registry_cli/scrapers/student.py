@@ -195,3 +195,59 @@ class StudentSemesterScraper(BaseScraper):
             semesters.append(semester)
 
         return semesters
+
+
+class StudentModuleScraper(BaseScraper):
+    """Scraper for student module information."""
+
+    def __init__(self, semester_id: int):
+        """Initialize the scraper with semester ID."""
+        self.semester_id = semester_id
+        super().__init__(
+            f"{BASE_URL}/r_stdmodulelist.php?showmaster=1&StdSemesterID={semester_id}"
+        )
+
+    def scrape(self) -> List[Dict[str, Any]]:
+        """Scrape student module data.
+
+        Returns:
+            List of dictionaries containing module data with keys:
+            - code: Module code (e.g. DBBM1106)
+            - name: Module name
+            - type: Module type (Major/Minor/Core)
+            - status: Module status (e.g. Compulsory)
+            - credits: Credit hours
+            - marks: Module marks
+            - grade: Module grade
+        """
+        soup = self._get_soup()
+        modules = []
+
+        table = soup.find("table", {"id": "ewlistmain"})
+        if not table:
+            return modules
+
+        rows = table.find_all("tr")[1:-1]  # Skip header and footer rows
+        for row in rows:
+            cells = row.find_all("td")
+            if len(cells) < 6:
+                continue
+
+            # Extract module code and name from the first cell
+            module_text = cells[0].get_text(strip=True)
+            code_name = module_text.split(" ", 1)
+            code = code_name[0] if len(code_name) > 0 else ""
+            name = code_name[1] if len(code_name) > 1 else module_text
+
+            module = {
+                "code": code,
+                "name": name,
+                "type": cells[1].get_text(strip=True),
+                "status": cells[2].get_text(strip=True),
+                "credits": float(cells[3].get_text(strip=True) or 0),
+                "marks": cells[4].get_text(strip=True) or "0",
+                "grade": cells[5].get_text(strip=True) or "N/A",
+            }
+            modules.append(module)
+
+        return modules

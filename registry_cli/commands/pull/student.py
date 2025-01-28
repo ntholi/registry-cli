@@ -2,13 +2,17 @@ import click
 from sqlalchemy.orm import Session
 
 from registry_cli.models.student import (
+    ModuleStatus,
+    ModuleType,
     ProgramStatus,
     SemesterStatus,
     Student,
+    StudentModule,
     StudentProgram,
     StudentSemester,
 )
 from registry_cli.scrapers.student import (
+    StudentModuleScraper,
     StudentProgramScraper,
     StudentScraper,
     StudentSemesterScraper,
@@ -76,18 +80,57 @@ def student_pull(db: Session, student_id: int) -> None:
                     }
 
                     for sem in semester_data:
-                        if sem["term"] in existing_semester_map:
-                            existing_sem = existing_semester_map[sem["term"]]
-                            existing_sem.status = sem["status"]
+                        semester = existing_semester_map.get(sem["term"])
+                        if semester:
+                            semester.status = SemesterStatus(sem["status"])
                         else:
-                            new_semester = StudentSemester(
+                            semester = StudentSemester(
                                 term=sem["term"],
-                                status=sem["status"],
-                                student_program_id=program.id,
+                                status=SemesterStatus(sem["status"]),
+                                student_program=program,
                             )
-                            db.add(new_semester)
+                            db.add(semester)
+                        db.commit()
 
-                    db.commit()
+                        # Scrape and save modules for this semester
+                        module_scraper = StudentModuleScraper(semester.id)
+                        try:
+                            module_data = module_scraper.scrape()
+                            existing_modules = (
+                                db.query(StudentModule)
+                                .filter(StudentModule.student_semester_id == semester.id)
+                                .all()
+                            )
+                            existing_module_map = {mod.code: mod for mod in existing_modules}
+
+                            for mod in module_data:
+                                module = existing_module_map.get(mod["code"])
+                                if module:
+                                    module.name = mod["name"]
+                                    module.type = ModuleType(mod["type"])
+                                    module.status = ModuleStatus(mod["status"])
+                                    module.credits = mod["credits"]
+                                    module.marks = mod["marks"]
+                                    module.grade = mod["grade"]
+                                else:
+                                    module = StudentModule(
+                                        code=mod["code"],
+                                        name=mod["name"],
+                                        type=ModuleType(mod["type"]),
+                                        status=ModuleStatus(mod["status"]),
+                                        credits=mod["credits"],
+                                        marks=mod["marks"],
+                                        grade=mod["grade"],
+                                        student_semester=semester,
+                                    )
+                                    db.add(module)
+                            db.commit()
+                            click.echo(
+                                f"Successfully saved {len(module_data)} modules for semester {semester.term}"
+                            )
+                        except Exception as e:
+                            click.echo(f"Error scraping modules: {str(e)}", err=True)
+
                     click.echo(
                         f"Successfully pulled {len(semester_data)} semesters for program: {program.name}"
                     )
