@@ -41,7 +41,7 @@ class Student(Base):
     )
 
     programs: Mapped[List["StudentProgram"]] = relationship(
-        "StudentProgram", back_populates="student"
+        "StudentProgram", back_populates="student", cascade="all, delete-orphan"
     )
 
     def __repr__(self) -> str:
@@ -129,12 +129,8 @@ class ModuleStatus(str, Enum):
 class StudentModule(Base):
     __tablename__ = "student_modules"
     id: Mapped[int] = mapped_column(primary_key=True)
-    code: Mapped[str] = mapped_column(
-        String(10), nullable=False
-    )  # eg. DBBM1106 Introduction to Business Management	-> code is DBBM1106
-    name: Mapped[str] = mapped_column(
-        String(200), nullable=False
-    )  # eg. DBBM1106 Introduction to Business Management -> name is Introduction to Business Management
+    code: Mapped[str] = mapped_column(String(10), nullable=False)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
     type: Mapped[ModuleType] = mapped_column(nullable=False)
     status: Mapped[ModuleStatus] = mapped_column(nullable=False)
     credits: Mapped[float] = mapped_column(Numeric(3, 1), nullable=False)
@@ -143,4 +139,6 @@ class StudentModule(Base):
     student_semester_id: Mapped[int] = mapped_column(
         ForeignKey("student_semesters.id"), nullable=False
     )
-    student_semester: Mapped["StudentSemester"] = relationship(back_populates="modules")
+    student_semester: Mapped["StudentSemester"] = relationship(
+        "StudentSemester", back_populates="modules"
+    )
