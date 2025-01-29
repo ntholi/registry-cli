@@ -1,13 +1,14 @@
 from datetime import datetime
 from typing import Literal, Optional
 from uuid import uuid4
+
 from sqlalchemy import (
-    ForeignKey,
-    String,
-    Float,
-    DateTime,
     Boolean,
+    DateTime,
+    Float,
+    ForeignKey,
     Integer,
+    String,
     UniqueConstraint,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -102,6 +103,28 @@ class Authenticator(Base):
     __table_args__ = (
         UniqueConstraint("user_id", "credential_id", name="authenticators_pk"),
     )
+
+
+SignUpStatus = Literal["pending", "approved", "rejected"]
+
+
+class SignUp(Base):
+    __tablename__ = "signups"
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="cascade"), primary_key=True
+    )
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    std_no: Mapped[str] = mapped_column(String, nullable=False)
+    status: Mapped[SignUpStatus] = mapped_column(
+        String, nullable=False, default="pending"
+    )
+    message: Mapped[Optional[str]] = mapped_column(String, default="Pending approval")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+
+    user: Mapped["User"] = relationship("User")
 
 
 Gender = Literal["Male", "Female", "Other"]
