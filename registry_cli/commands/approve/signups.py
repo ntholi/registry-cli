@@ -5,6 +5,15 @@ from registry_cli.commands.pull.student import student_pull
 from registry_cli.models import SignUp, Student, User
 
 
+def names_match(name1: str, name2: str) -> bool:
+    parts1 = name1.lower().split()
+    parts2 = name2.lower().split()
+    for part in parts1:
+        if part in parts2:
+            return True
+    return False
+
+
 def approve_signups(db: Session) -> None:
     """Approve pending signups by pulling student data and verifying names."""
 
@@ -24,7 +33,7 @@ def approve_signups(db: Session) -> None:
                 click.echo(f"Failed to pull student data for {signup.std_no}")
                 continue
 
-            if student.name.lower() == signup.name.lower():
+            if names_match(student.name, signup.name):
                 user = db.query(User).filter(User.id == signup.user_id).first()
                 if user:
                     user.role = "student"
