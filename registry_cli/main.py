@@ -2,6 +2,7 @@ import click
 from sqlalchemy.orm import sessionmaker
 
 from registry_cli.commands.pull.programs import program_pull
+from registry_cli.commands.pull.signups import approve_signups
 from registry_cli.commands.pull.structures import structure_pull
 from registry_cli.commands.pull.student import student_pull
 from registry_cli.commands.push.students import student_push
@@ -50,6 +51,12 @@ def programs(school_id: int) -> None:
 def student(student_id: int) -> None:
     db = get_db()
     student_pull(db, student_id)
+
+
+@pull.command()
+def signups() -> None:
+    db = get_db()
+    approve_signups(db)
 
 
 @cli.command()
