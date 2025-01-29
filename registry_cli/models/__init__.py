@@ -119,10 +119,8 @@ class SignUp(Base):
         String, nullable=False, default="pending"
     )
     message: Mapped[Optional[str]] = mapped_column(String, default="Pending approval")
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, default=datetime.utcnow
-    )
-    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    created_at: Mapped[int] = mapped_column(Integer, nullable=False)
+    updated_at: Mapped[Optional[int]] = mapped_column(Integer)
 
     user: Mapped["User"] = relationship("User")
 
