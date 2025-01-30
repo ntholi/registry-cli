@@ -135,6 +135,7 @@ class Student(Base):
     std_no: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String, nullable=False)
     national_id: Mapped[str] = mapped_column(String, nullable=False)
+    sem: Mapped[int] = mapped_column(Integer, nullable=False)
     date_of_birth: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     phone1: Mapped[Optional[str]] = mapped_column(String)
     phone2: Mapped[Optional[str]] = mapped_column(String)
