@@ -243,12 +243,25 @@ class StudentModule(Base):
     semester: Mapped["StudentSemester"] = relationship(back_populates="modules")
 
 
+class School(Base):
+    __tablename__ = "schools"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    code: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+
+    programs: Mapped[list["Program"]] = relationship(back_populates="school")
+
+
 class Program(Base):
     __tablename__ = "programs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     code: Mapped[str] = mapped_column(String, nullable=False, unique=True)
     name: Mapped[str] = mapped_column(String, nullable=False)
+
+    school_id: Mapped[int] = mapped_column(ForeignKey("schools.id"), nullable=False)
+    school: Mapped["School"] = relationship(back_populates="programs")
 
     structures: Mapped[list["Structure"]] = relationship(back_populates="program")
 
@@ -259,7 +272,6 @@ class Structure(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     code: Mapped[str] = mapped_column(String, nullable=False, unique=True)
     program_id: Mapped[int] = mapped_column(ForeignKey("programs.id"), nullable=False)
-
     program: Mapped["Program"] = relationship(back_populates="structures")
     students: Mapped[list["Student"]] = relationship(back_populates="structure")
     semesters: Mapped[list["Semester"]] = relationship(back_populates="structure")
