@@ -8,7 +8,9 @@ from registry_cli.models import Program
 from registry_cli.scrapers.program import ProgramScraper
 
 
-def program_pull(db: Session, school_id: int = 3) -> None:
+def program_pull(db: Session, school_id: int) -> None:
+    if not school_id:
+        raise ValueError("School ID is required.")
     url = f"{BASE_URL}/f_programlist.php?showmaster=1&SchoolID={school_id}"
     scraper = ProgramScraper(url)
 

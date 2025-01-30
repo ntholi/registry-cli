@@ -3,6 +3,7 @@ from sqlalchemy.orm import sessionmaker
 
 from registry_cli.commands.approve.signups import approve_signups
 from registry_cli.commands.pull.programs import program_pull
+from registry_cli.commands.pull.schools import school_pull
 from registry_cli.commands.pull.structures import structure_pull
 from registry_cli.commands.pull.student import student_pull
 from registry_cli.commands.push.students import student_push
@@ -30,6 +31,12 @@ def cli() -> None:
 @cli.group()
 def pull() -> None:
     pass
+
+
+@pull.command()
+def schools() -> None:
+    db = get_db()
+    school_pull(db)
 
 
 @pull.command()
