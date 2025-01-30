@@ -52,7 +52,7 @@ def structure_pull(db: Session, program_id: int) -> None:
                 semester = Semester(
                     id=semester_data["id"],
                     structure_id=structure.id,
-                    year=semester_data["year"],
+                    name=semester_data["name"],
                     semester_number=semester_data["semester_number"],
                     total_credits=semester_data["total_credits"],
                 )

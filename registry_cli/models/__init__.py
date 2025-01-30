@@ -299,8 +299,8 @@ class Semester(Base):
     structure_id: Mapped[int] = mapped_column(
         ForeignKey("structures.id"), nullable=False
     )
-    year: Mapped[int] = mapped_column(Integer, nullable=False)
     semester_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    name: Mapped[str] = mapped_column(String, nullable=False)
     total_credits: Mapped[float] = mapped_column(Float, nullable=False)
 
     structure: Mapped["Structure"] = relationship(back_populates="semesters")

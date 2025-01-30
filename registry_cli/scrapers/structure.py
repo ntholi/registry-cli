@@ -67,7 +67,7 @@ class SemesterScraper(BaseScraper):
             if len(cells) < 7:  # Skip rows without enough cells
                 continue
 
-            semester_code = cells[0].get_text(strip=True)
+            semester = cells[0].get_text(strip=True)
             credits_text = cells[1].get_text(strip=True).replace(",", "")
             try:
                 credits = float(credits_text) if credits_text else 0.0
@@ -80,36 +80,23 @@ class SemesterScraper(BaseScraper):
                 continue
             semester_id = view_link["href"].split("SemesterID=")[-1]
 
-            # Parse semester code to extract year and semester number
-            # Example: "01 Year 1 Sem 1" -> year=1, semester_number=1
-            # Example: "B1 Bridging Semester 1" -> year=0, semester_number=1
-            # Example: "F1 Foundation Semester 1" -> year=0, semester_number=1
-            parts = semester_code.split()
+            parts: List[str] = semester.split()
 
-            if semester_code.startswith(("B", "F")):
-                year = 0  # Special case for Bridging and Foundation
+            if semester.startswith(("B", "F")):
+                semester_number = 0  # Special case for Bridging and Foundation
             else:
-                # Find the year number in the parts
-                for part in parts:
-                    if part.isdigit():
-                        year = int(part)
-                        break
+                if len(parts) >= 2 and parts[0].isdigit():
+                    semester_number = int(parts[0])
                 else:
-                    year = 0
+                    semester_number = 0
 
-            # Get the last number in the code as semester number
-            for part in reversed(parts):
-                if part.isdigit():
-                    semester_number = int(part)
-                    break
-            else:
-                semester_number = 0
+            name = " ".join(parts[1:])
 
             semesters.append(
                 {
                     "id": int(semester_id),
-                    "year": year,
                     "semester_number": semester_number,
+                    "name": name,
                     "total_credits": credits,
                 }
             )
