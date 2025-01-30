@@ -275,7 +275,9 @@ class Structure(Base):
     program_id: Mapped[int] = mapped_column(ForeignKey("programs.id"), nullable=False)
     program: Mapped["Program"] = relationship(back_populates="structures")
     students: Mapped[list["Student"]] = relationship(back_populates="structure")
-    semesters: Mapped[list["Semester"]] = relationship(back_populates="structure")
+    semesters: Mapped[list["StructureSemester"]] = relationship(
+        back_populates="structure"
+    )
 
 
 class Module(Base):
@@ -292,8 +294,8 @@ class Module(Base):
     )
 
 
-class Semester(Base):
-    __tablename__ = "semesters"
+class StructureSemester(Base):
+    __tablename__ = "structure_semesters"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     structure_id: Mapped[int] = mapped_column(
@@ -316,5 +318,7 @@ class SemesterModule(Base):
     semester_id: Mapped[int] = mapped_column(ForeignKey("semesters.id"), nullable=False)
     module_id: Mapped[int] = mapped_column(ForeignKey("modules.id"), nullable=False)
 
-    semester: Mapped["Semester"] = relationship(back_populates="semester_modules")
+    semester: Mapped["StructureSemester"] = relationship(
+        back_populates="semester_modules"
+    )
     module: Mapped["Module"] = relationship(back_populates="semester_modules")

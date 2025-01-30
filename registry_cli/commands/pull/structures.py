@@ -3,7 +3,13 @@ from sqlalchemy.orm import Session
 
 from registry_cli.browser import BASE_URL
 from registry_cli.commands.pull.programs import program_pull
-from registry_cli.models import Module, Program, Semester, SemesterModule, Structure
+from registry_cli.models import (
+    Module,
+    Program,
+    SemesterModule,
+    Structure,
+    StructureSemester,
+)
 from registry_cli.scrapers.structure import (
     ProgramStructureScraper,
     SemesterModuleScraper,
@@ -49,7 +55,7 @@ def structure_pull(db: Session, program_id: int) -> None:
             semesters_data = semester_scraper.scrape()
 
             for semester_data in semesters_data:
-                semester = Semester(
+                semester = StructureSemester(
                     id=semester_data["id"],
                     structure_id=structure.id,
                     name=semester_data["name"],
