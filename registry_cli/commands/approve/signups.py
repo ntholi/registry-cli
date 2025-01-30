@@ -6,12 +6,10 @@ from registry_cli.models import SignUp, Student, User
 
 
 def names_match(name1: str, name2: str) -> bool:
-    parts1 = name1.lower().split()
-    parts2 = name2.lower().split()
-    for part in parts1:
-        if part in parts2:
-            return True
-    return False
+    """
+    Returns True if at least two words are common between the names.
+    """
+    return len(set(name1.lower().split()) & set(name2.lower().split())) >= 2
 
 
 def approve_signups(db: Session) -> None:
@@ -44,7 +42,7 @@ def approve_signups(db: Session) -> None:
                     click.echo(f"Approved signup for {student.name} ({student.std_no})")
             else:
                 signup.status = "rejected"
-                signup.message = "Name mismatch with student records"
+                signup.message = "Student Number does not match provided name"
                 db.commit()
                 click.echo(
                     f"Rejected signup for {signup.name} - name mismatch with student records"
