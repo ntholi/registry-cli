@@ -4,8 +4,10 @@ import click
 from sqlalchemy.orm import Session
 
 from registry_cli.browser import BASE_URL
-from registry_cli.models import School
+from registry_cli.models import School, Program
 from registry_cli.scrapers.schools import SchoolScraper
+from registry_cli.commands.pull.programs import program_pull
+from registry_cli.commands.pull.structures import structure_pull
 
 
 def school_pull(db: Session) -> None:
@@ -36,9 +38,21 @@ def school_pull(db: Session) -> None:
                 )
                 db.add(school)
                 added_count += 1
+            
+            # Pull programs for this school
+            click.echo(f"\nPulling programs for school {school_data['name']}...")
+            program_pull(db, school_id)
+
+            # Pull structures for each program
+            programs = db.query(Program).filter(Program.school_id == school_id).all()
+            for program in programs:
+                click.echo(f"\nPulling structures for program {program.name}...")
+                structure_pull(db, program.id)
 
         db.commit()
-        click.echo(f"Successfully updated {updated_count} and added {added_count} schools to the database.")
+        click.echo(f"\nSummary:")
+        click.echo(f"- Updated {updated_count} and added {added_count} schools")
 
     except Exception as e:
+        db.rollback()
         click.echo(f"Error pulling schools: {str(e)}")

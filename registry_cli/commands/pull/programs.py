@@ -25,22 +25,27 @@ def program_pull(db: Session, school_id: int) -> None:
         for program_data in programs_data:
             program_id = int(program_data["program_id"])
             program = db.query(Program).filter(Program.id == program_id).first()
-            
+
             if program:
                 program.code = program_data["code"]
                 program.name = program_data["name"]
+                program.school_id = school_id
                 updated_count += 1
             else:
                 program = Program(
                     id=program_id,
                     code=program_data["code"],
                     name=program_data["name"],
+                    school_id=school_id,  # Set school_id for new programs
                 )
                 db.add(program)
                 added_count += 1
 
         db.commit()
-        click.echo(f"Successfully updated {updated_count} and added {added_count} programs to the database.")
+        click.echo(
+            f"Successfully updated {updated_count} and added {added_count} programs to the database."
+        )
 
     except Exception as e:
+        db.rollback()  # Rollback on error
         click.echo(f"Error pulling programs: {str(e)}")
