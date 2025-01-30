@@ -20,16 +20,27 @@ def program_pull(db: Session, school_id: int) -> None:
             click.echo("No programs found.")
             return
 
+        updated_count = 0
+        added_count = 0
         for program_data in programs_data:
-            program = Program(
-                id=int(program_data["program_id"]),
-                code=program_data["code"],
-                name=program_data["name"],
-            )
-            db.add(program)
+            program_id = int(program_data["program_id"])
+            program = db.query(Program).filter(Program.id == program_id).first()
+            
+            if program:
+                program.code = program_data["code"]
+                program.name = program_data["name"]
+                updated_count += 1
+            else:
+                program = Program(
+                    id=program_id,
+                    code=program_data["code"],
+                    name=program_data["name"],
+                )
+                db.add(program)
+                added_count += 1
 
         db.commit()
-        click.echo(f"Successfully added {len(programs_data)} programs to the database.")
+        click.echo(f"Successfully updated {updated_count} and added {added_count} programs to the database.")
 
     except Exception as e:
         click.echo(f"Error pulling programs: {str(e)}")

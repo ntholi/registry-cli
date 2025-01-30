@@ -18,16 +18,27 @@ def school_pull(db: Session) -> None:
             click.echo("No schools found.")
             return
 
+        updated_count = 0
+        added_count = 0
         for school_data in schools_data:
-            school = School(
-                id=int(school_data["school_id"]),
-                code=school_data["code"],
-                name=school_data["name"],
-            )
-            db.add(school)
+            school_id = int(school_data["school_id"])
+            school = db.query(School).filter(School.id == school_id).first()
+            
+            if school:
+                school.code = school_data["code"]
+                school.name = school_data["name"]
+                updated_count += 1
+            else:
+                school = School(
+                    id=school_id,
+                    code=school_data["code"],
+                    name=school_data["name"],
+                )
+                db.add(school)
+                added_count += 1
 
         db.commit()
-        click.echo(f"Successfully added {len(schools_data)} schools to the database.")
+        click.echo(f"Successfully updated {updated_count} and added {added_count} schools to the database.")
 
     except Exception as e:
         click.echo(f"Error pulling schools: {str(e)}")
