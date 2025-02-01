@@ -88,6 +88,7 @@ def student_pull(db: Session, student_id: int) -> None:
                                 id=sem["id"],
                                 term=sem["term"],
                                 status=sem["status"],
+                                semester_number=sem["semester_number"],
                                 student_program_id=program.id,
                             )
                             db.add(semester)

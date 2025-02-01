@@ -193,6 +193,7 @@ class StudentSemester(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     term: Mapped[str] = mapped_column(String, nullable=False)
     status: Mapped[SemesterStatus] = mapped_column(String, nullable=False)
+    semester_number: Mapped[int] = mapped_column(Integer)
     student_program_id: Mapped[int] = mapped_column(
         ForeignKey("student_programs.id", ondelete="cascade"), nullable=False
     )
