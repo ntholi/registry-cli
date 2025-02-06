@@ -24,12 +24,14 @@ def approve_signups(db: Session) -> None:
     for signup in data:
         try:
             student_id = int(signup.std_no)
-            student_pull(db, student_id)
-            student = db.query(Student).filter(Student.std_no == student_id).first()
 
+            student = db.query(Student).filter(Student.std_no == student_id).first()
             if not student:
-                click.echo(f"Failed to pull student data for {signup.std_no}")
-                continue
+                student_pull(db, student_id)
+                student = db.query(Student).filter(Student.std_no == student_id).first()
+                if not student:
+                    click.echo(f"Failed to pull student data for {signup.std_no}")
+                    continue
 
             if names_match(student.name, signup.name):
                 user = db.query(User).filter(User.id == signup.user_id).first()
