@@ -13,7 +13,7 @@ def program_pull(db: Session, school_id: int) -> None:
     if not school_id:
         raise ValueError("School ID is required.")
 
-    school = create_or_read_school(db, school_id)
+    school = read_or_create_school(db, school_id)
     url = f"{BASE_URL}/f_programlist.php?showmaster=1&SchoolID={school_id}"
     scraper = ProgramScraper(url)
 
@@ -54,7 +54,7 @@ def program_pull(db: Session, school_id: int) -> None:
         click.echo(f"Error pulling programs: {str(e)}")
 
 
-def create_or_read_school(db: Session, school_id: int) -> School:
+def read_or_create_school(db: Session, school_id: int) -> School:
     school = db.query(School).filter(School.id == school_id).first()
     if not school:
         scraper = SchoolScraper(f"{BASE_URL}/f_schoollist.php?cmd=resetall")
@@ -63,13 +63,15 @@ def create_or_read_school(db: Session, school_id: int) -> School:
             click.echo("No schools found.")
             return
         for school_data in schools_data:
-            school_id = int(school_data["school_id"])
             school = School(
-                id=school_id,
+                id=int(school_data["school_id"]),
                 code=school_data["code"],
                 name=school_data["name"],
             )
             db.add(school)
         db.commit()
         click.echo(f"Successfully added {len(schools_data)} schools.")
+    school = db.query(School).filter(School.id == school_id).first()
+    if not school:
+        raise ValueError(f"School with ID {school_id} not found. even after scraping")
     return school
