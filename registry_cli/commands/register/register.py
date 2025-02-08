@@ -1,4 +1,5 @@
 import logging
+from typing import Optional
 
 import requests
 from bs4 import BeautifulSoup, Tag
@@ -59,18 +60,16 @@ class Crawler:
             logger.error("Failed to add semester")
 
     @staticmethod
-    def get_id_for(response: requests.Response, search_key: str) -> str | None:
-        page = BeautifulSoup(response.text, "lxml")
-        table = page.select_one("table#ewlistmain")
-        if table:
+    def get_id_for(response: requests.Response, search_key: str) -> Optional[str]:
+        page: BeautifulSoup = BeautifulSoup(response.text, "lxml")
+
+        if table := page.select_one("table#ewlistmain"):
             rows = table.select("tr.ewTableRow")
             for row in rows:
                 cols = row.select("td")
-                if search_key in cols[0].text.strip():
-                    link = row.select_one("a")
-                    if link:
-                        href = link.attrs["href"]
-                        if href:
+                if cols and search_key in cols[0].text.strip():
+                    if link := row.select_one("a"):
+                        if href := link.attrs.get("href"):
                             return href.split("=")[-1]
         return None
 
