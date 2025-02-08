@@ -3,28 +3,6 @@ import datetime
 date_format = "%Y-%m-%d"
 
 
-def register_program_payload(std_no: str, program_code: str) -> dict:
-    program = get_program(program_code)
-    settings = Settings()
-    if not settings.intake_date_str():
-        raise ValueError("Intake date is not set")
-    if not settings.term:
-        raise ValueError("Term is not set")
-
-    return {
-        "a_add": "A",
-        "x_StudentID": std_no,
-        "x_StdProgRegDate": today(),
-        "x_ProgramID": program.program_id,
-        "x_ProgramIntakeDate": settings.intake_date_str(),
-        "x_TermCode": settings.term,
-        "x_StructureID": program.version,
-        "x_ProgStreamCode": "Normal",
-        "x_ProgramStatus": "Active",
-        "btnAction": "Add",
-    }
-
-
 def add_semester_payload(
     std_program_id: int,
     school_id: int,

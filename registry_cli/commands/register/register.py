@@ -50,9 +50,9 @@ class Crawler:
             semester_id=self.read_semester_id(form, semester),
             term=term.name,
         )
-        response = self.post(f"{BASE_URL}/r_stdsemesteradd.php", payload)
-        std_semester_id = self.get_id_for(response, term)
-        if "Successful" in response.text:
+        response = self.browser.post(f"{BASE_URL}/r_stdsemesteradd.php", payload)
+        std_semester_id = self.get_id_for(response, term.name)
+        if std_semester_id and "Successful" in response.text:
             logger.info(f"Semester added successfully, semester id: {std_semester_id}")
             return int(std_semester_id.strip())
         else:
@@ -67,9 +67,11 @@ class Crawler:
             for row in rows:
                 cols = row.select("td")
                 if search_key in cols[0].text.strip():
-                    href = row.select_one("a").attrs["href"]
-                    if href:
-                        return href.split("=")[-1]
+                    link = row.select_one("a")
+                    if link:
+                        href = link.attrs["href"]
+                        if href:
+                            return href.split("=")[-1]
         return None
 
     @staticmethod
