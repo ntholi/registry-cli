@@ -324,3 +324,12 @@ class SemesterModule(Base):
         back_populates="semester_modules", foreign_keys=[semester_id]
     )
     module: Mapped["Module"] = relationship(back_populates="semester_modules")
+
+
+class Term(Base):
+    __tablename__ = "terms"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
