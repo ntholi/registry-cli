@@ -15,7 +15,7 @@ def get_engine() -> Engine:
         url = f"{TURSO_DATABASE_URL}?authToken={TURSO_AUTH_TOKEN}"
         return create_engine(
             f"sqlite+{url}",
-            connect_args={"check_same_thread": False},
+            connect_args={"check_same_thread": False, "timeout": 30},
             echo=False,
         )
     else:
