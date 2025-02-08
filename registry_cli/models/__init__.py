@@ -231,11 +231,10 @@ class StudentModule(Base):
     __tablename__ = "student_modules"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    code: Mapped[str] = mapped_column(String, nullable=False)
-    name: Mapped[str] = mapped_column(String, nullable=False)
-    type: Mapped[ModuleType] = mapped_column(String, nullable=False)
+    module_id: Mapped[int] = mapped_column(
+        ForeignKey("modules.id", ondelete="cascade"), nullable=False
+    )
     status: Mapped[ModuleStatus] = mapped_column(String, nullable=False)
-    credits: Mapped[float] = mapped_column(Float, nullable=False)
     marks: Mapped[str] = mapped_column(String, nullable=False)
     grade: Mapped[str] = mapped_column(String, nullable=False)
     student_semester_id: Mapped[int] = mapped_column(
