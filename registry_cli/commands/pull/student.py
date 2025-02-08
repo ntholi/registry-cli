@@ -2,6 +2,7 @@ import click
 from sqlalchemy.orm import Session
 
 from registry_cli.models import (
+    Module,
     ModuleStatus,
     ModuleType,
     ProgramStatus,
@@ -105,29 +106,34 @@ def student_pull(db: Session, student_id: int) -> None:
                                 .all()
                             )
                             existing_module_map = {
-                                mod.code: mod for mod in existing_modules
+                                mod.id: mod for mod in existing_modules
                             }
 
                             for mod in module_data:
-                                module = existing_module_map.get(mod["code"])
+                                module = existing_module_map.get(mod["id"])
+                                db_module = (
+                                    db.query(Module)
+                                    .filter(Module.code == mod["code"])
+                                    .first()
+                                )
+                                if not db_module:
+                                    raise ValueError(
+                                        f"Module with code {mod['code']} not found"
+                                    )
+
                                 if module:
                                     module.id = mod["id"]
-                                    module.name = mod["name"]
-                                    module.type = mod["type"]
                                     module.status = mod["status"]
-                                    module.credits = mod["credits"]
                                     module.marks = mod["marks"]
                                     module.grade = mod["grade"]
+                                    module.module_id = db_module.id
                                 else:
                                     module = StudentModule(
                                         id=mod["id"],
-                                        code=mod["code"],
-                                        name=mod["name"],
-                                        type=mod["type"],
                                         status=mod["status"],
-                                        credits=mod["credits"],
                                         marks=mod["marks"],
                                         grade=mod["grade"],
+                                        module_id=db_module.id,
                                         semester=semester,
                                     )
                                     db.add(module)
