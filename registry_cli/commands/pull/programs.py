@@ -29,17 +29,31 @@ def program_pull(db: Session, school_id: int) -> None:
             program_id = int(program_data["program_id"])
             program = db.query(Program).filter(Program.id == program_id).first()
 
+            program_name: str = program_data["name"]
+            program_level = None
+
+            if program_name.lower().startswith("certificate"):
+                program_level = "certificate"
+            elif program_name.lower().startswith(
+                "diploma"
+            ) or program_name.lower().startswith("associate"):
+                program_level = "diploma"
+            else:
+                program_level = "degree"
+
             if program:
                 program.code = program_data["code"]
-                program.name = program_data["name"]
+                program.name = program_name
                 program.school_id = school.id
+                program.level = program_level
                 updated_count += 1
             else:
                 program = Program(
                     id=program_id,
                     code=program_data["code"],
-                    name=program_data["name"],
-                    school_id=school.id,  # Set school_id for new programs
+                    name=program_name,
+                    school_id=school.id,
+                    level=program_level,
                 )
                 db.add(program)
                 added_count += 1

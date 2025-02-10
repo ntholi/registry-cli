@@ -2,10 +2,19 @@ from datetime import datetime
 from typing import Any, Dict, List, cast
 
 from bs4 import ResultSet, Tag
+from sqlalchemy.orm import Session
 
 from registry_cli.browser import BASE_URL
-from registry_cli.models import Gender, MaritalStatus, SemesterStatus
+from registry_cli.models import (
+    Gender,
+    MaritalStatus,
+    Program,
+    ProgramStatus,
+    SemesterStatus,
+    Structure,
+)
 from registry_cli.scrapers.base import BaseScraper
+from registry_cli.scrapers.structure import ProgramStructureScraper
 
 
 class StudentScraper(BaseScraper):
@@ -87,10 +96,11 @@ class StudentScraper(BaseScraper):
 class StudentProgramScraper(BaseScraper):
     """Scraper for student program information."""
 
-    def __init__(self, std_no: int):
+    def __init__(self, db: Session, std_no: int):
         if not std_no:
             raise ValueError("std_no must be provided")
         self.std_no = std_no
+        self.db = db
         super().__init__(
             f"{BASE_URL}/r_stdprogramlist.php?showmaster=1&StudentID={std_no}"
         )
@@ -110,21 +120,26 @@ class StudentProgramScraper(BaseScraper):
             if len(cells) < 6:
                 continue
 
-            code_name = cells[0].get_text(strip=True)
-            code = code_name.split(" ")[0]
-            name = " ".join(code_name.split(" ")[1:])
-
             program_id = None
             link = cells[-1].find("a")
             if link and "href" in link.attrs:
                 program_id = link["href"].split("ProgramID=")[-1]
 
+            program_version = cells[2].get_text(strip=True)
+            structure = (
+                self.db.query(Structure)
+                .filter(Structure.code == program_version)
+                .first()
+            )
+            if not structure:
+                raise ValueError(
+                    f"Structure with code '{program_version}' not found, did you scrape it?"
+                )
+
             program = {
                 "id": program_id,
-                "code": code,
-                "name": name,
-                "term": cells[1].get_text(strip=True),
-                "version": cells[2].get_text(strip=True),
+                "start_term": cells[1].get_text(strip=True),
+                "structure_id": structure.id,
                 "stream": cells[3].get_text(strip=True),
                 "status": cells[4].get_text(strip=True),
                 "assist_provider": cells[5].get_text(strip=True),

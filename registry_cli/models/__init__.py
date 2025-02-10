@@ -161,18 +161,21 @@ class StudentProgram(Base):
     __tablename__ = "student_programs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    program_id: Mapped[int] = mapped_column(
-        ForeignKey("programs.id", ondelete="cascade"), nullable=False
-    )
-    status: Mapped[ProgramStatus] = mapped_column(String, nullable=False)
     std_no: Mapped[int] = mapped_column(
         ForeignKey("students.std_no", ondelete="cascade"), nullable=False
     )
+    start_term: Mapped[Optional[str]] = mapped_column(String)
+    structure_id: Mapped[int] = mapped_column(
+        ForeignKey("structures.id", ondelete="cascade"), nullable=False
+    )
+    stream: Mapped[Optional[str]] = mapped_column(String)
+    status: Mapped[ProgramStatus] = mapped_column(String, nullable=False)
+    assist_provider: Mapped[Optional[str]] = mapped_column(String)
 
-    student: Mapped["Student"] = relationship(back_populates="programs")
     semesters: Mapped[list["StudentSemester"]] = relationship(
         back_populates="program", cascade="all, delete"
     )
+    student: Mapped["Student"] = relationship(back_populates="programs")
 
 
 SemesterStatus = Literal[

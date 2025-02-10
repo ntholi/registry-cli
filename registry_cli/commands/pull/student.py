@@ -41,7 +41,7 @@ def student_pull(db: Session, student_id: int) -> None:
             f"Successfully {'updated' if student else 'added'} student: {student}"
         )
 
-        program_scraper = StudentProgramScraper(student_id)
+        program_scraper = StudentProgramScraper(db, student_id)
         try:
             program_data = program_scraper.scrape()
             existing_programs = (
@@ -49,18 +49,21 @@ def student_pull(db: Session, student_id: int) -> None:
                 .filter(StudentProgram.std_no == student.std_no)
                 .all()
             )
-            existing_program_map = {prog.name: prog for prog in existing_programs}
+            existing_program_map = {prog.id: prog for prog in existing_programs}
 
             for prog in program_data:
-                program = existing_program_map.get(prog["name"])
+                program = existing_program_map.get(prog["id"])
                 if program:
                     program.status = prog["status"]
+                    program.structure_id = prog["structure_id"]
                 else:
                     program = StudentProgram(
                         id=prog["id"],
-                        code=prog["code"],
-                        name=prog["name"],
+                        start_term=prog["start_term"],
+                        structure_id=prog["structure_id"],
+                        stream=prog["stream"],
                         status=prog["status"],
+                        assist_provider=prog["assist_provider"],
                         std_no=student.std_no,
                     )
                     db.add(program)
@@ -145,13 +148,13 @@ def student_pull(db: Session, student_id: int) -> None:
                             click.echo(f"Error scraping modules: {str(e)}", err=True)
 
                     click.echo(
-                        f"Successfully pulled {len(semester_data)} semesters for program: {program.name}"
+                        f"Successfully pulled {len(semester_data)} semesters for program: {program.id}"
                     )
 
                 except Exception as e:
                     db.rollback()
                     click.echo(
-                        f"Error pulling semester data for program {program.name}: {str(e)}"
+                        f"Error pulling semester data for program {program.id}: {str(e)}"
                     )
 
             click.echo(
