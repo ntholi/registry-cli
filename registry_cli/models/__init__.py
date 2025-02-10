@@ -161,8 +161,9 @@ class StudentProgram(Base):
     __tablename__ = "student_programs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    code: Mapped[str] = mapped_column(String, nullable=False)
-    name: Mapped[str] = mapped_column(String, nullable=False)
+    program_id: Mapped[int] = mapped_column(
+        ForeignKey("programs.id", ondelete="cascade"), nullable=False
+    )
     status: Mapped[ProgramStatus] = mapped_column(String, nullable=False)
     std_no: Mapped[int] = mapped_column(
         ForeignKey("students.std_no", ondelete="cascade"), nullable=False
@@ -254,12 +255,16 @@ class School(Base):
     programs: Mapped[list["Program"]] = relationship(back_populates="school")
 
 
+ProgramLevel = Literal["certificate", "diploma", "degree"]
+
+
 class Program(Base):
     __tablename__ = "programs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     code: Mapped[str] = mapped_column(String, nullable=False, unique=True)
     name: Mapped[str] = mapped_column(String, nullable=False)
+    level: Mapped[ProgramLevel] = mapped_column(String, nullable=False)
 
     school_id: Mapped[int] = mapped_column(ForeignKey("schools.id"), nullable=False)
     school: Mapped["School"] = relationship(back_populates="programs")
