@@ -64,7 +64,7 @@ class Crawler:
         page: BeautifulSoup = BeautifulSoup(response.text, "lxml")
 
         if table := page.select_one("table#ewlistmain"):
-            rows = table.select("tr.ewTableRow")
+            rows = table.select("tr")
             for row in rows:
                 cols = row.select("td")
                 if cols and search_key in cols[0].text.strip():
