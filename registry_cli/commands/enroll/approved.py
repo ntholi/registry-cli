@@ -1,7 +1,7 @@
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
-from registry_cli.commands.register.crawler import Crawler
+from registry_cli.commands.enroll.crawler import Crawler
 from registry_cli.models import (
     Program,
     RegistrationClearance,
@@ -12,7 +12,7 @@ from registry_cli.models import (
 )
 
 
-def register_all(db: Session) -> None:
+def enroll_approved(db: Session) -> None:
     crawler = Crawler(db)
 
     approved_requests = (

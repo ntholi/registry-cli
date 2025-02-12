@@ -2,12 +2,12 @@ import click
 from sqlalchemy.orm import sessionmaker
 
 from registry_cli.commands.approve.signups import approve_signups
+from registry_cli.commands.enroll.approved import enroll_approved
 from registry_cli.commands.pull.programs import program_pull
 from registry_cli.commands.pull.schools import school_pull
 from registry_cli.commands.pull.structures import structure_pull
 from registry_cli.commands.pull.student import student_pull
 from registry_cli.commands.push.students import student_push
-from registry_cli.commands.register.approved import register_all
 from registry_cli.db.config import engine
 from registry_cli.models import Base
 
@@ -80,14 +80,14 @@ def push(name: str) -> None:
 
 
 @cli.group()
-def register() -> None:
+def enroll() -> None:
     pass
 
 
-@register.command()
+@enroll.command()
 def approved():
     db = get_db()
-    register_all(db)
+    enroll_approved(db)
 
 
 if __name__ == "__main__":

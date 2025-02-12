@@ -6,7 +6,7 @@ from bs4 import BeautifulSoup, Tag
 from sqlalchemy.orm import Session
 
 from registry_cli.browser import BASE_URL, Browser, get_form_payload
-from registry_cli.commands.register.payloads import add_semester_payload
+from registry_cli.commands.enroll.payloads import add_semester_payload
 from registry_cli.models import Term
 
 logging.basicConfig(
