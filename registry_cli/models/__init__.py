@@ -341,3 +341,93 @@ class Term(Base):
     name: Mapped[str] = mapped_column(String, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
+RegistrationRequestStatus = Literal["pending", "approved", "rejected"]
+
+
+class RegistrationRequest(Base):
+    __tablename__ = "registration_requests"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    std_no: Mapped[int] = mapped_column(
+        ForeignKey("students.std_no", ondelete="cascade"), nullable=False
+    )
+    term_id: Mapped[int] = mapped_column(
+        ForeignKey("terms.id", ondelete="cascade"), nullable=False
+    )
+    status: Mapped[RegistrationRequestStatus] = mapped_column(
+        String, nullable=False, default="pending"
+    )
+    semester_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    message: Mapped[Optional[str]] = mapped_column(String)
+    created_at: Mapped[int] = mapped_column(Integer, nullable=False)
+    updated_at: Mapped[Optional[int]] = mapped_column(Integer)
+    date_approved: Mapped[Optional[int]] = mapped_column(Integer)
+
+    requested_modules: Mapped[list["RequestedModule"]] = relationship(
+        back_populates="registration_request", cascade="all, delete"
+    )
+    clearances: Mapped[list["RegistrationClearance"]] = relationship(
+        back_populates="registration_request", cascade="all, delete"
+    )
+
+    __table_args__ = (
+        UniqueConstraint("std_no", "term_id", name="unique_registration_requests"),
+    )
+
+
+class RequestedModule(Base):
+    __tablename__ = "requested_modules"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    module_status: Mapped[ModuleStatus] = mapped_column(
+        String, nullable=False, default="Compulsory"
+    )
+    registration_request_id: Mapped[int] = mapped_column(
+        ForeignKey("registration_requests.id", ondelete="cascade"), nullable=False
+    )
+    module_id: Mapped[int] = mapped_column(
+        ForeignKey("modules.id", ondelete="cascade"), nullable=False
+    )
+    created_at: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    registration_request: Mapped["RegistrationRequest"] = relationship(
+        back_populates="requested_modules"
+    )
+    module: Mapped["Module"] = relationship()
+
+
+DashboardUser = Literal["admin", "finance", "academic", "library"]
+
+
+class RegistrationClearance(Base):
+    __tablename__ = "registration_clearances"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    registration_request_id: Mapped[int] = mapped_column(
+        ForeignKey("registration_requests.id", ondelete="cascade"), nullable=False
+    )
+    department: Mapped[DashboardUser] = mapped_column(String, nullable=False)
+    status: Mapped[RegistrationRequestStatus] = mapped_column(
+        String, nullable=False, default="pending"
+    )
+    message: Mapped[Optional[str]] = mapped_column(String)
+    responded_by: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("users.id", ondelete="cascade")
+    )
+    response_date: Mapped[Optional[int]] = mapped_column(Integer)
+    created_at: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    registration_request: Mapped["RegistrationRequest"] = relationship(
+        back_populates="clearances"
+    )
+    responder: Mapped[Optional["User"]] = relationship()
+
+    __table_args__ = (
+        UniqueConstraint(
+            "registration_request_id",
+            "department",
+            name="unique_registration_clearance",
+        ),
+    )
