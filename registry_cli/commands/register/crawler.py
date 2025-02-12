@@ -53,7 +53,7 @@ class Crawler:
         )
         response = self.browser.post(f"{BASE_URL}/r_stdsemesteradd.php", payload)
         std_semester_id = self.get_id_for(response, term.name)
-        if std_semester_id and "Successful" in response.text:
+        if std_semester_id:
             logger.info(f"Semester added successfully, semester id: {std_semester_id}")
             return int(std_semester_id.strip())
         else:

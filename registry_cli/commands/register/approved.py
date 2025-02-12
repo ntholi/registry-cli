@@ -49,7 +49,10 @@ def register_all(db: Session) -> None:
 
         program, structure, program_details = result
 
-        semester_name = f"Year {(request.semester_number + 1) // 2} Sem {(request.semester_number % 2) + 1}"
+        year = (request.semester_number - 1) // 2 + 1
+        sem = (request.semester_number - 1) % 2 + 1
+        semester_name = f"Year {year} Sem {sem}"
+
         print(
             "school_id=",
             program_details.school_id,
@@ -62,10 +65,10 @@ def register_all(db: Session) -> None:
             ", semester=",
             semester_name,
         )
-        # crawler.add_semester(
-        #     school_id=program_details.school_id,
-        #     program_id=program_details.id,
-        #     structure_id=structure.id,
-        #     std_program_id=program.id,
-        #     semester=semester_name,
-        # )
+        crawler.add_semester(
+            school_id=program_details.school_id,
+            program_id=program_details.id,
+            structure_id=structure.id,
+            std_program_id=program.id,
+            semester=semester_name,
+        )

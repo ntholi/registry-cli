@@ -7,7 +7,7 @@ from registry_cli.commands.pull.schools import school_pull
 from registry_cli.commands.pull.structures import structure_pull
 from registry_cli.commands.pull.student import student_pull
 from registry_cli.commands.push.students import student_push
-from registry_cli.commands.register.all import register_all
+from registry_cli.commands.register.approved import register_all
 from registry_cli.db.config import engine
 from registry_cli.models import Base
 
@@ -85,7 +85,7 @@ def register() -> None:
 
 
 @register.command()
-def all():
+def approved():
     db = get_db()
     register_all(db)
 
