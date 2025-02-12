@@ -53,10 +53,13 @@ def enroll_approved(db: Session) -> None:
         sem = (request.semester_number - 1) % 2 + 1
         semester_name = f"Year {year} Sem {sem}"
 
-        crawler.add_semester(
+        semester_id = crawler.add_semester(
             school_id=program_details.school_id,
             program_id=program_details.id,
             structure_id=structure.id,
             std_program_id=program.id,
             semester=semester_name,
         )
+
+        if semester_id:
+            # add_modules

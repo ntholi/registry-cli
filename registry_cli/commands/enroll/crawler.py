@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from registry_cli.browser import BASE_URL, Browser, get_form_payload
 from registry_cli.commands.enroll.payloads import add_semester_payload
-from registry_cli.models import Term
+from registry_cli.models import Module, Term
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -58,6 +58,42 @@ class Crawler:
             return int(std_semester_id.strip())
         else:
             logger.error("Failed to add semester")
+
+    def add_modules(self, std_semester_id: int, requested_modules: list[Module]):
+        url = f"{BASE_URL}/r_stdmodulelist.php?showmaster=1&StdSemesterID={std_semester_id}"
+        self.browser.fetch(url)
+        add_response = self.browser.fetch(f"{BASE_URL}/r_stdmoduleadd1.php")
+        page = BeautifulSoup(add_response.text, "lxml")
+        checkboxes = page.find_all("input", type="checkbox")
+
+        modules = []
+        for i, checkbox in enumerate(checkboxes):
+            parent_tr = checkbox.find_parent("tr")
+            # is_disabled = 'disabled' in checkbox.attrs
+            # is_blue = parent_tr and "phpmaker1" in parent_tr.get("class", [])
+
+            print(parent_tr)
+
+            # if is_blue:
+            # modules.append(checkbox.attrs["value"])
+
+        return
+
+        modules_with_amounts = []
+        for module in modules:
+            parts = module.split("-")
+            parts[-1] = "1200"
+            modules_with_amounts.append("-".join(parts))
+
+        payload = get_form_payload(page) | {
+            "Submit": "Add+Modules",
+            "take[]": modules_with_amounts,
+        }
+        hidden_inputs = page.find_all("input", type="hidden")
+        for hidden in hidden_inputs:
+            payload.update({hidden["name"]: hidden["value"]})
+
+        self.browser.post(f"{BASE_URL}/r_stdmoduleadd1.php", payload)
 
     @staticmethod
     def get_id_for(response: requests.Response, search_key: str) -> Optional[str]:
