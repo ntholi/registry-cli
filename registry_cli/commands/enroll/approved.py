@@ -3,9 +3,11 @@ from sqlalchemy.orm import Session
 
 from registry_cli.commands.enroll.crawler import Crawler
 from registry_cli.models import (
+    Module,
     Program,
     RegistrationClearance,
     RegistrationRequest,
+    RequestedModule,
     Structure,
     Student,
     StudentProgram,
@@ -62,4 +64,10 @@ def enroll_approved(db: Session) -> None:
         )
 
         if semester_id:
-            # add_modules
+            requested_modules = (
+                db.query(Module)
+                .join(RequestedModule)
+                .filter(RequestedModule.registration_request_id == request.id)
+                .all()
+            )
+            crawler.add_modules(semester_id, requested_modules)

@@ -67,17 +67,18 @@ class Crawler:
         checkboxes = page.find_all("input", type="checkbox")
 
         modules = []
-        for i, checkbox in enumerate(checkboxes):
-            parent_tr = checkbox.find_parent("tr")
-            # is_disabled = 'disabled' in checkbox.attrs
-            # is_blue = parent_tr and "phpmaker1" in parent_tr.get("class", [])
-
-            print(parent_tr)
-
-            # if is_blue:
-            # modules.append(checkbox.attrs["value"])
-
-        return
+        for _, checkbox in enumerate(checkboxes):
+            # Skip disabled checkboxes #TODO: SHOULD LEAVE IT LIKE THIS?
+            if checkbox.has_attr("disabled"):
+                continue
+            row = checkbox.find_parent("tr")
+            if row:
+                module_name = row.find("td").text.strip()
+                is_requested_module = any(
+                    module.name == module_name for module in requested_modules
+                )
+                if is_requested_module:
+                    modules.append(checkbox.attrs["value"])
 
         modules_with_amounts = []
         for module in modules:
