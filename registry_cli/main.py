@@ -7,6 +7,7 @@ from registry_cli.commands.pull.schools import school_pull
 from registry_cli.commands.pull.structures import structure_pull
 from registry_cli.commands.pull.student import student_pull
 from registry_cli.commands.push.students import student_push
+from registry_cli.commands.register.all import register_all
 from registry_cli.db.config import engine
 from registry_cli.models import Base
 
@@ -76,6 +77,17 @@ def signups() -> None:
 def push(name: str) -> None:
     db = get_db()
     student_push(db, name)
+
+
+@cli.group()
+def register() -> None:
+    pass
+
+
+@register.command()
+def all():
+    db = get_db()
+    register_all(db)
 
 
 if __name__ == "__main__":
