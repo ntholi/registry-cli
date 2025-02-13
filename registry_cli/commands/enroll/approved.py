@@ -1,4 +1,4 @@
-from sqlalchemy import and_
+from sqlalchemy import and_, func
 from sqlalchemy.orm import Session
 
 from registry_cli.commands.enroll.crawler import Crawler
@@ -22,12 +22,29 @@ def enroll_approved(db: Session) -> None:
         .join(RegistrationClearance)
         .filter(
             and_(
-                RegistrationClearance.department == "finance",
+                RegistrationRequest.id == RegistrationClearance.registration_request_id,
                 RegistrationClearance.status == "approved",
+                RegistrationClearance.id.in_(
+                    db.query(RegistrationClearance.registration_request_id)
+                    .filter(
+                        and_(
+                            RegistrationClearance.department.in_(
+                                ["finance", "library"]
+                            ),
+                            RegistrationClearance.status == "approved",
+                        )
+                    )
+                    .group_by(RegistrationClearance.registration_request_id)
+                    .having(func.count(RegistrationClearance.id) == 2)
+                ),
             )
         )
         .all()
     )
+
+    if len(approved_requests) == 0:
+        print("No approved requests found.")
+        return
 
     for request in approved_requests:
         student = db.query(Student).filter(Student.std_no == request.std_no).first()
