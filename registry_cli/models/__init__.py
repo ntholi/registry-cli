@@ -342,7 +342,7 @@ class Term(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
 
-RegistrationRequestStatus = Literal["pending", "approved", "rejected"]
+RegistrationRequestStatus = Literal["pending", "approved", "registered", "rejected"]
 
 
 class RegistrationRequest(Base):

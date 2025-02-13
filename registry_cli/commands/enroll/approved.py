@@ -1,3 +1,5 @@
+import time
+
 from sqlalchemy import and_, func
 from sqlalchemy.orm import Session
 
@@ -88,3 +90,7 @@ def enroll_approved(db: Session) -> None:
                 .all()
             )
             crawler.add_modules(semester_id, requested_modules)
+
+            request.status = "registered"
+            request.updated_at = int(time.time())
+            db.commit()
