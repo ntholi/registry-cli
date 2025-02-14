@@ -44,6 +44,9 @@ class User(Base):
     )
     student: Mapped[Optional["Student"]] = relationship(back_populates="user")
 
+    def __repr__(self) -> str:
+        return f"<User id={self.id!r} name={self.name!r} role={self.role!r} email={self.email!r}>"
+
 
 class Account(Base):
     __tablename__ = "accounts"
@@ -64,6 +67,12 @@ class Account(Base):
 
     user: Mapped["User"] = relationship(back_populates="accounts")
 
+    def __repr__(self) -> str:
+        return (
+            f"<Account provider={self.provider!r} provider_account_id={self.provider_account_id!r} "
+            f"type={self.type!r} user_id={self.user_id!r}>"
+        )
+
 
 class Session(Base):
     __tablename__ = "sessions"
@@ -76,6 +85,12 @@ class Session(Base):
 
     user: Mapped["User"] = relationship(back_populates="sessions")
 
+    def __repr__(self) -> str:
+        return (
+            f"<Session session_token={self.session_token!r} user_id={self.user_id!r} "
+            f"expires={self.expires!r}>"
+        )
+
 
 class VerificationToken(Base):
     __tablename__ = "verification_tokens"
@@ -83,6 +98,11 @@ class VerificationToken(Base):
     identifier: Mapped[str] = mapped_column(String, primary_key=True)
     token: Mapped[str] = mapped_column(String, primary_key=True)
     expires: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    def __repr__(self) -> str:
+        return (
+            f"<VerificationToken identifier={self.identifier!r} token={self.token!r}>"
+        )
 
 
 class Authenticator(Base):
@@ -104,6 +124,12 @@ class Authenticator(Base):
         UniqueConstraint("user_id", "credential_id", name="authenticators_pk"),
     )
 
+    def __repr__(self) -> str:
+        return (
+            f"<Authenticator user_id={self.user_id!r} credential_id={self.credential_id!r} "
+            f"provider_account_id={self.provider_account_id!r}>"
+        )
+
 
 SignUpStatus = Literal["pending", "approved", "rejected"]
 
@@ -123,6 +149,12 @@ class SignUp(Base):
     updated_at: Mapped[Optional[int]] = mapped_column(Integer)
 
     user: Mapped["User"] = relationship("User")
+
+    def __repr__(self) -> str:
+        return (
+            f"<SignUp user_id={self.user_id!r} name={self.name!r} std_no={self.std_no!r} "
+            f"status={self.status!r}>"
+        )
 
 
 Gender = Literal["Male", "Female", "Other"]
@@ -153,6 +185,9 @@ class Student(Base):
         back_populates="student", cascade="all, delete"
     )
 
+    def __repr__(self) -> str:
+        return f"<Student std_no={self.std_no!r} name={self.name!r} national_id={self.national_id!r}>"
+
 
 ProgramStatus = Literal["Active", "Changed", "Completed", "Deleted", "Inactive"]
 
@@ -176,6 +211,9 @@ class StudentProgram(Base):
         back_populates="program", cascade="all, delete"
     )
     student: Mapped["Student"] = relationship(back_populates="programs")
+
+    def __repr__(self) -> str:
+        return f"<StudentProgram id={self.id!r} std_no={self.std_no!r} status={self.status!r}>"
 
 
 SemesterStatus = Literal[
@@ -206,6 +244,12 @@ class StudentSemester(Base):
     modules: Mapped[list["StudentModule"]] = relationship(
         back_populates="semester", cascade="all, delete"
     )
+
+    def __repr__(self) -> str:
+        return (
+            f"<StudentSemester id={self.id!r} term={self.term!r} status={self.status!r} "
+            f"semester_number={self.semester_number!r}>"
+        )
 
 
 ModuleType = Literal["Major", "Minor", "Core"]
@@ -247,6 +291,12 @@ class StudentModule(Base):
 
     semester: Mapped["StudentSemester"] = relationship(back_populates="modules")
 
+    def __repr__(self) -> str:
+        return (
+            f"<StudentModule id={self.id!r} module_id={self.module_id!r} status={self.status!r} "
+            f"marks={self.marks!r} grade={self.grade!r}>"
+        )
+
 
 class School(Base):
     __tablename__ = "schools"
@@ -256,6 +306,9 @@ class School(Base):
     name: Mapped[str] = mapped_column(String, nullable=False)
 
     programs: Mapped[list["Program"]] = relationship(back_populates="school")
+
+    def __repr__(self) -> str:
+        return f"<School id={self.id!r} code={self.code!r} name={self.name!r}>"
 
 
 ProgramLevel = Literal["certificate", "diploma", "degree"]
@@ -274,6 +327,12 @@ class Program(Base):
 
     structures: Mapped[list["Structure"]] = relationship(back_populates="program")
 
+    def __repr__(self) -> str:
+        return (
+            f"<Program id={self.id!r} code={self.code!r} name={self.name!r} "
+            f"level={self.level!r}>"
+        )
+
 
 class Structure(Base):
     __tablename__ = "structures"
@@ -286,6 +345,9 @@ class Structure(Base):
     semesters: Mapped[list["StructureSemester"]] = relationship(
         back_populates="structure"
     )
+
+    def __repr__(self) -> str:
+        return f"<Structure id={self.id!r} code={self.code!r} program_id={self.program_id!r}>"
 
 
 class Module(Base):
@@ -300,6 +362,12 @@ class Module(Base):
     semester_modules: Mapped[list["SemesterModule"]] = relationship(
         back_populates="module"
     )
+
+    def __repr__(self) -> str:
+        return (
+            f"<Module id={self.id!r} code={self.code!r} name={self.name!r} "
+            f"type={self.type!r} credits={self.credits!r}>"
+        )
 
 
 class StructureSemester(Base):
@@ -318,6 +386,13 @@ class StructureSemester(Base):
         back_populates="semester", foreign_keys="[SemesterModule.semester_id]"
     )
 
+    def __repr__(self) -> str:
+        return (
+            f"<StructureSemester id={self.id!r} structure_id={self.structure_id!r} "
+            f"semester_number={self.semester_number!r} name={self.name!r} "
+            f"total_credits={self.total_credits!r}>"
+        )
+
 
 class SemesterModule(Base):
     __tablename__ = "semester_modules"
@@ -333,6 +408,12 @@ class SemesterModule(Base):
     )
     module: Mapped["Module"] = relationship(back_populates="semester_modules")
 
+    def __repr__(self) -> str:
+        return (
+            f"<SemesterModule id={self.id!r} semester_id={self.semester_id!r} "
+            f"module_id={self.module_id!r}>"
+        )
+
 
 class Term(Base):
     __tablename__ = "terms"
@@ -340,6 +421,9 @@ class Term(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+    def __repr__(self) -> str:
+        return f"<Term id={self.id!r} name={self.name!r} is_active={self.is_active!r}>"
 
 
 RegistrationRequestStatus = Literal["pending", "approved", "registered", "rejected"]
@@ -375,6 +459,12 @@ class RegistrationRequest(Base):
         UniqueConstraint("std_no", "term_id", name="unique_registration_requests"),
     )
 
+    def __repr__(self) -> str:
+        return (
+            f"<RegistrationRequest id={self.id!r} std_no={self.std_no!r} term_id={self.term_id!r} "
+            f"status={self.status!r} semester_number={self.semester_number!r}>"
+        )
+
 
 class RequestedModule(Base):
     __tablename__ = "requested_modules"
@@ -395,6 +485,12 @@ class RequestedModule(Base):
         back_populates="requested_modules"
     )
     module: Mapped["Module"] = relationship()
+
+    def __repr__(self) -> str:
+        return (
+            f"<RequestedModule id={self.id!r} module_status={self.module_status!r} "
+            f"registration_request_id={self.registration_request_id!r} module_id={self.module_id!r}>"
+        )
 
 
 DashboardUser = Literal["admin", "finance", "academic", "library"]
@@ -430,3 +526,9 @@ class RegistrationClearance(Base):
             name="unique_registration_clearance",
         ),
     )
+
+    def __repr__(self) -> str:
+        return (
+            f"<RegistrationClearance id={self.id!r} registration_request_id={self.registration_request_id!r} "
+            f"department={self.department!r} status={self.status!r}>"
+        )
