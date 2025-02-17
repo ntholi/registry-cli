@@ -351,9 +351,18 @@ class Module(Base):
     name: Mapped[str] = mapped_column(String, nullable=False)
     type: Mapped[ModuleType] = mapped_column(String, nullable=False)
     credits: Mapped[float] = mapped_column(Float, nullable=False)
-
     semester_modules: Mapped[list["SemesterModule"]] = relationship(
         back_populates="module"
+    )
+    prerequisites: Mapped[list["ModulePrerequisite"]] = relationship(
+        back_populates="module",
+        foreign_keys="[ModulePrerequisite.module_id]",
+        cascade="all, delete"
+    )
+    is_prerequisite_for: Mapped[list["ModulePrerequisite"]] = relationship(
+        back_populates="prerequisite",
+        foreign_keys="[ModulePrerequisite.prerequisite_id]",
+        cascade="all, delete"
     )
 
     def __repr__(self) -> str:
