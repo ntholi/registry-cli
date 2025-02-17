@@ -21,7 +21,10 @@ def approve_signups(db: Session) -> None:
         click.echo("No pending signups found.")
         return
 
-    for signup in data:
+    for i, signup in enumerate(data):
+        print()
+        print("-" * 30)
+        print(f"{i}/{len(data)}] {signup.name} ({signup.std_no})")
         try:
             student_id = int(signup.std_no)
 
