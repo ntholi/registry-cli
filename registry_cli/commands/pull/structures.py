@@ -5,6 +5,7 @@ from registry_cli.browser import BASE_URL
 from registry_cli.commands.pull.programs import program_pull
 from registry_cli.models import (
     Module,
+    ModulePrerequisite,
     Program,
     SemesterModule,
     Structure,
@@ -90,6 +91,30 @@ def structure_pull(db: Session, program_id: int) -> None:
                         module_id=module.id,
                     )
                     db.add(semester_module)
+
+                    # Handle prerequisites
+                    if module_data.get("prerequisite_code"):
+                        prerequisite = (
+                            db.query(Module)
+                            .filter(Module.code == module_data["prerequisite_code"])
+                            .first()
+                        )
+                        if prerequisite:
+                            # Check if prerequisite already exists
+                            existing_prerequisite = (
+                                db.query(ModulePrerequisite)
+                                .filter(
+                                    ModulePrerequisite.module_id == module.id,
+                                    ModulePrerequisite.prerequisite_id == prerequisite.id,
+                                )
+                                .first()
+                            )
+                            if not existing_prerequisite:
+                                module_prerequisite = ModulePrerequisite(
+                                    module_id=module.id,
+                                    prerequisite_id=prerequisite.id,
+                                )
+                                db.add(module_prerequisite)
 
         db.commit()
         click.echo(

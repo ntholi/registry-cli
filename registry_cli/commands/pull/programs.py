@@ -13,7 +13,7 @@ def program_pull(db: Session, school_id: int) -> None:
     if not school_id:
         raise ValueError("School ID is required.")
 
-    # school = read_or_create_school(db, school_id)
+    read_or_create_school(db, school_id)
     url = f"{BASE_URL}/f_programlist.php?showmaster=1&SchoolID={school_id}"
     scraper = ProgramScraper(url)
 

@@ -117,6 +117,7 @@ class SemesterModuleScraper(BaseScraper):
             - name: Module name (e.g. Creative and Innovation Studies)
             - type: Module type (Core, Major, Minor)
             - credits: Module credits
+            - prerequisite: Module prerequisite code (if any)
         """
         soup = self._get_soup()
         modules = []
@@ -147,12 +148,25 @@ class SemesterModuleScraper(BaseScraper):
             except ValueError:
                 module_type = "Core"
 
+            # Skip modules marked as "Delete"
+            if type_text == "Delete":
+                continue
+
             # Get credits
             credits_text = cells[3].get_text(strip=True).replace(",", "")
             try:
                 credits = float(credits_text) if credits_text else 0.0
             except ValueError:
                 credits = 0.0
+
+            # Get prerequisite
+            prerequisite_text = cells[4].get_text(strip=True)
+            prerequisite_code = None
+            if prerequisite_text:
+                # Format: "01 DIAL1110 Algebra" - extract the module code
+                parts = prerequisite_text.split()
+                if len(parts) >= 2:
+                    prerequisite_code = parts[1]
 
             # Get module ID from view link
             view_link = cells[5].find("a")
@@ -167,6 +181,7 @@ class SemesterModuleScraper(BaseScraper):
                     "name": name,
                     "type": module_type,
                     "credits": credits,
+                    "prerequisite_code": prerequisite_code,
                 }
             )
 
