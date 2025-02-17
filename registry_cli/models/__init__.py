@@ -2,15 +2,8 @@ from datetime import datetime
 from typing import Literal, Optional
 from uuid import uuid4
 
-from sqlalchemy import (
-    Boolean,
-    DateTime,
-    Float,
-    ForeignKey,
-    Integer,
-    String,
-    UniqueConstraint,
-)
+from sqlalchemy import (Boolean, DateTime, Float, ForeignKey, Integer, String,
+                        UniqueConstraint)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -369,6 +362,35 @@ class Module(Base):
             f"type={self.type!r} credits={self.credits!r}>"
         )
 
+
+class ModulePrerequisite(Base):
+    __tablename__ = "module_prerequisites"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    module_id: Mapped[int] = mapped_column(
+        ForeignKey("modules.id", ondelete="cascade"), nullable=False
+    )
+    prerequisite_id: Mapped[int] = mapped_column(
+        ForeignKey("modules.id", ondelete="cascade"), nullable=False
+    )
+
+    module: Mapped["Module"] = relationship(
+        "Module", foreign_keys=[module_id], back_populates="prerequisites"
+    )
+    prerequisite: Mapped["Module"] = relationship(
+        "Module", foreign_keys=[prerequisite_id], back_populates="is_prerequisite_for"
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "module_id",
+            "prerequisite_id",
+            name="unique_module_prerequisite",
+        ),
+    )
+
+    def __repr__(self) -> str:
+        return f"<ModulePrerequisite id={self.id!r} module_id={self.module_id!r} prerequisite_id={self.prerequisite_id!r}>"
 
 class StructureSemester(Base):
     __tablename__ = "structure_semesters"

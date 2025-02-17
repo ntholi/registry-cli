@@ -4,10 +4,10 @@ import click
 from sqlalchemy.orm import Session
 
 from registry_cli.browser import BASE_URL
-from registry_cli.models import School, Program
-from registry_cli.scrapers.schools import SchoolScraper
 from registry_cli.commands.pull.programs import program_pull
 from registry_cli.commands.pull.structures import structure_pull
+from registry_cli.models import Program, School
+from registry_cli.scrapers.schools import SchoolScraper
 
 
 def school_pull(db: Session) -> None:
@@ -25,7 +25,7 @@ def school_pull(db: Session) -> None:
         for school_data in schools_data:
             school_id = int(school_data["school_id"])
             school = db.query(School).filter(School.id == school_id).first()
-            
+
             if school:
                 school.code = school_data["code"]
                 school.name = school_data["name"]
@@ -38,7 +38,7 @@ def school_pull(db: Session) -> None:
                 )
                 db.add(school)
                 added_count += 1
-            
+
             # Pull programs for this school
             click.echo(f"\nPulling programs for school {school_data['name']}...")
             program_pull(db, school_id)
