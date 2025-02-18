@@ -5,14 +5,8 @@ from bs4 import ResultSet, Tag
 from sqlalchemy.orm import Session
 
 from registry_cli.browser import BASE_URL
-from registry_cli.models import (
-    Gender,
-    MaritalStatus,
-    Program,
-    ProgramStatus,
-    SemesterStatus,
-    Structure,
-)
+from registry_cli.models import (Gender, MaritalStatus, Program, ProgramStatus,
+                                 SemesterStatus, Structure)
 from registry_cli.scrapers.base import BaseScraper
 from registry_cli.scrapers.structure import ProgramStructureScraper
 
@@ -126,6 +120,10 @@ class StudentProgramScraper(BaseScraper):
                 program_id = link["href"].split("ProgramID=")[-1]
 
             program_version = cells[2].get_text(strip=True)
+            program_status = cells[4].get_text(strip=True)
+            if program_status == "Deleted":
+                continue
+
             structure = (
                 self.db.query(Structure)
                 .filter(Structure.code == program_version)
@@ -141,7 +139,7 @@ class StudentProgramScraper(BaseScraper):
                 "start_term": cells[1].get_text(strip=True),
                 "structure_id": structure.id,
                 "stream": cells[3].get_text(strip=True),
-                "status": cells[4].get_text(strip=True),
+                "status": program_status,
                 "assist_provider": cells[5].get_text(strip=True),
             }
             programs.append(program)
