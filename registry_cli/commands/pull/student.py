@@ -116,7 +116,15 @@ def student_pull(db: Session, student_id: int) -> None:
                                 module = existing_module_map.get(mod["id"])
                                 db_module = (
                                     db.query(Module)
-                                    .filter(Module.code == mod["code"])
+                                    .filter(
+                                        # I did this because if a module has been deleted in the program structure
+                                        # that module will not show the code and name of that module when in the
+                                        # student academic/semesters/modules view
+                                        # Ideally this query should just be: filter(Module.code == mod["code"])
+                                        Module.id == int(mod["code"])
+                                        if mod["code"].isdigit()
+                                        else Module.code == mod["code"]
+                                    )
                                     .first()
                                 )
                                 if not db_module:
