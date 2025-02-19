@@ -24,7 +24,7 @@ def approve_signups(db: Session) -> None:
     for i, signup in enumerate(data):
         print()
         print("-" * 30)
-        print(f"{i}/{len(data)}] {signup.name} ({signup.std_no})")
+        print(f"{i+1}/{len(data)}] {signup.name} ({signup.std_no})")
         try:
             student_id = int(signup.std_no)
 

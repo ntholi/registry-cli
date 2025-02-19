@@ -3,6 +3,7 @@ from sqlalchemy.orm import sessionmaker
 
 from registry_cli.commands.approve.signups import approve_signups
 from registry_cli.commands.enroll.approved import enroll_approved
+from registry_cli.commands.enroll.student import enroll_by_student_number
 from registry_cli.commands.pull.programs import program_pull
 from registry_cli.commands.pull.schools import school_pull
 from registry_cli.commands.pull.structures import structure_pull
@@ -85,9 +86,16 @@ def enroll() -> None:
 
 
 @enroll.command()
-def approved():
+def approved() -> None:
     db = get_db()
     enroll_approved(db)
+
+
+@enroll.command()
+@click.argument("std_no")
+def enroll_student(std_no: str) -> None:
+    db = get_db()
+    enroll_by_student_number(db, std_no)
 
 
 if __name__ == "__main__":
