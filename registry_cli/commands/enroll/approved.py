@@ -35,7 +35,10 @@ def enroll_approved(db: Session) -> None:
         print("No approved requests found.")
         return
 
-    for request in approved_requests:
+    for i, request in enumerate(approved_requests):
+        print()
+        print("-" * 30)
+        print(f"{i}/{len(approved_requests)}] {request.std_no}")
         if enroll_student(db, request):
             print(f"Successfully enrolled student {request.std_no}")
         else:
