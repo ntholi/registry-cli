@@ -71,23 +71,11 @@ class Crawler:
             row = checkbox.find_parent("tr")
             if row:
                 module_name = row.find("td").text.strip()
-                status_cell = row.find_all("td")[
-                    -2
-                ].text.strip()  # Get the status column
-
-                # Check if this module was requested
                 is_requested_module = any(
                     module.name == module_name for module in requested_modules
                 )
-
                 if is_requested_module:
-                    # For repeat modules, get value from hidden input
-                    if checkbox.has_attr("disabled"):
-                        hidden_input = row.find("input", type="hidden")
-                        if hidden_input and status_cell.startswith("Repeat"):
-                            modules.append(hidden_input.attrs["value"])
-                    else:
-                        modules.append(checkbox.attrs["value"])
+                    modules.append(checkbox.attrs["value"])
 
         modules_with_amounts = []
         for module in modules:
