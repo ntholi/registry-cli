@@ -1,24 +1,11 @@
-import time
-
 from sqlalchemy import and_, func
 from sqlalchemy.orm import Session
 
-from registry_cli.commands.enroll.crawler import Crawler
-from registry_cli.models import (
-    Module,
-    Program,
-    RegistrationClearance,
-    RegistrationRequest,
-    RequestedModule,
-    Structure,
-    Student,
-    StudentProgram,
-)
+from registry_cli.commands.enroll.enrollment import enroll_student
+from registry_cli.models import RegistrationClearance, RegistrationRequest
 
 
 def enroll_approved(db: Session) -> None:
-    crawler = Crawler(db)
-
     approved_requests = (
         db.query(RegistrationRequest)
         .join(RegistrationClearance)
@@ -49,48 +36,7 @@ def enroll_approved(db: Session) -> None:
         return
 
     for request in approved_requests:
-        student = db.query(Student).filter(Student.std_no == request.std_no).first()
-        if not student:
-            continue
-
-        result = (
-            db.query(StudentProgram, Structure, Program)
-            .join(Structure, StudentProgram.structure_id == Structure.id)
-            .join(Program, Structure.program_id == Program.id)
-            .filter(
-                and_(
-                    StudentProgram.std_no == student.std_no,
-                    StudentProgram.status == "Active",
-                )
-            )
-            .first()
-        )
-        if not result:
-            continue
-
-        program, structure, program_details = result
-
-        year = (request.semester_number - 1) // 2 + 1
-        sem = (request.semester_number - 1) % 2 + 1
-        semester_name = f"Year {year} Sem {sem}"
-
-        semester_id = crawler.add_semester(
-            school_id=program_details.school_id,
-            program_id=program_details.id,
-            structure_id=structure.id,
-            std_program_id=program.id,
-            semester=semester_name,
-        )
-
-        if semester_id:
-            requested_modules = (
-                db.query(Module)
-                .join(RequestedModule)
-                .filter(RequestedModule.registration_request_id == request.id)
-                .all()
-            )
-            crawler.add_modules(semester_id, requested_modules)
-
-            request.status = "registered"
-            request.updated_at = int(time.time())
-            db.commit()
+        if enroll_student(db, request):
+            print(f"Successfully enrolled student {request.std_no}")
+        else:
+            print(f"Failed to enroll student {request.std_no}")
