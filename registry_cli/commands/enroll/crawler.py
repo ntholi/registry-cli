@@ -59,7 +59,35 @@ class Crawler:
         else:
             logger.error("Failed to add semester")
 
+    def get_existing_modules(self, std_semester_id: int) -> list[str]:
+        url = f"{BASE_URL}/r_stdmodulelist.php?showmaster=1&StdSemesterID={std_semester_id}"
+        response = self.browser.fetch(url)
+        page = BeautifulSoup(response.text, "lxml")
+        
+        existing_modules = []
+        table = page.find("table", id="ewlistmain")
+        if table:
+            rows = table.find_all("tr", class_=["ewTableRow", "ewTableAltRow"])
+            for row in rows:
+                module_cell = row.find("td")
+                if module_cell and module_cell.text.strip():
+                    module_code = module_cell.text.strip().split()[0]
+                    existing_modules.append(module_code)
+        
+        return existing_modules
+
     def add_modules(self, std_semester_id: int, requested_modules: list[Module]):
+        existing_modules = self.get_existing_modules(std_semester_id)
+        
+        modules_to_add = [
+            module for module in requested_modules 
+            if module.code not in existing_modules
+        ]
+        
+        if not modules_to_add:
+            logger.info("No new modules to add")
+            return
+
         url = f"{BASE_URL}/r_stdmodulelist.php?showmaster=1&StdSemesterID={std_semester_id}"
         self.browser.fetch(url)
         add_response = self.browser.fetch(f"{BASE_URL}/r_stdmoduleadd1.php")
@@ -72,7 +100,7 @@ class Crawler:
             if row:
                 module_name = row.find("td").text.strip()
                 is_requested_module = any(
-                    module.name == module_name for module in requested_modules
+                    module.name == module_name for module in modules_to_add
                 )
                 if is_requested_module:
                     modules.append(checkbox.attrs["value"])

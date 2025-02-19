@@ -10,7 +10,6 @@ from registry_cli.models import (Module, Program, RegistrationRequest,
 
 
 def enroll_student(db: Session, request: RegistrationRequest) -> bool:
-    return True
     student = db.query(Student).filter(Student.std_no == request.std_no).first()
     if not student:
         return False
