@@ -91,7 +91,7 @@ def approved() -> None:
     enroll_approved(db)
 
 
-@enroll.command()
+@enroll.command(name="student")
 @click.argument("std_no")
 def enroll_student(std_no: str) -> None:
     db = get_db()
