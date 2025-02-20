@@ -4,9 +4,15 @@ from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
 from registry_cli.commands.enroll.crawler import Crawler
-from registry_cli.models import (Module, Program, RegistrationRequest,
-                                 RequestedModule, Structure, Student,
-                                 StudentProgram)
+from registry_cli.models import (
+    Module,
+    Program,
+    RegistrationRequest,
+    RequestedModule,
+    Structure,
+    Student,
+    StudentProgram,
+)
 
 
 def enroll_student(db: Session, request: RegistrationRequest) -> bool:
@@ -52,9 +58,10 @@ def enroll_student(db: Session, request: RegistrationRequest) -> bool:
         )
         crawler.add_modules(semester_id, requested_modules)
 
+        # TODO: Update Semester Number
         request.status = "registered"
         request.updated_at = int(time.time())
         db.commit()
         return True
-        
+
     return False
