@@ -70,30 +70,20 @@ def student_pull(db: Session, student_id: int) -> None:
                     semester_scraper = StudentSemesterScraper(program.id)
                     semester_data = semester_scraper.scrape()
 
-                    existing_semesters = (
-                        db.query(StudentSemester)
-                        .filter(StudentSemester.student_program_id == program.id)
-                        .all()
-                    )
-
-                    existing_semester_map = {sem.id: sem for sem in existing_semesters}
+                    db.query(StudentSemester).filter(
+                        StudentSemester.student_program_id == program.id
+                    ).delete()
+                    db.commit()
 
                     for sem in semester_data:
-                        semester = existing_semester_map.get(sem["id"])
-                        if semester:
-                            semester.term = sem["term"]
-                            semester.status = sem["status"]
-                            semester.semester_number = sem["semester_number"]
-                            semester.student_program_id = program.id
-                        else:
-                            semester = StudentSemester(
-                                id=sem["id"],
-                                term=sem["term"],
-                                status=sem["status"],
-                                semester_number=sem["semester_number"],
-                                student_program_id=program.id,
-                            )
-                            db.add(semester)
+                        semester = StudentSemester(
+                            id=sem["id"],
+                            term=sem["term"],
+                            status=sem["status"],
+                            semester_number=sem["semester_number"],
+                            student_program_id=program.id,
+                        )
+                        db.add(semester)
                         db.commit()
 
                         module_scraper = StudentModuleScraper(semester.id)
@@ -103,7 +93,6 @@ def student_pull(db: Session, student_id: int) -> None:
                                 StudentModule.student_semester_id == semester.id
                             ).delete()
                             db.commit()
-
                             for mod in module_data:
                                 db_module = (
                                     db.query(Module)
