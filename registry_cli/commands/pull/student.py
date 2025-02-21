@@ -76,14 +76,15 @@ def student_pull(db: Session, student_id: int) -> None:
                         .all()
                     )
 
-                    existing_semester_map = {
-                        sem.term: sem for sem in existing_semesters
-                    }
+                    existing_semester_map = {sem.id: sem for sem in existing_semesters}
 
                     for sem in semester_data:
-                        semester = existing_semester_map.get(sem["term"])
+                        semester = existing_semester_map.get(sem["id"])
                         if semester:
+                            semester.term = sem["term"]
                             semester.status = sem["status"]
+                            semester.semester_number = sem["semester_number"]
+                            semester.student_program_id = program.id
                         else:
                             semester = StudentSemester(
                                 id=sem["id"],
@@ -98,19 +99,12 @@ def student_pull(db: Session, student_id: int) -> None:
                         module_scraper = StudentModuleScraper(semester.id)
                         try:
                             module_data = module_scraper.scrape()
-                            existing_modules = (
-                                db.query(StudentModule)
-                                .filter(
-                                    StudentModule.student_semester_id == semester.id
-                                )
-                                .all()
-                            )
-                            existing_module_map = {
-                                mod.id: mod for mod in existing_modules
-                            }
+                            db.query(StudentModule).filter(
+                                StudentModule.student_semester_id == semester.id
+                            ).delete()
+                            db.commit()
 
                             for mod in module_data:
-                                module = existing_module_map.get(mod["id"])
                                 db_module = (
                                     db.query(Module)
                                     .filter(
@@ -128,23 +122,15 @@ def student_pull(db: Session, student_id: int) -> None:
                                     raise ValueError(
                                         f"Module with code {mod['code']} not found"
                                     )
-
-                                if module:
-                                    module.id = mod["id"]
-                                    module.status = mod["status"]
-                                    module.marks = mod["marks"]
-                                    module.grade = mod["grade"]
-                                    module.module_id = db_module.id
-                                else:
-                                    module = StudentModule(
-                                        id=mod["id"],
-                                        status=mod["status"],
-                                        marks=mod["marks"],
-                                        grade=mod["grade"],
-                                        module_id=db_module.id,
-                                        semester=semester,
-                                    )
-                                    db.add(module)
+                                module = StudentModule(
+                                    id=mod["id"],
+                                    status=mod["status"],
+                                    marks=mod["marks"],
+                                    grade=mod["grade"],
+                                    module_id=db_module.id,
+                                    semester=semester,
+                                )
+                                db.add(module)
                             db.commit()
                             click.echo(
                                 f"Successfully saved {len(module_data)} modules for semester {semester.term}"
