@@ -3,10 +3,6 @@ from sqlalchemy.orm import Session
 
 from registry_cli.models import (
     Module,
-    ModuleStatus,
-    ModuleType,
-    ProgramStatus,
-    SemesterStatus,
     Student,
     StudentModule,
     StudentProgram,
@@ -44,18 +40,19 @@ def student_pull(db: Session, student_id: int) -> None:
         program_scraper = StudentProgramScraper(db, student_id)
         try:
             program_data = program_scraper.scrape()
-            existing_programs = (
-                db.query(StudentProgram)
-                .filter(StudentProgram.std_no == student.std_no)
-                .all()
-            )
-            existing_program_map = {prog.id: prog for prog in existing_programs}
-
             for prog in program_data:
-                program = existing_program_map.get(prog["id"])
+                program = (
+                    db.query(StudentProgram)
+                    .filter(StudentProgram.id == prog["id"])
+                    .first()
+                )
                 if program:
                     program.status = prog["status"]
                     program.structure_id = prog["structure_id"]
+                    program.start_term = prog["start_term"]
+                    program.stream = prog["stream"]
+                    program.assist_provider = prog["assist_provider"]
+                    program.std_no = student.std_no
                 else:
                     program = StudentProgram(
                         id=prog["id"],
