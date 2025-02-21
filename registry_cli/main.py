@@ -10,11 +10,10 @@ from registry_cli.commands.pull.structures import structure_pull
 from registry_cli.commands.pull.student import student_pull
 from registry_cli.commands.push.students import student_push
 from registry_cli.db.config import get_engine
-from registry_cli.models import Base
 
 
 def get_db():
-    use_local = input("Use local environment (y/n)? ").lower().strip() == "y"
+    use_local = input("Chose environment (local/prod)? ").lower().strip() != "prod"
     engine = get_engine(use_local)
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     db = SessionLocal()
