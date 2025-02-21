@@ -9,6 +9,8 @@ def names_match(name1: str, name2: str) -> bool:
     """
     Returns True if at least two words are common between the names.
     """
+    if name1.lower() == name2.lower():
+        return True
     return len(set(name1.lower().split()) & set(name2.lower().split())) >= 2
 
 
