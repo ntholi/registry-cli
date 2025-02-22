@@ -1,11 +1,13 @@
-from typing import List, Dict, Any
+from typing import Any, Dict, List
+
 import click
 from sqlalchemy.orm import Session
 
 from registry_cli.models import Module, StudentModule, StudentSemester
 from registry_cli.scrapers.student import StudentModuleScraper
 
-def scrape_and_save_modules(db: Session, semester: StudentSemester) -> None:
+
+def scrape_and_save_modules(db: Session, semester: StudentSemester):
     """Scrape and save modules for a given semester."""
     module_scraper = StudentModuleScraper(semester.id)
     try:
@@ -16,19 +18,14 @@ def scrape_and_save_modules(db: Session, semester: StudentSemester) -> None:
         db.commit()
 
         for mod in module_data:
-            db_module = (
-                db.query(Module)
-                .filter(
-                    # I did this because if a module has been deleted in the program structure
-                    # that module will not show the code and name of that module when in the
-                    # student academic/semesters/modules view
-                    # Ideally this query should just be: filter(Module.code == mod["code"])
-                    Module.id == int(mod["code"])
-                    if mod["code"].isdigit()
-                    else Module.code == mod["code"]
-                )
-                .first()
-            )
+            # I did this because if a module has been deleted in the program structure
+            # that module will not show the code and name of that module when in the
+            # student academic/semesters/modules view
+            # Ideally this query should just be: filter(Module.code == mod["code"])
+            filter_query = Module.code == mod["code"]
+            if mod["code"].isdigit():
+                filter_query = Module.id == int(mod["code"])
+            db_module = db.query(Module).filter(filter_query).first()
             if not db_module:
                 raise ValueError(f"Module with code {mod['code']} not found")
 
@@ -41,9 +38,11 @@ def scrape_and_save_modules(db: Session, semester: StudentSemester) -> None:
                 semester=semester,
             )
             db.add(module)
-        
+
         db.commit()
-        click.echo(f"Successfully saved {len(module_data)} modules for semester {semester.term}")
+        click.echo(
+            f"Successfully saved {len(module_data)} modules for semester {semester.term}"
+        )
         return module_data
     except Exception as e:
         db.rollback()
