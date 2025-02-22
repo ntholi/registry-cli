@@ -7,6 +7,7 @@ from registry_cli.commands.enroll.student import enroll_by_student_number
 from registry_cli.commands.pull.modules import modules_pull
 from registry_cli.commands.pull.programs import program_pull
 from registry_cli.commands.pull.schools import school_pull
+from registry_cli.commands.pull.semesters import semesters_pull
 from registry_cli.commands.pull.structures import structure_pull
 from registry_cli.commands.pull.student import student_pull
 from registry_cli.commands.push.students import student_push
@@ -67,6 +68,14 @@ def student(std_no: int) -> None:
 def modules(std_no: int, term: str) -> None:
     db = get_db()
     modules_pull(db, std_no, term)
+
+
+@pull.command()
+@click.argument("std_no", type=int)
+@click.option("--program", help="Program name filter")
+def semesters(std_no: int, program: str) -> None:
+    db = get_db()
+    semesters_pull(db, std_no, program)
 
 
 @cli.group()
