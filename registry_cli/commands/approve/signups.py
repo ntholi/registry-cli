@@ -33,10 +33,12 @@ def approve_signups(db: Session) -> None:
             if not student:
                 passed = student_pull(db, student_id)
                 if not passed:
-                    click.secho(f"Failed to pull student data for {signup.std_no}", fg="red")
+                    click.secho(
+                        f"Failed to pull student data for {signup.std_no}", fg="red"
+                    )
                     signup.status = "rejected"
                     signup.message = (
-                        "Error while syncing student data, please try again later"
+                        "Error while syncing student data, resubmit your request later"
                     )
                     db.commit()
                 continue
@@ -56,7 +58,7 @@ def approve_signups(db: Session) -> None:
                 db.commit()
                 click.secho(
                     f"Rejected signup for {signup.name} - name mismatch with student records",
-                    fg="red"
+                    fg="red",
                 )
 
         except Exception as e:
