@@ -1,23 +1,19 @@
 import click
 from sqlalchemy.orm import Session
 
-from registry_cli.models import (
-    Student,
-    StudentProgram,
-    StudentSemester,
-)
+from registry_cli.models import Student, StudentProgram, StudentSemester
 from registry_cli.scrapers.student import (
     StudentProgramScraper,
     StudentScraper,
     StudentSemesterScraper,
 )
+
 from .common import scrape_and_save_modules
-from .term import term_pull
 
 
-def student_pull(db: Session, student_id: int) -> None:
+def student_pull(db: Session, std_no: int) -> None:
     """Pull a student record from the registry system."""
-    scraper = StudentScraper(student_id)
+    scraper = StudentScraper(std_no)
 
     try:
         student_data = scraper.scrape()
@@ -36,7 +32,7 @@ def student_pull(db: Session, student_id: int) -> None:
             f"Successfully {'updated' if student else 'added'} student: {student}"
         )
 
-        program_scraper = StudentProgramScraper(db, student_id)
+        program_scraper = StudentProgramScraper(db, std_no)
         try:
             program_data = program_scraper.scrape()
             for prog in program_data:

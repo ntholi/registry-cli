@@ -4,11 +4,11 @@ from sqlalchemy.orm import sessionmaker
 from registry_cli.commands.approve.signups import approve_signups
 from registry_cli.commands.enroll.approved import enroll_approved
 from registry_cli.commands.enroll.student import enroll_by_student_number
+from registry_cli.commands.pull.modules import modules_pull
 from registry_cli.commands.pull.programs import program_pull
 from registry_cli.commands.pull.schools import school_pull
 from registry_cli.commands.pull.structures import structure_pull
 from registry_cli.commands.pull.student import student_pull
-from registry_cli.commands.pull.student.term import term_pull
 from registry_cli.commands.push.students import student_push
 from registry_cli.db.config import get_engine
 
@@ -55,14 +55,18 @@ def programs(school_id: int) -> None:
 
 
 @pull.command()
-@click.argument("student_id", type=int)
-@click.option("--term", help="Pull data for a specific term only")
-def student(student_id: int, term: str = None) -> None:
+@click.argument("std_no", type=int)
+def student(std_no: int) -> None:
     db = get_db()
-    if term:
-        term_pull(db, student_id, term)
-    else:
-        student_pull(db, student_id)
+    student_pull(db, std_no)
+
+
+@pull.command()
+@click.argument("std_no", type=int)
+@click.argument("term")
+def modules(std_no: int, term: str) -> None:
+    db = get_db()
+    modules_pull(db, std_no, term)
 
 
 @cli.group()
