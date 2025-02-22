@@ -29,17 +29,17 @@ def approve_signups(db: Session) -> None:
         print(f"{i+1}/{len(data)}] {signup.name} ({signup.std_no})")
         try:
             student_id = int(signup.std_no)
-
             student = db.query(Student).filter(Student.std_no == student_id).first()
             if not student:
-                student_pull(db, student_id)
-                student = db.query(Student).filter(Student.std_no == student_id).first()
-                if not student:
+                passed = student_pull(db, student_id)
+                if not passed:
                     click.echo(f"Failed to pull student data for {signup.std_no}")
                     signup.status = "rejected"
-                    signup.message = "Error while syncing student data, try again later"
+                    signup.message = (
+                        "Error while syncing student data, please try again later"
+                    )
                     db.commit()
-                    continue
+                continue
 
             if names_match(student.name, signup.name):
                 user = db.query(User).filter(User.id == signup.user_id).first()
