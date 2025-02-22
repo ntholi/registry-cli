@@ -15,7 +15,7 @@ from registry_cli.db.config import get_engine
 
 
 def get_db():
-    use_local = input("Chose environment (local/prod)? ").lower().strip() != "prod"
+    use_local = input("Choose environment (local/prod)? ").lower().strip() != "prod"
     engine = get_engine(use_local)
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     db = SessionLocal()

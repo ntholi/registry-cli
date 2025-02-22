@@ -68,7 +68,7 @@ def program_pull(db: Session, school_id: int) -> None:
         click.echo(f"Error pulling programs: {str(e)}")
 
 
-def read_or_create_school(db: Session, school_id: int) -> School:
+def read_or_create_school(db: Session, school_id: int):
     school = db.query(School).filter(School.id == school_id).first()
     if not school:
         scraper = SchoolScraper(f"{BASE_URL}/f_schoollist.php?cmd=resetall")
