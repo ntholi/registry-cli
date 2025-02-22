@@ -17,4 +17,4 @@ def student_push(db: Session, name: str) -> None:
         click.echo(f"Successfully added student: {student}")
     except Exception as e:
         db.rollback()
-        click.echo(f"Error adding student: {str(e)}")
+        click.secho(f"Error adding student: {str(e)}", fg="red")

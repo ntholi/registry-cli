@@ -2,6 +2,7 @@ import time
 
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
+import click
 
 from registry_cli.commands.enroll.crawler import Crawler
 from registry_cli.models import (
@@ -18,7 +19,9 @@ from registry_cli.models import (
 def enroll_student(db: Session, request: RegistrationRequest) -> bool:
     student = db.query(Student).filter(Student.std_no == request.std_no).first()
     if not student:
+        click.secho(f"Student {request.std_no} not found", fg="red")
         return False
+
     crawler = Crawler(db)
     result = (
         db.query(StudentProgram, Structure, Program)
@@ -33,6 +36,7 @@ def enroll_student(db: Session, request: RegistrationRequest) -> bool:
         .first()
     )
     if not result:
+        click.secho(f"No active program found for student {student.std_no}", fg="red")
         return False
 
     program, structure, program_details = result

@@ -32,7 +32,7 @@ def semesters_pull(db: Session, std_no: int, program_code: Optional[str] = None)
         semester_data = semester_scraper.scrape()
 
         if not semester_data:
-            click.echo("No semesters found.")
+            click.secho("No semesters found.", fg="red")
             return
 
         db.query(StudentSemester).filter(
@@ -54,10 +54,10 @@ def semesters_pull(db: Session, std_no: int, program_code: Optional[str] = None)
             try:
                 scrape_and_save_modules(db, semester)
             except Exception as e:
-                click.echo(f"Error scraping modules for semester {sem['term']}: {str(e)}", err=True)
+                click.secho(f"Error scraping modules for semester {sem['term']}: {str(e)}", fg="red", err=True)
 
         click.echo(f"Successfully pulled {len(semester_data)} semesters for student {std_no}")
 
     except Exception as e:
         db.rollback()
-        click.echo(f"Error pulling semesters: {str(e)}", err=True)
+        click.secho(f"Error pulling semesters: {str(e)}", fg="red", err=True)

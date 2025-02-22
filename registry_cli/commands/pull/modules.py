@@ -32,4 +32,4 @@ def modules_pull(db: Session, std_no: int, term: str) -> None:
 
     except Exception as e:
         db.rollback()
-        click.echo(f"Error pulling modules for term {term}: {str(e)}", err=True)
+        click.secho(f"Error pulling modules for term {term}: {str(e)}", fg="red", err=True)

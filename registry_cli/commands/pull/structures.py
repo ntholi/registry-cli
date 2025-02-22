@@ -13,15 +13,17 @@ from registry_cli.scrapers.structure import (ProgramStructureScraper,
 def structure_pull(db: Session, program_id: int) -> None:
     program = db.query(Program).filter(Program.id == program_id).first()
     if not program:
-        click.echo(
-            f"Program {program_id} not found in database. Pulling program data first..."
+        click.secho(
+            f"Program {program_id} not found in database. Pulling program data first...",
+            fg="red"
         )
         school_id = click.prompt("Enter the school ID", type=int)
         program_pull(db, school_id=school_id)
         program = db.query(Program).filter(Program.id == program_id).first()
         if not program:
-            click.echo(
-                f"Error: Program {program_id} not found after pulling programs. Please verify the program ID."
+            click.secho(
+                f"Error: Program {program_id} not found after pulling programs. Please verify the program ID.",
+                fg="red"
             )
             return
 
@@ -119,7 +121,7 @@ def structure_pull(db: Session, program_id: int) -> None:
                     )
                     db.add(module_prerequisite)
             else:
-                click.echo(f"Warning: Prerequisite module {prerequisite_code} not found in database")
+                click.secho(f"Warning: Prerequisite module {prerequisite_code} not found in database", fg="red")
 
         db.commit()
         click.echo(
@@ -128,4 +130,4 @@ def structure_pull(db: Session, program_id: int) -> None:
 
     except Exception as e:
         db.rollback()
-        click.echo(f"Error pulling program structures: {str(e)}")
+        click.secho(f"Error pulling program structures: {str(e)}", fg="red")

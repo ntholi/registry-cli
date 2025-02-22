@@ -65,7 +65,7 @@ def program_pull(db: Session, school_id: int) -> None:
 
     except Exception as e:
         db.rollback()  # Rollback on error
-        click.echo(f"Error pulling programs: {str(e)}")
+        click.secho(f"Error pulling programs: {str(e)}", fg="red")
 
 
 def read_or_create_school(db: Session, school_id: int):

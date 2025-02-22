@@ -46,4 +46,4 @@ def scrape_and_save_modules(db: Session, semester: StudentSemester):
         return module_data
     except Exception as e:
         db.rollback()
-        raise Exception(f"Error scraping modules: {str(e)}")
+        click.secho(f"Error scraping modules: {str(e)}", fg="red")

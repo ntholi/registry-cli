@@ -84,7 +84,7 @@ def student_pull(db: Session, std_no: int) -> bool:
                         try:
                             scrape_and_save_modules(db, semester)
                         except Exception as e:
-                            click.echo(f"Error scraping modules: {str(e)}")
+                            click.secho(f"Error scraping modules: {str(e)}", fg="red")
                             return False
 
                     click.echo(
@@ -93,9 +93,7 @@ def student_pull(db: Session, std_no: int) -> bool:
 
                 except Exception as e:
                     db.rollback()
-                    click.echo(
-                        f"Error pulling semester data for program {program.id}: {str(e)}"
-                    )
+                    click.secho(f"Error pulling semester data for program {program.id}: {str(e)}", fg="red")
                     return False
 
             click.echo(
@@ -104,12 +102,12 @@ def student_pull(db: Session, std_no: int) -> bool:
 
         except Exception as e:
             db.rollback()
-            click.echo(f"Error pulling student program data: {str(e)}")
+            click.secho(f"Error pulling student program data: {str(e)}", fg="red")
             return False
 
     except Exception as e:
         db.rollback()
-        click.echo(f"Error pulling student data: {str(e)}")
+        click.secho(f"Error pulling student data: {str(e)}", fg="red")
         return False
 
     return True

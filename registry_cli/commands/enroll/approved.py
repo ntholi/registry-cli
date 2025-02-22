@@ -1,5 +1,6 @@
 from sqlalchemy import and_, func
 from sqlalchemy.orm import Session
+import click
 
 from registry_cli.commands.enroll.enrollment import enroll_student
 from registry_cli.models import RegistrationClearance, RegistrationRequest
@@ -32,7 +33,7 @@ def enroll_approved(db: Session) -> None:
     )
 
     if len(approved_requests) == 0:
-        print("No approved requests found.")
+        click.secho("No approved requests found.", fg="red")
         return
 
     for i, request in enumerate(approved_requests):
@@ -42,4 +43,4 @@ def enroll_approved(db: Session) -> None:
         if enroll_student(db, request):
             print(f"Successfully enrolled student {request.std_no}")
         else:
-            print(f"Failed to enroll student {request.std_no}")
+            click.secho(f"Failed to enroll student {request.std_no}", fg="red")

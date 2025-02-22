@@ -20,7 +20,7 @@ def approve_signups(db: Session) -> None:
     data = db.query(SignUp).filter(SignUp.status == "pending").all()
 
     if not data:
-        click.echo("No pending signups found.")
+        click.secho("No pending signups found.", fg="red")
         return
 
     for i, signup in enumerate(data):
@@ -33,7 +33,7 @@ def approve_signups(db: Session) -> None:
             if not student:
                 passed = student_pull(db, student_id)
                 if not passed:
-                    click.echo(f"Failed to pull student data for {signup.std_no}")
+                    click.secho(f"Failed to pull student data for {signup.std_no}", fg="red")
                     signup.status = "rejected"
                     signup.message = (
                         "Error while syncing student data, please try again later"
@@ -54,10 +54,11 @@ def approve_signups(db: Session) -> None:
                 signup.status = "rejected"
                 signup.message = "Student Number does not match provided name"
                 db.commit()
-                click.echo(
-                    f"Rejected signup for {signup.name} - name mismatch with student records"
+                click.secho(
+                    f"Rejected signup for {signup.name} - name mismatch with student records",
+                    fg="red"
                 )
 
         except Exception as e:
-            click.echo(f"Error processing signup {signup.std_no}: {str(e)}")
+            click.secho(f"Error processing signup {signup.std_no}: {str(e)}", fg="red")
             continue

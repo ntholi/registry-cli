@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from registry_cli.commands.enroll.enrollment import enroll_student
 from registry_cli.models import RegistrationClearance, RegistrationRequest
+import click
 
 
 def enroll_by_student_number(db: Session, std_no: str) -> None:
@@ -40,4 +41,4 @@ def enroll_by_student_number(db: Session, std_no: str) -> None:
     if enroll_student(db, registration_request):
         print(f"Successfully enrolled student {std_no}")
     else:
-        print(f"Failed to enroll student {std_no}")
+        click.secho(f"Failed to enroll student {std_no}", fg="red")

@@ -55,4 +55,4 @@ def school_pull(db: Session) -> None:
 
     except Exception as e:
         db.rollback()
-        click.echo(f"Error pulling schools: {str(e)}")
+        click.secho(f"Error pulling schools: {str(e)}", fg="red")
