@@ -14,6 +14,7 @@ from registry_cli.scrapers.student import (
     StudentScraper,
     StudentSemesterScraper,
 )
+from .term import term_pull
 
 
 def student_pull(db: Session, student_id: int) -> None:

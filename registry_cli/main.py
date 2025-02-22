@@ -8,6 +8,7 @@ from registry_cli.commands.pull.programs import program_pull
 from registry_cli.commands.pull.schools import school_pull
 from registry_cli.commands.pull.structures import structure_pull
 from registry_cli.commands.pull.student import student_pull
+from registry_cli.commands.pull.student.term import term_pull
 from registry_cli.commands.push.students import student_push
 from registry_cli.db.config import get_engine
 
@@ -55,9 +56,13 @@ def programs(school_id: int) -> None:
 
 @pull.command()
 @click.argument("student_id", type=int)
-def student(student_id: int) -> None:
+@click.option("--term", help="Pull data for a specific term only")
+def student(student_id: int, term: str = None) -> None:
     db = get_db()
-    student_pull(db, student_id)
+    if term:
+        term_pull(db, student_id, term)
+    else:
+        student_pull(db, student_id)
 
 
 @cli.group()
