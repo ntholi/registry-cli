@@ -63,7 +63,7 @@ def student(std_no: int) -> None:
 
 @pull.command()
 @click.argument("std_no", type=int)
-@click.argument("term")
+@click.option("--term", required=True, help="Academic term (e.g. 2024-07)")
 def modules(std_no: int, term: str) -> None:
     db = get_db()
     modules_pull(db, std_no, term)
