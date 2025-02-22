@@ -36,6 +36,9 @@ def approve_signups(db: Session) -> None:
                 student = db.query(Student).filter(Student.std_no == student_id).first()
                 if not student:
                     click.echo(f"Failed to pull student data for {signup.std_no}")
+                    signup.status = "rejected"
+                    signup.message = "Error while syncing student data, try again later"
+                    db.commit()
                     continue
 
             if names_match(student.name, signup.name):
