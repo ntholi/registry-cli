@@ -3,11 +3,18 @@ from sqlalchemy.orm import Session
 
 from registry_cli.browser import BASE_URL
 from registry_cli.commands.pull.programs import program_pull
-from registry_cli.models import (Module, ModulePrerequisite, Program,
-                                 SemesterModule, Structure, StructureSemester)
-from registry_cli.scrapers.structure import (ProgramStructureScraper,
-                                             SemesterModuleScraper,
-                                             SemesterScraper)
+from registry_cli.models import (
+    Module,
+    ModulePrerequisite,
+    Program,
+    Structure,
+    StructureSemester,
+)
+from registry_cli.scrapers.structure import (
+    ProgramStructureScraper,
+    SemesterModuleScraper,
+    SemesterScraper,
+)
 
 
 def structure_pull(db: Session, program_id: int) -> None:
@@ -15,7 +22,7 @@ def structure_pull(db: Session, program_id: int) -> None:
     if not program:
         click.secho(
             f"Program {program_id} not found in database. Pulling program data first...",
-            fg="red"
+            fg="red",
         )
         school_id = click.prompt("Enter the school ID", type=int)
         program_pull(db, school_id=school_id)
@@ -23,7 +30,7 @@ def structure_pull(db: Session, program_id: int) -> None:
         if not program:
             click.secho(
                 f"Error: Program {program_id} not found after pulling programs. Please verify the program ID.",
-                fg="red"
+                fg="red",
             )
             return
 
@@ -77,20 +84,16 @@ def structure_pull(db: Session, program_id: int) -> None:
                             name=module_data["name"],
                             type=module_data["type"],
                             credits=module_data["credits"],
+                            semester_id=semester.id,
                         )
                         db.add(module)
-
-                    semester_module = SemesterModule(
-                        semester_id=semester.id,
-                        module_id=module.id,
-                    )
-                    db.add(semester_module)
-
                     if module_data.get("prerequisite_code"):
-                        modules_needing_prerequisites.append({
-                            "module": module,
-                            "prerequisite_code": module_data["prerequisite_code"]
-                        })
+                        modules_needing_prerequisites.append(
+                            {
+                                "module": module,
+                                "prerequisite_code": module_data["prerequisite_code"],
+                            }
+                        )
 
         # Flush to ensure all modules are in the database
         db.flush()
@@ -98,13 +101,11 @@ def structure_pull(db: Session, program_id: int) -> None:
         for item in modules_needing_prerequisites:
             module = item["module"]
             prerequisite_code = item["prerequisite_code"]
-            
+
             prerequisite = (
-                db.query(Module)
-                .filter(Module.code == prerequisite_code)
-                .first()
+                db.query(Module).filter(Module.code == prerequisite_code).first()
             )
-            
+
             if prerequisite:
                 existing_prerequisite = (
                     db.query(ModulePrerequisite)
@@ -121,7 +122,10 @@ def structure_pull(db: Session, program_id: int) -> None:
                     )
                     db.add(module_prerequisite)
             else:
-                click.secho(f"Warning: Prerequisite module {prerequisite_code} not found in database", fg="red")
+                click.secho(
+                    f"Warning: Prerequisite module {prerequisite_code} not found in database",
+                    fg="red",
+                )
 
         db.commit()
         click.echo(
