@@ -74,7 +74,7 @@ def structure_pull(db: Session, program_id: int) -> None:
                 for module_data in modules_data:
                     module = (
                         db.query(Module)
-                        .filter(Module.code == module_data["code"])
+                        .filter(Module.code == module_data["id"])
                         .first()
                     )
                     if not module:
@@ -87,6 +87,13 @@ def structure_pull(db: Session, program_id: int) -> None:
                             semester_id=semester.id,
                         )
                         db.add(module)
+                    else:
+                        module.code = module_data["code"]
+                        module.name = module_data["name"]
+                        module.type = module_data["type"]
+                        module.credits = module_data["credits"]
+                        module.semester_id = semester.id
+
                     if module_data.get("prerequisite_code"):
                         modules_needing_prerequisites.append(
                             {
