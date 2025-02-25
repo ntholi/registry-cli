@@ -46,26 +46,48 @@ def structure_pull(db: Session, program_id: int) -> None:
         modules_needing_prerequisites = []
 
         for structure_data in structures_data:
-            structure = Structure(
-                id=int(structure_data["id"]),
-                code=structure_data["code"],
-                program_id=program_id,
+            structure = (
+                db.query(Structure)
+                .filter(Structure.id == int(structure_data["id"]))
+                .first()
             )
-            db.add(structure)
+
+            if not structure:
+                structure = Structure(
+                    id=int(structure_data["id"]),
+                    code=structure_data["code"],
+                    program_id=program_id,
+                )
+                db.add(structure)
+            else:
+                structure.code = structure_data["code"]
+                structure.program_id = program_id
 
             semester_url = f"{BASE_URL}/f_semesterlist.php?showmaster=1&StructureID={structure_data['id']}"
             semester_scraper = SemesterScraper(semester_url)
             semesters_data = semester_scraper.scrape()
 
             for semester_data in semesters_data:
-                semester = StructureSemester(
-                    id=semester_data["id"],
-                    structure_id=structure.id,
-                    name=semester_data["name"],
-                    semester_number=semester_data["semester_number"],
-                    total_credits=semester_data["total_credits"],
+                semester = (
+                    db.query(StructureSemester)
+                    .filter(StructureSemester.id == semester_data["id"])
+                    .first()
                 )
-                db.add(semester)
+
+                if not semester:
+                    semester = StructureSemester(
+                        id=semester_data["id"],
+                        structure_id=structure.id,
+                        name=semester_data["name"],
+                        semester_number=semester_data["semester_number"],
+                        total_credits=semester_data["total_credits"],
+                    )
+                    db.add(semester)
+                else:
+                    semester.structure_id = structure.id
+                    semester.name = semester_data["name"]
+                    semester.semester_number = semester_data["semester_number"]
+                    semester.total_credits = semester_data["total_credits"]
 
                 module_url = f"{BASE_URL}/f_semmodulelist.php?showmaster=1&SemesterID={semester_data['id']}"
                 module_scraper = SemesterModuleScraper(module_url)
@@ -73,9 +95,7 @@ def structure_pull(db: Session, program_id: int) -> None:
 
                 for module_data in modules_data:
                     module = (
-                        db.query(Module)
-                        .filter(Module.code == module_data["id"])
-                        .first()
+                        db.query(Module).filter(Module.id == module_data["id"]).first()
                     )
                     if not module:
                         module = Module(
@@ -101,8 +121,6 @@ def structure_pull(db: Session, program_id: int) -> None:
                                 "prerequisite_code": module_data["prerequisite_code"],
                             }
                         )
-
-        # Flush to ensure all modules are in the database
         db.flush()
 
         for item in modules_needing_prerequisites:
