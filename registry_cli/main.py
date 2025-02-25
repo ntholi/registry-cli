@@ -57,9 +57,14 @@ def programs(school_id: int) -> None:
 
 @pull.command()
 @click.argument("std_no", type=int)
-def student(std_no: int) -> None:
+@click.option(
+    "--info",
+    is_flag=True,
+    help="Only update student information without programs and modules",
+)
+def student(std_no: int, info: bool) -> None:
     db = get_db()
-    student_pull(db, std_no)
+    student_pull(db, std_no, info)
 
 
 @pull.command()

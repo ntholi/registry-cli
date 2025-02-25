@@ -11,7 +11,7 @@ from registry_cli.scrapers.student import (
 from .common import scrape_and_save_modules
 
 
-def student_pull(db: Session, std_no: int) -> bool:
+def student_pull(db: Session, std_no: int, info_only: bool = False) -> bool:
     """Pull a student record from the registry system."""
     scraper = StudentScraper(std_no)
 
@@ -31,6 +31,9 @@ def student_pull(db: Session, std_no: int) -> bool:
         click.echo(
             f"Successfully {'updated' if student else 'added'} student: {student}"
         )
+
+        if info_only:
+            return True
 
         program_scraper = StudentProgramScraper(db, std_no)
         try:
@@ -93,7 +96,10 @@ def student_pull(db: Session, std_no: int) -> bool:
 
                 except Exception as e:
                     db.rollback()
-                    click.secho(f"Error pulling semester data for program {program.id}: {str(e)}", fg="red")
+                    click.secho(
+                        f"Error pulling semester data for program {program.id}: {str(e)}",
+                        fg="red",
+                    )
                     return False
 
             click.echo(
