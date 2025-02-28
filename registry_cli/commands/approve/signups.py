@@ -41,7 +41,14 @@ def approve_signups(db: Session) -> None:
                         "Error while syncing student data, resubmit your request later"
                     )
                     db.commit()
-                continue
+                    continue
+                student = db.query(Student).filter(Student.std_no == student_id).first()
+                if not student:
+                    click.secho(
+                        f"Student data pulled but not found in database for {signup.std_no}",
+                        fg="red",
+                    )
+                    continue
 
             if names_match(student.name, signup.name):
                 user = db.query(User).filter(User.id == signup.user_id).first()
