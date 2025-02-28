@@ -3,6 +3,7 @@ from typing import Literal, Optional
 from uuid import uuid4
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     DateTime,
     Float,
@@ -18,7 +19,12 @@ class Base(DeclarativeBase):
     pass
 
 
-UserRole = Literal["admin", "student"]
+DashboardUser = Literal[
+    "finance", "registry", "library", "resource", "academic", "admin"
+]
+UserRole = Literal[
+    "user", "student", "finance", "registry", "library", "resource", "academic", "admin"
+]
 
 
 class User(Base):
@@ -28,7 +34,7 @@ class User(Base):
         String, primary_key=True, default=lambda: str(uuid4())
     )
     name: Mapped[Optional[str]] = mapped_column(String)
-    role: Mapped[UserRole] = mapped_column(String, default="student", nullable=False)
+    role: Mapped[UserRole] = mapped_column(String, default="user", nullable=False)
     email: Mapped[Optional[str]] = mapped_column(String, unique=True)
     email_verified: Mapped[Optional[datetime]] = mapped_column(DateTime)
     image: Mapped[Optional[str]] = mapped_column(String)
@@ -174,9 +180,14 @@ class Student(Base):
     gender: Mapped[Gender] = mapped_column(String)
     marital_status: Mapped[MaritalStatus] = mapped_column(String)
     religion: Mapped[Optional[str]] = mapped_column(String)
-    structure_id: Mapped[Optional[int]] = mapped_column(ForeignKey("structures.id"))
+    structure_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("structures.id", ondelete="SET NULL")
+    )
     user_id: Mapped[Optional[str]] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=lambda: int(datetime.now().timestamp())
     )
 
     structure: Mapped[Optional["Structure"]] = relationship(back_populates="students")
@@ -206,6 +217,9 @@ class StudentProgram(Base):
     stream: Mapped[Optional[str]] = mapped_column(String)
     status: Mapped[ProgramStatus] = mapped_column(String, nullable=False)
     assist_provider: Mapped[Optional[str]] = mapped_column(String)
+    created_at: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=lambda: int(datetime.now().timestamp())
+    )
 
     semesters: Mapped[list["StudentSemester"]] = relationship(
         back_populates="program", cascade="all, delete"
@@ -218,6 +232,7 @@ class StudentProgram(Base):
 
 SemesterStatus = Literal[
     "Active",
+    "Outstanding",
     "Deferred",
     "Deleted",
     "DNR",
@@ -239,6 +254,9 @@ class StudentSemester(Base):
     student_program_id: Mapped[int] = mapped_column(
         ForeignKey("student_programs.id", ondelete="cascade"), nullable=False
     )
+    created_at: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=lambda: int(datetime.now().timestamp())
+    )
 
     program: Mapped["StudentProgram"] = relationship(back_populates="semesters")
     modules: Mapped[list["StudentModule"]] = relationship(
@@ -252,7 +270,7 @@ class StudentSemester(Base):
         )
 
 
-ModuleType = Literal["Major", "Minor", "Core"]
+ModuleType = Literal["Major", "Minor", "Core", "Delete", "Elective"]
 ModuleStatus = Literal[
     "Add",
     "Compulsory",
@@ -274,6 +292,31 @@ ModuleStatus = Literal[
     "Supplementary",
 ]
 
+GradeType = Literal[
+    "A+",
+    "A",
+    "A-",
+    "B+",
+    "B",
+    "B-",
+    "C+",
+    "C",
+    "C-",
+    "F",
+    "PC",
+    "PX",
+    "AP",
+    "X",
+    "GNS",
+    "ANN",
+    "FIN",
+    "FX",
+    "DNC",
+    "DNA",
+    "PP",
+    "DNS",
+]
+
 
 class StudentModule(Base):
     __tablename__ = "student_modules"
@@ -284,9 +327,12 @@ class StudentModule(Base):
     )
     status: Mapped[ModuleStatus] = mapped_column(String, nullable=False)
     marks: Mapped[str] = mapped_column(String, nullable=False)
-    grade: Mapped[str] = mapped_column(String, nullable=False)
+    grade: Mapped[GradeType] = mapped_column(String, nullable=False)
     student_semester_id: Mapped[int] = mapped_column(
         ForeignKey("student_semesters.id", ondelete="cascade"), nullable=False
+    )
+    created_at: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=lambda: int(datetime.now().timestamp())
     )
 
     semester: Mapped["StudentSemester"] = relationship(back_populates="modules")
@@ -304,6 +350,9 @@ class School(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     code: Mapped[str] = mapped_column(String, nullable=False, unique=True)
     name: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=lambda: int(datetime.now().timestamp())
+    )
 
     programs: Mapped[list["Program"]] = relationship(back_populates="school")
 
@@ -321,10 +370,14 @@ class Program(Base):
     code: Mapped[str] = mapped_column(String, nullable=False, unique=True)
     name: Mapped[str] = mapped_column(String, nullable=False)
     level: Mapped[ProgramLevel] = mapped_column(String, nullable=False)
+    school_id: Mapped[int] = mapped_column(
+        ForeignKey("schools.id", ondelete="cascade"), nullable=False
+    )
+    created_at: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=lambda: int(datetime.now().timestamp())
+    )
 
-    school_id: Mapped[int] = mapped_column(ForeignKey("schools.id"), nullable=False)
     school: Mapped["School"] = relationship(back_populates="programs")
-
     structures: Mapped[list["Structure"]] = relationship(back_populates="program")
 
     def __repr__(self) -> str:
@@ -339,7 +392,13 @@ class Structure(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     code: Mapped[str] = mapped_column(String, nullable=False, unique=True)
-    program_id: Mapped[int] = mapped_column(ForeignKey("programs.id"), nullable=False)
+    program_id: Mapped[int] = mapped_column(
+        ForeignKey("programs.id", ondelete="cascade"), nullable=False
+    )
+    created_at: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=lambda: int(datetime.now().timestamp())
+    )
+
     program: Mapped["Program"] = relationship(back_populates="structures")
     students: Mapped[list["Student"]] = relationship(back_populates="structure")
     semesters: Mapped[list["StructureSemester"]] = relationship(
@@ -358,10 +417,15 @@ class Module(Base):
     name: Mapped[str] = mapped_column(String, nullable=False)
     type: Mapped[ModuleType] = mapped_column(String, nullable=False)
     credits: Mapped[float] = mapped_column(Float, nullable=False)
-    semester_id: Mapped[int] = mapped_column(
-        ForeignKey("structure_semesters.id"), nullable=False
+    semester_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("structure_semesters.id", ondelete="SET NULL")
     )
-    semester: Mapped["StructureSemester"] = relationship(
+    hidden: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created_at: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=lambda: int(datetime.now().timestamp())
+    )
+
+    semester: Mapped[Optional["StructureSemester"]] = relationship(
         back_populates="semester_modules", foreign_keys=[semester_id]
     )
     prerequisites: Mapped[list["ModulePrerequisite"]] = relationship(
@@ -392,6 +456,9 @@ class ModulePrerequisite(Base):
     prerequisite_id: Mapped[int] = mapped_column(
         ForeignKey("modules.id", ondelete="cascade"), nullable=False
     )
+    created_at: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=lambda: int(datetime.now().timestamp())
+    )
 
     module: Mapped["Module"] = relationship(
         "Module", foreign_keys=[module_id], back_populates="prerequisites"
@@ -417,11 +484,14 @@ class StructureSemester(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     structure_id: Mapped[int] = mapped_column(
-        ForeignKey("structures.id"), nullable=False
+        ForeignKey("structures.id", ondelete="cascade"), nullable=False
     )
     semester_number: Mapped[int] = mapped_column(Integer, nullable=False)
     name: Mapped[str] = mapped_column(String, nullable=False)
     total_credits: Mapped[float] = mapped_column(Float, nullable=False)
+    created_at: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=lambda: int(datetime.now().timestamp())
+    )
 
     structure: Mapped["Structure"] = relationship(back_populates="semesters")
     semester_modules: Mapped[list["Module"]] = relationship(
@@ -439,12 +509,57 @@ class StructureSemester(Base):
 class Term(Base):
     __tablename__ = "terms"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    name: Mapped[str] = mapped_column(String, nullable=False)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String, nullable=False, unique=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    semester: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    created_at: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=lambda: int(datetime.now().timestamp())
+    )
 
     def __repr__(self) -> str:
-        return f"<Term id={self.id!r} name={self.name!r} is_active={self.is_active!r}>"
+        return f"<Term id={self.id!r} name={self.name!r} is_active={self.is_active!r} semester={self.semester!r}>"
+
+
+class Sponsor(Base):
+    __tablename__ = "sponsors"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    created_at: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=lambda: int(datetime.now().timestamp())
+    )
+    updated_at: Mapped[Optional[int]] = mapped_column(Integer)
+
+    def __repr__(self) -> str:
+        return f"<Sponsor id={self.id!r} name={self.name!r}>"
+
+
+class SponsoredStudent(Base):
+    __tablename__ = "sponsored_students"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    sponsor_id: Mapped[int] = mapped_column(
+        ForeignKey("sponsors.id", ondelete="cascade"), nullable=False
+    )
+    std_no: Mapped[int] = mapped_column(
+        ForeignKey("students.std_no", ondelete="cascade"), nullable=False
+    )
+    borrower_no: Mapped[Optional[str]] = mapped_column(String)
+    term_id: Mapped[int] = mapped_column(
+        ForeignKey("terms.id", ondelete="cascade"), nullable=False
+    )
+    created_at: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=lambda: int(datetime.now().timestamp())
+    )
+    updated_at: Mapped[Optional[int]] = mapped_column(Integer)
+
+    __table_args__ = (
+        UniqueConstraint("std_no", "term_id", name="unique_sponsored_term"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<SponsoredStudent id={self.id!r} sponsor_id={self.sponsor_id!r} std_no={self.std_no!r}>"
 
 
 RegistrationRequestStatus = Literal["pending", "approved", "registered", "rejected"]
@@ -453,7 +568,10 @@ RegistrationRequestStatus = Literal["pending", "approved", "registered", "reject
 class RegistrationRequest(Base):
     __tablename__ = "registration_requests"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    sponsor_id: Mapped[int] = mapped_column(
+        ForeignKey("sponsors.id", ondelete="cascade"), nullable=False
+    )
     std_no: Mapped[int] = mapped_column(
         ForeignKey("students.std_no", ondelete="cascade"), nullable=False
     )
@@ -463,9 +581,14 @@ class RegistrationRequest(Base):
     status: Mapped[RegistrationRequestStatus] = mapped_column(
         String, nullable=False, default="pending"
     )
+    semester_status: Mapped[Literal["Active", "Repeat"]] = mapped_column(
+        String, nullable=False
+    )
     semester_number: Mapped[int] = mapped_column(Integer, nullable=False)
     message: Mapped[Optional[str]] = mapped_column(String)
-    created_at: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=lambda: int(datetime.now().timestamp())
+    )
     updated_at: Mapped[Optional[int]] = mapped_column(Integer)
     date_approved: Mapped[Optional[int]] = mapped_column(Integer)
 
@@ -475,6 +598,7 @@ class RegistrationRequest(Base):
     clearances: Mapped[list["RegistrationClearance"]] = relationship(
         back_populates="registration_request", cascade="all, delete"
     )
+    sponsor: Mapped["Sponsor"] = relationship()
 
     __table_args__ = (
         UniqueConstraint("std_no", "term_id", name="unique_registration_requests"),
@@ -514,9 +638,6 @@ class RequestedModule(Base):
         )
 
 
-DashboardUser = Literal["admin", "finance", "academic", "library"]
-
-
 class RegistrationClearance(Base):
     __tablename__ = "registration_clearances"
 
@@ -552,4 +673,35 @@ class RegistrationClearance(Base):
         return (
             f"<RegistrationClearance id={self.id!r} registration_request_id={self.registration_request_id!r} "
             f"department={self.department!r} status={self.status!r}>"
+        )
+
+
+class RegistrationClearanceAudit(Base):
+    __tablename__ = "registration_clearance_audit"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    registration_clearance_id: Mapped[int] = mapped_column(
+        ForeignKey("registration_clearances.id", ondelete="cascade"), nullable=False
+    )
+    previous_status: Mapped[Optional[RegistrationRequestStatus]] = mapped_column(String)
+    new_status: Mapped[RegistrationRequestStatus] = mapped_column(
+        String, nullable=False
+    )
+    created_by: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="set null"), nullable=False
+    )
+    date: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=lambda: int(datetime.now().timestamp())
+    )
+    message: Mapped[Optional[str]] = mapped_column(String)
+    modules: Mapped[list[str]] = mapped_column(JSON, default=lambda: [], nullable=False)
+
+    registration_clearance: Mapped["RegistrationClearance"] = relationship()
+    creator: Mapped["User"] = relationship(foreign_keys=[created_by])
+
+    def __repr__(self) -> str:
+        return (
+            f"<RegistrationClearanceAudit id={self.id!r} "
+            f"registration_clearance_id={self.registration_clearance_id!r} "
+            f"previous_status={self.previous_status!r} new_status={self.new_status!r}>"
         )
