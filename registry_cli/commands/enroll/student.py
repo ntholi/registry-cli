@@ -1,9 +1,9 @@
-from sqlalchemy import and_, func
+import click
+from sqlalchemy import and_, func, not_, or_
 from sqlalchemy.orm import Session
 
 from registry_cli.commands.enroll.enrollment import enroll_student
 from registry_cli.models import RegistrationClearance, RegistrationRequest
-import click
 
 
 def enroll_by_student_number(db: Session, std_no: str) -> None:
@@ -13,6 +13,7 @@ def enroll_by_student_number(db: Session, std_no: str) -> None:
         .filter(
             and_(
                 RegistrationRequest.std_no == std_no,
+                not_(RegistrationRequest.status.in_(["registered", "rejected"])),
                 RegistrationRequest.id == RegistrationClearance.registration_request_id,
                 RegistrationClearance.status == "approved",
                 RegistrationClearance.id.in_(

@@ -1,6 +1,6 @@
-from sqlalchemy import and_, func
-from sqlalchemy.orm import Session
 import click
+from sqlalchemy import and_, func, not_
+from sqlalchemy.orm import Session
 
 from registry_cli.commands.enroll.enrollment import enroll_student
 from registry_cli.models import RegistrationClearance, RegistrationRequest
@@ -12,6 +12,7 @@ def enroll_approved(db: Session) -> None:
         .join(RegistrationClearance)
         .filter(
             and_(
+                not_(RegistrationRequest.status.in_(["registered", "rejected"])),
                 RegistrationRequest.id == RegistrationClearance.registration_request_id,
                 RegistrationClearance.status == "approved",
                 RegistrationClearance.id.in_(
@@ -44,3 +45,5 @@ def enroll_approved(db: Session) -> None:
             print(f"Successfully enrolled student {request.std_no}")
         else:
             click.secho(f"Failed to enroll student {request.std_no}", fg="red")
+        exit(0)
+    click.secho("Done!", fg="green")
