@@ -39,7 +39,8 @@ def enroll_by_student_number(db: Session, std_no: str) -> None:
         return
 
     print(f"Processing enrollment for student {std_no}")
-    if enroll_student(db, registration_request):
+    try:
+        enroll_student(db, registration_request)
         print(f"Successfully enrolled student {std_no}")
-    else:
-        click.secho(f"Failed to enroll student {std_no}", fg="red")
+    except Exception as e:
+        click.secho(f"Failed to enroll student {std_no}: {str(e)}", fg="red")

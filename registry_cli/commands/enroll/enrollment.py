@@ -16,11 +16,10 @@ from registry_cli.models import (
 )
 
 
-def enroll_student(db: Session, request: RegistrationRequest) -> bool:
+def enroll_student(db: Session, request: RegistrationRequest) -> None:
     student = db.query(Student).filter(Student.std_no == request.std_no).first()
     if not student:
-        click.secho(f"Student {request.std_no} not found", fg="red")
-        return False
+        raise ValueError(f"Student {request.std_no} not found")
 
     crawler = Crawler(db)
     result = (
@@ -36,8 +35,7 @@ def enroll_student(db: Session, request: RegistrationRequest) -> bool:
         .first()
     )
     if not result:
-        click.secho(f"No active program found for student {student.std_no}", fg="red")
-        return False
+        raise ValueError(f"No active program found for student {student.std_no}")
 
     program, structure, program_details = result
 
@@ -53,52 +51,49 @@ def enroll_student(db: Session, request: RegistrationRequest) -> bool:
         semester=semester_name,
     )
 
-    if semester_id:
-        requested_modules = (
-            db.query(Module)
-            .join(RequestedModule)
-            .filter(RequestedModule.registration_request_id == request.id)
-            .all()
+    if not semester_id:
+        raise RuntimeError("Failed to add semester")
+
+    requested_modules = (
+        db.query(Module)
+        .join(RequestedModule)
+        .filter(RequestedModule.registration_request_id == request.id)
+        .all()
+    )
+
+    registered_module_codes = crawler.add_modules(semester_id, requested_modules)
+
+    requested_module_records = (
+        db.query(RequestedModule)
+        .join(Module)
+        .filter(
+            RequestedModule.registration_request_id == request.id,
+            Module.code.in_(registered_module_codes),
+        )
+        .all()
+    )
+
+    for module in requested_module_records:
+        module.status = "registered"
+
+    click.echo(f"Updated status for {len(requested_module_records)} registered modules")
+
+    total_requested_modules = (
+        db.query(RequestedModule)
+        .filter(RequestedModule.registration_request_id == request.id)
+        .count()
+    )
+
+    if len(requested_module_records) == total_requested_modules:
+        request.status = "registered"
+        click.secho("All modules were registered successfully", fg="green")
+    elif len(requested_module_records) > 0:
+        request.status = "partial"
+        click.secho(
+            f"Only {len(requested_module_records)} out of {total_requested_modules} modules were registered",
+            fg="yellow",
         )
 
-        registered_module_codes = crawler.add_modules(semester_id, requested_modules)
-
-        requested_module_records = (
-            db.query(RequestedModule)
-            .join(Module)
-            .filter(
-                RequestedModule.registration_request_id == request.id,
-                Module.code.in_(registered_module_codes),
-            )
-            .all()
-        )
-
-        for module in requested_module_records:
-            module.status = "registered"
-
-        click.echo(
-            f"Updated status for {len(requested_module_records)} registered modules"
-        )
-
-        total_requested_modules = (
-            db.query(RequestedModule)
-            .filter(RequestedModule.registration_request_id == request.id)
-            .count()
-        )
-
-        if len(requested_module_records) == total_requested_modules:
-            request.status = "registered"
-            click.secho("All modules were registered successfully", fg="green")
-        elif len(requested_module_records) > 0:
-            request.status = "partial"
-            click.secho(
-                f"Only {len(requested_module_records)} out of {total_requested_modules} modules were registered",
-                fg="yellow",
-            )
-
-        request.updated_at = int(time.time())
-        student.sem = request.semester_number
-        db.commit()
-        return True
-
-    return False
+    request.updated_at = int(time.time())
+    student.sem = request.semester_number
+    db.commit()

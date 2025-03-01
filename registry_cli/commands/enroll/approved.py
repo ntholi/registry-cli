@@ -41,9 +41,12 @@ def enroll_approved(db: Session) -> None:
         print()
         print("-" * 30)
         print(f"{i}/{len(approved_requests)}] {request.std_no}")
-        if enroll_student(db, request):
+        try:
+            enroll_student(db, request)
             print(f"Successfully enrolled student {request.std_no}")
-        else:
-            click.secho(f"Failed to enroll student {request.std_no}", fg="red")
+        except Exception as e:
+            click.secho(
+                f"Failed to enroll student {request.std_no}: {str(e)}", fg="red"
+            )
         exit(0)
     click.secho("Done!", fg="green")
