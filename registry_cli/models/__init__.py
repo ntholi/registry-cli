@@ -562,7 +562,9 @@ class SponsoredStudent(Base):
         return f"<SponsoredStudent id={self.id!r} sponsor_id={self.sponsor_id!r} std_no={self.std_no!r}>"
 
 
-RegistrationRequestStatus = Literal["pending", "approved", "registered", "rejected"]
+RegistrationRequestStatus = Literal[
+    "pending", "approved", "partial", "registered", "rejected"
+]
 
 
 class RegistrationRequest(Base):
@@ -611,6 +613,9 @@ class RegistrationRequest(Base):
         )
 
 
+RequestedModuleStatus = Literal["pending", "registered", "rejected"]
+
+
 class RequestedModule(Base):
     __tablename__ = "requested_modules"
 
@@ -624,7 +629,12 @@ class RequestedModule(Base):
     module_id: Mapped[int] = mapped_column(
         ForeignKey("modules.id", ondelete="cascade"), nullable=False
     )
-    created_at: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[RequestedModuleStatus] = mapped_column(
+        String, nullable=False, default="pending"
+    )
+    created_at: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=lambda: int(datetime.now().timestamp())
+    )
 
     registration_request: Mapped["RegistrationRequest"] = relationship(
         back_populates="requested_modules"
@@ -634,7 +644,8 @@ class RequestedModule(Base):
     def __repr__(self) -> str:
         return (
             f"<RequestedModule id={self.id!r} module_status={self.module_status!r} "
-            f"registration_request_id={self.registration_request_id!r} module_id={self.module_id!r}>"
+            f"registration_request_id={self.registration_request_id!r} module_id={self.module_id!r} "
+            f"status={self.status!r}>"
         )
 
 

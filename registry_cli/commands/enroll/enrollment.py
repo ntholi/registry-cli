@@ -1,8 +1,8 @@
 import time
 
+import click
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
-import click
 
 from registry_cli.commands.enroll.crawler import Crawler
 from registry_cli.models import (
@@ -60,11 +60,44 @@ def enroll_student(db: Session, request: RegistrationRequest) -> bool:
             .filter(RequestedModule.registration_request_id == request.id)
             .all()
         )
-        crawler.add_modules(semester_id, requested_modules)
 
-        # TODO: Update Semester Number
-        request.status = "registered"
+        registered_module_codes = crawler.add_modules(semester_id, requested_modules)
+
+        requested_module_records = (
+            db.query(RequestedModule)
+            .join(Module)
+            .filter(
+                RequestedModule.registration_request_id == request.id,
+                Module.code.in_(registered_module_codes),
+            )
+            .all()
+        )
+
+        for module in requested_module_records:
+            module.status = "registered"
+
+        click.echo(
+            f"Updated status for {len(requested_module_records)} registered modules"
+        )
+
+        total_requested_modules = (
+            db.query(RequestedModule)
+            .filter(RequestedModule.registration_request_id == request.id)
+            .count()
+        )
+
+        if len(requested_module_records) == total_requested_modules:
+            request.status = "registered"
+            click.secho("All modules were registered successfully", fg="green")
+        elif len(requested_module_records) > 0:
+            request.status = "partial"
+            click.secho(
+                f"Only {len(requested_module_records)} out of {total_requested_modules} modules were registered",
+                fg="yellow",
+            )
+
         request.updated_at = int(time.time())
+        student.sem = request.semester_number
         db.commit()
         return True
 
