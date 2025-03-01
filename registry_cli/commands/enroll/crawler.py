@@ -63,7 +63,7 @@ class Crawler:
         url = f"{BASE_URL}/r_stdmodulelist.php?showmaster=1&StdSemesterID={std_semester_id}"
         response = self.browser.fetch(url)
         page = BeautifulSoup(response.text, "lxml")
-        
+
         existing_modules = []
         table = page.find("table", id="ewlistmain")
         if table:
@@ -73,20 +73,21 @@ class Crawler:
                 if module_cell and module_cell.text.strip():
                     module_code = module_cell.text.strip().split()[0]
                     existing_modules.append(module_code)
-        
+
         return existing_modules
 
-    def add_modules(self, std_semester_id: int, requested_modules: list[Module]):
+    def add_modules(
+        self, std_semester_id: int, requested_modules: list[Module]
+    ) -> list[str]:
         existing_modules = self.get_existing_modules(std_semester_id)
-        
+
         modules_to_add = [
-            module for module in requested_modules 
-            if module.code not in existing_modules
+            m for m in requested_modules if m.code not in existing_modules
         ]
-        
+
         if not modules_to_add:
             logger.info("No new modules to add")
-            return
+            return existing_modules
 
         url = f"{BASE_URL}/r_stdmodulelist.php?showmaster=1&StdSemesterID={std_semester_id}"
         self.browser.fetch(url)
@@ -120,6 +121,11 @@ class Crawler:
             payload.update({hidden["name"]: hidden["value"]})
 
         self.browser.post(f"{BASE_URL}/r_stdmoduleadd1.php", payload)
+
+        registered_modules = self.get_existing_modules(std_semester_id)
+        logger.info(f"Successfully registered modules: {registered_modules}")
+
+        return registered_modules
 
     @staticmethod
     def get_id_for(response: requests.Response, search_key: str) -> Optional[str]:
