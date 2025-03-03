@@ -11,6 +11,7 @@ from registry_cli.commands.pull.semesters import semesters_pull
 from registry_cli.commands.pull.structures import structure_pull
 from registry_cli.commands.pull.student import student_pull
 from registry_cli.commands.push.students import student_push
+from registry_cli.commands.send.proof import send_proof_registration
 from registry_cli.db.config import get_engine
 
 
@@ -117,6 +118,20 @@ def approved() -> None:
 def enroll_student(std_no: str) -> None:
     db = get_db()
     enroll_by_student_number(db, std_no)
+
+
+@cli.group()
+def send() -> None:
+    """Commands to send documents and notifications."""
+    pass
+
+
+@send.command()
+@click.argument("std_no", type=int)
+def proof(std_no: int) -> None:
+    """Send proof of registration to the specified student."""
+    db = get_db()
+    send_proof_registration(db, std_no)
 
 
 if __name__ == "__main__":

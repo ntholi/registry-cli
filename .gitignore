@@ -171,3 +171,4 @@ cython_debug/
 .pypirc
 /session.pkl
 *.db
+registration_pdfs/

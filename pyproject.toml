@@ -13,6 +13,8 @@ beautifulsoup4 = "^4.12.2"
 requests = "^2.31.0"
 selenium = "^4.15.2"
 lxml = "^4.9.3"
+reportlab = "^4.0.8"
+python-dotenv = "^1.0.1"
 
 [tool.poetry.scripts]
 registry = "registry_cli.main:cli"

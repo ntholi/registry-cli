@@ -14,6 +14,7 @@ from registry_cli.models import (
     Student,
     StudentProgram,
 )
+from registry_cli.utils.registration_notification import send_registration_confirmation
 
 
 def enroll_student(db: Session, request: RegistrationRequest) -> None:
@@ -97,3 +98,27 @@ def enroll_student(db: Session, request: RegistrationRequest) -> None:
     request.updated_at = int(time.time())
     student.sem = request.semester_number
     db.commit()
+
+    # Send registration confirmation email with PDF attachment
+    if (
+        len(requested_module_records) > 0
+    ):  # Only send if at least some modules were registered
+        click.echo(
+            "Generating registration confirmation PDF and sending email notification..."
+        )
+        email_sent, pdf_path = send_registration_confirmation(
+            db=db,
+            request=request,
+            student=student,
+            registered_modules=registered_module_codes,
+        )
+
+        if email_sent:
+            click.secho("Registration confirmation email sent successfully", fg="green")
+        elif pdf_path:
+            click.secho(
+                f"Registration PDF generated but email could not be sent. PDF saved at: {pdf_path}",
+                fg="yellow",
+            )
+        else:
+            click.secho("Failed to generate registration confirmation", fg="red")
