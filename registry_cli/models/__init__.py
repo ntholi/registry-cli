@@ -588,6 +588,7 @@ class RegistrationRequest(Base):
     )
     semester_number: Mapped[int] = mapped_column(Integer, nullable=False)
     message: Mapped[Optional[str]] = mapped_column(String)
+    mail_sent: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[int] = mapped_column(
         Integer, nullable=False, default=lambda: int(datetime.now().timestamp())
     )

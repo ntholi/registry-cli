@@ -1,4 +1,5 @@
 import logging
+import time
 from typing import List, Optional, Tuple
 
 from sqlalchemy.orm import Session
@@ -139,6 +140,10 @@ Limkokwing University of Creative Technology
 
     if success:
         logger.info(f"Registration confirmation email sent successfully to {email}")
+        # Mark the email as sent in the database
+        request.mail_sent = True
+        request.updated_at = int(time.time())
+        db.commit()
         return True, pdf_path
     else:
         logger.error(f"Failed to send registration confirmation email to {email}")
