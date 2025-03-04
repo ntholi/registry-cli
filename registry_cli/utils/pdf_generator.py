@@ -131,16 +131,7 @@ class RegistrationPDFGenerator:
                 RegistrationPDFGenerator._build_modules_table(module_details, styles)
             )
             elements.append(Spacer(1, 0.2 * inch))  # Reduced spacing
-
-            # Add registration status
-            elements.append(
-                RegistrationPDFGenerator._build_registration_status(request.status)
-            )
             elements.append(Spacer(1, 0.3 * inch))  # Reduced spacing
-
-            # Add signature
-            elements.append(RegistrationPDFGenerator._build_signature())
-            elements.append(Spacer(1, 0.3 * inch))
 
             # Add footer
             elements.extend(
@@ -181,6 +172,9 @@ class RegistrationPDFGenerator:
             "small": ParagraphStyle("Small", fontSize=8, fontName="Helvetica"),
             "header_text": ParagraphStyle(
                 "HeaderText", fontSize=10, fontName="Helvetica"
+            ),
+            "contact_info": ParagraphStyle(
+                "ContactInfo", fontSize=6, fontName="Helvetica"
             ),
             "section_header": ParagraphStyle(
                 "SectionHeader",
@@ -223,16 +217,12 @@ class RegistrationPDFGenerator:
                 Maseru Maseru 0101<br/>
                 Lesotho<br/>
                 +(266) 22315767<br/>
-                https://www.limkokwing.net/m/contact/limkokwing_lesotho""",
-                styles["header_text"],
+                registry@limkokwing.ac.ls""",
+                styles["contact_info"],
             )
 
-            # Create logo with fixed width and height
-            logo = Image(logo_path, width=1.2 * inch, height=0.8 * inch)
+            logo = Image(logo_path, width=1.8 * inch, height=1 * inch)
 
-            # Create a table with fixed widths
-            # First column for contact info (left-aligned) - takes most of the page width
-            # Second column for logo (right-aligned) - takes just enough width for the logo
             header_table = Table(
                 [[contact_info, logo]], colWidths=[5.5 * inch, 1.5 * inch]
             )
@@ -282,7 +272,7 @@ class RegistrationPDFGenerator:
                 Lesotho<br/>
                 +(266) 22315767<br/>
                 https://www.limkokwing.net/m/contact/limkokwing_lesotho""",
-                styles["header_text"],
+                styles["contact_info"],
             )
             elements.append(contact_info)
 
@@ -438,83 +428,7 @@ class RegistrationPDFGenerator:
 
         elements.append(modules_table)
 
-        # Total credits row
-        total_data = [
-            ["", "", "Total Credits:", str(total_credits)],
-        ]
-        total_table = Table(
-            total_data, colWidths=[0.3 * inch, 4.7 * inch, 1 * inch, 0.7 * inch]
-        )
-        total_table.setStyle(
-            TableStyle(
-                [
-                    ("ALIGN", (2, 0), (2, -1), "RIGHT"),
-                    ("ALIGN", (3, 0), (3, -1), "CENTER"),
-                    ("FONTNAME", (2, 0), (3, -1), "Helvetica-Bold"),
-                    ("LINEABOVE", (2, 0), (3, 0), 1, colors.black),
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-                    ("TOPPADDING", (0, 0), (-1, -1), 6),
-                ]
-            )
-        )
-        elements.append(total_table)
-
         return elements
-
-    @staticmethod
-    def _build_registration_status(request_status: str) -> Table:
-        """Build the registration status table
-
-        Args:
-            request_status: Status of the registration request
-
-        Returns:
-            Table object with registration status
-        """
-        status_data = [
-            ["Registration Status:", request_status.upper()],
-            ["Processed On:", datetime.now().strftime("%d %B %Y")],
-        ]
-
-        status_table = Table(status_data, colWidths=[1.5 * inch, 5 * inch])
-        status_table.setStyle(
-            TableStyle(
-                [
-                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                    ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-                ]
-            )
-        )
-
-        return status_table
-
-    @staticmethod
-    def _build_signature() -> Table:
-        """Build the signature section with only registry signature
-
-        Returns:
-            Table object with signature line
-        """
-        signature_data = [
-            ["_______________________________"],
-            ["Registry Department"],
-        ]
-
-        signature_table = Table(signature_data, colWidths=[6 * inch])
-        signature_table.setStyle(
-            TableStyle(
-                [
-                    ("ALIGN", (0, 0), (0, 1), "CENTER"),
-                    ("VALIGN", (0, 0), (0, 1), "MIDDLE"),
-                    ("FONTNAME", (0, 1), (0, 1), "Helvetica"),
-                    ("FONTSIZE", (0, 1), (0, 1), 9),
-                    ("TOPPADDING", (0, 1), (0, 1), 2),
-                ]
-            )
-        )
-
-        return signature_table
 
     @staticmethod
     def _build_footer(doc_id: str, styles: Dict[str, ParagraphStyle]) -> List[Any]:
