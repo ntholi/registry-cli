@@ -2,7 +2,7 @@ import logging
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
@@ -61,6 +61,7 @@ class RegistrationPDFGenerator:
             str: Path to the generated PDF file, or None if generation failed
         """
         try:
+            # Fetch required data
             term = db.query(Term).filter(Term.id == request.term_id).first()
 
             program_info = (
@@ -90,11 +91,15 @@ class RegistrationPDFGenerator:
                 .all()
             )
 
+            # Generate filename
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             pdf_filename = f"registration_{student.std_no}_{timestamp}.pdf"
             pdf_path = os.path.join(OUTPUT_DIR, pdf_filename)
 
-            # Document with smaller margins for more space
+            # Create document styles
+            styles = RegistrationPDFGenerator._create_styles()
+
+            # Create document
             doc = SimpleDocTemplate(
                 pdf_path,
                 pagesize=A4,
@@ -104,282 +109,47 @@ class RegistrationPDFGenerator:
                 bottomMargin=30,
             )
 
-            styles = getSampleStyleSheet()
-            title_style = ParagraphStyle(
-                "Title",
-                fontSize=16,
-                alignment=0,
-                spaceAfter=6,
-                fontName="Helvetica-Bold",
-                textColor=colors.black,
-            )
-            normal_style = styles["Normal"]
-            small_style = ParagraphStyle("Small", fontSize=8, fontName="Helvetica")
-            header_text_style = ParagraphStyle(
-                "HeaderText", fontSize=10, fontName="Helvetica"
-            )
-            section_header_style = ParagraphStyle(
-                "SectionHeader",
-                fontSize=12,
-                fontName="Helvetica-Bold",
-                spaceAfter=6,
-                textColor=colors.black,
-            )
-
+            # Build the document elements
             elements = []
 
-            # Create header table with university info and logo
-            logo_path = "path/to/logo.png"
-            has_logo = os.path.exists(logo_path)
+            # Add header
+            elements.extend(RegistrationPDFGenerator._build_header(styles))
 
-            if has_logo:
-                header_data = [
-                    [
-                        Paragraph(
-                            "Limkokwing University of Creative Technology",
-                            title_style,
-                        ),
-                        Image(logo_path, width=1.5 * inch, height=1.5 * inch),
-                    ],
-                    [
-                        Paragraph(
-                            """
-                            Moshoeshoe Road Maseru Central<br/>
-                            P.O. Box 8971<br/>
-                            Maseru Maseru 0101<br/>
-                            Lesotho<br/>
-                            +(266) 22315767<br/>
-                            https://www.limkokwing.net/m/contact/limkokwing_lesotho""",
-                            header_text_style,
-                        ),
-                        Paragraph("LESOTHO", header_text_style),
-                    ],
-                ]
-                header_table = Table(header_data, colWidths=[4.5 * inch, 2 * inch])
-                header_table.setStyle(
-                    TableStyle(
-                        [
-                            ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                            ("ALIGN", (1, 0), (1, 1), "CENTER"),
-                        ]
-                    )
-                )
-            else:
-                # Fallback if logo is unavailable
-                header_data = [
-                    [
-                        Paragraph(
-                            "Limkokwing University of Creative Technology",
-                            title_style,
-                        ),
-                    ],
-                    [
-                        Paragraph(
-                            """Tax ID : 200051832-0<br/>
-                            Moshoeshoe Road Maseru Central<br/>
-                            P.O. Box 8971<br/>
-                            Maseru Maseru 0101<br/>
-                            Lesotho<br/>
-                            +(266) 22315767<br/>
-                            https://www.limkokwing.net/m/contact/limkokwing_lesotho""",
-                            header_text_style,
-                        ),
-                    ],
-                ]
-                header_table = Table(header_data)
-                header_table.setStyle(
-                    TableStyle(
-                        [
-                            ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                        ]
-                    )
-                )
+            # Add registration header
+            elements.extend(RegistrationPDFGenerator._build_registration_header(styles))
 
-            elements.append(header_table)
+            # Add student information
             elements.append(
-                HRFlowable(
-                    width="100%",
-                    thickness=1,
-                    color=colors.black,
-                    spaceBefore=6,
-                    spaceAfter=12,
+                RegistrationPDFGenerator._build_student_info(
+                    student, program, term, request.semester_number, styles
                 )
             )
+            elements.append(Spacer(1, 0.2 * inch))  # Reduced spacing
 
-            # Registration header - cleaner, with date aligned right
-            reg_header_data = [
-                [
-                    Paragraph("PROOF OF REGISTRATION", title_style),
-                    Paragraph(
-                        f"Date: {datetime.now().strftime('%d %b %Y')}",
-                        header_text_style,
-                    ),
-                ],
-            ]
-            reg_header_table = Table(reg_header_data, colWidths=[4 * inch, 2.5 * inch])
-            reg_header_table.setStyle(
-                TableStyle(
-                    [
-                        ("ALIGN", (0, 0), (0, 0), "LEFT"),
-                        ("ALIGN", (1, 0), (1, 0), "RIGHT"),
-                        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                    ]
-                )
+            # Add modules table
+            elements.extend(
+                RegistrationPDFGenerator._build_modules_table(module_details, styles)
             )
-            elements.append(reg_header_table)
-            elements.append(Spacer(1, 0.2 * inch))
+            elements.append(Spacer(1, 0.2 * inch))  # Reduced spacing
 
-            # Student information - cleaner, without the removed fields
-            student_info = [
-                ["Student Number:", str(student.std_no)],
-                ["Student Name:", student.name],
-                ["Program:", program.name],
-                ["Term:", term.name if term else "N/A"],
-                ["Semester:", f"Semester {request.semester_number}"],
-            ]
-            student_info_table = Table(student_info, colWidths=[1.5 * inch, 5 * inch])
-            student_info_table.setStyle(
-                TableStyle(
-                    [
-                        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
-                        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-                    ]
-                )
+            # Add registration status
+            elements.append(
+                RegistrationPDFGenerator._build_registration_status(request.status)
             )
-            elements.append(student_info_table)
+            elements.append(Spacer(1, 0.3 * inch))  # Reduced spacing
+
+            # Add signature
+            elements.append(RegistrationPDFGenerator._build_signature())
             elements.append(Spacer(1, 0.3 * inch))
 
-            # Registered modules with improved styling
-            elements.append(Paragraph("REGISTERED MODULES", section_header_style))
-
-            # Add a light gray background to alternate rows for better readability
-            module_data = [["#", "Module Code & Description", "Type", "Credits"]]
-
-            for idx, module in enumerate(module_details, 1):
-                module_data.append(
-                    [
-                        idx,
-                        f"{module.code}\n{module.name}",
-                        module.type,
-                        str(module.credits),
-                    ]
-                )
-
-            # Calculate total credits
-            total_credits = sum(module.credits for module in module_details)
-
-            modules_table = Table(
-                module_data,
-                colWidths=[0.3 * inch, 4.7 * inch, 1 * inch, 0.7 * inch],
-                repeatRows=1,
-            )
-
-            row_colors = [colors.lightgrey, colors.white]
-            for i in range(1, len(module_data)):
-                bg_color = row_colors[i % 2]
-                modules_table.setStyle(
-                    TableStyle([("BACKGROUND", (0, i), (-1, i), bg_color)])
-                )
-
-            modules_table.setStyle(
-                TableStyle(
-                    [
-                        ("BACKGROUND", (0, 0), (-1, 0), colors.gray),
-                        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                        ("ALIGN", (0, 0), (0, -1), "CENTER"),
-                        ("ALIGN", (2, 0), (3, -1), "CENTER"),
-                        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                        ("FONTSIZE", (0, 0), (-1, -1), 10),
-                        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                        ("GRID", (0, 0), (-1, -1), 0.5, colors.lightgrey),
-                        ("LINEBELOW", (0, 0), (-1, 0), 1, colors.black),
-                        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
-                        ("TOPPADDING", (0, 0), (-1, -1), 8),
-                    ]
+            # Add footer
+            elements.extend(
+                RegistrationPDFGenerator._build_footer(
+                    pdf_filename.split(".")[0], styles
                 )
             )
 
-            elements.append(modules_table)
-
-            # Total credits with stronger visual emphasis
-            total_data = [
-                ["", "", "Total Credits:", str(total_credits)],
-            ]
-            total_table = Table(
-                total_data, colWidths=[0.3 * inch, 4.7 * inch, 1 * inch, 0.7 * inch]
-            )
-            total_table.setStyle(
-                TableStyle(
-                    [
-                        ("ALIGN", (2, 0), (2, -1), "RIGHT"),
-                        ("ALIGN", (3, 0), (3, -1), "CENTER"),
-                        ("FONTNAME", (2, 0), (3, -1), "Helvetica-Bold"),
-                        ("LINEABOVE", (2, 0), (3, 0), 1, colors.black),
-                        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-                        ("TOPPADDING", (0, 0), (-1, -1), 6),
-                    ]
-                )
-            )
-            elements.append(total_table)
-            elements.append(Spacer(1, 0.3 * inch))
-
-            # Registration status - simplified and focused on key information
-            status_data = [
-                ["Registration Status:", request.status.upper()],
-                ["Processed On:", datetime.now().strftime("%d %B %Y")],
-            ]
-            status_table = Table(status_data, colWidths=[1.5 * inch, 5 * inch])
-            status_table.setStyle(
-                TableStyle(
-                    [
-                        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
-                        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-                    ]
-                )
-            )
-            elements.append(status_table)
-            elements.append(Spacer(1, 0.5 * inch))
-
-            # Signature line with better spacing and formatting
-            signature_data = [
-                ["_______________________________", "_______________________________"],
-                ["Registry Department", "Student Signature"],
-            ]
-            signature_table = Table(signature_data, colWidths=[3 * inch, 3 * inch])
-            signature_table.setStyle(
-                TableStyle(
-                    [
-                        ("ALIGN", (0, 0), (1, 1), "CENTER"),
-                        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                        ("FONTNAME", (0, 1), (1, 1), "Helvetica"),
-                        ("FONTSIZE", (0, 1), (1, 1), 9),
-                        ("TOPPADDING", (0, 1), (1, 1), 2),
-                    ]
-                )
-            )
-            elements.append(signature_table)
-
-            # Footer with document ID and verification text
-            elements.append(Spacer(1, 0.5 * inch))
-            elements.append(
-                HRFlowable(
-                    width="100%",
-                    thickness=0.5,
-                    color=colors.lightgrey,
-                    spaceBefore=6,
-                    spaceAfter=6,
-                )
-            )
-
-            footer_text = (
-                f"Document ID: {pdf_filename.split('.')[0]} | "
-                f"This document serves as official proof of registration for the above student. "
-                f"Registration processed through the official university system on {datetime.now().strftime('%d %B %Y')}."
-            )
-            elements.append(Paragraph(footer_text, small_style))
-
+            # Generate PDF
             doc.build(elements)
 
             logger.info(f"Generated registration PDF: {pdf_path}")
@@ -388,3 +158,392 @@ class RegistrationPDFGenerator:
         except Exception as e:
             logger.error(f"Failed to generate registration PDF: {str(e)}")
             return None
+
+    @staticmethod
+    def _create_styles() -> Dict[str, ParagraphStyle]:
+        """Create and return all document styles
+
+        Returns:
+            Dict of style names to ParagraphStyle objects
+        """
+        base_styles = getSampleStyleSheet()
+
+        styles = {
+            "title": ParagraphStyle(
+                "Title",
+                fontSize=16,
+                alignment=0,
+                spaceAfter=6,
+                fontName="Helvetica-Bold",
+                textColor=colors.black,
+            ),
+            "normal": base_styles["Normal"],
+            "small": ParagraphStyle("Small", fontSize=8, fontName="Helvetica"),
+            "header_text": ParagraphStyle(
+                "HeaderText", fontSize=10, fontName="Helvetica"
+            ),
+            "section_header": ParagraphStyle(
+                "SectionHeader",
+                fontSize=12,
+                fontName="Helvetica-Bold",
+                spaceAfter=6,
+                textColor=colors.black,
+            ),
+        }
+
+        return styles
+
+    @staticmethod
+    def _build_header(styles: Dict[str, ParagraphStyle]) -> List[Any]:
+        """Build the document header
+
+        Args:
+            styles: Dictionary of paragraph styles
+
+        Returns:
+            List of flowable elements for the header
+        """
+        elements = []
+        logo_path = "resource/logo.jpg"
+        has_logo = os.path.exists(logo_path)
+
+        # Title
+        title = Paragraph(
+            "Limkokwing University of Creative Technology", styles["title"]
+        )
+        elements.append(title)
+        elements.append(Spacer(1, 0.1 * inch))
+
+        # Contact info and logo
+        if has_logo:
+            # Create contact info paragraph
+            contact_info = Paragraph(
+                """Moshoeshoe Road Maseru Central<br/>
+                P.O. Box 8971<br/>
+                Maseru Maseru 0101<br/>
+                Lesotho<br/>
+                +(266) 22315767<br/>
+                https://www.limkokwing.net/m/contact/limkokwing_lesotho""",
+                styles["header_text"],
+            )
+
+            # Create logo with fixed width and height
+            logo = Image(logo_path, width=1.2 * inch, height=0.8 * inch)
+
+            # Create a table with fixed widths
+            # First column for contact info (left-aligned) - takes most of the page width
+            # Second column for logo (right-aligned) - takes just enough width for the logo
+            header_table = Table(
+                [[contact_info, logo]], colWidths=[5.5 * inch, 1.5 * inch]
+            )
+
+            # Set styling to ensure proper positioning
+            header_table.setStyle(
+                TableStyle(
+                    [
+                        ("VALIGN", (0, 0), (0, 0), "TOP"),  # Top-align contact info
+                        ("VALIGN", (1, 0), (1, 0), "TOP"),  # Top-align logo
+                        (
+                            "ALIGN",
+                            (1, 0),
+                            (1, 0),
+                            "RIGHT",
+                        ),  # Right-align logo in its cell
+                        (
+                            "LEFTPADDING",
+                            (0, 0),
+                            (0, 0),
+                            0,
+                        ),  # No left padding for contact info
+                        (
+                            "RIGHTPADDING",
+                            (0, 0),
+                            (0, 0),
+                            0,
+                        ),  # No right padding for contact info
+                        ("LEFTPADDING", (1, 0), (1, 0), 0),  # No left padding for logo
+                        (
+                            "RIGHTPADDING",
+                            (1, 0),
+                            (1, 0),
+                            0,
+                        ),  # No right padding for logo
+                    ]
+                )
+            )
+
+            elements.append(header_table)
+        else:
+            # Fallback without logo
+            contact_info = Paragraph(
+                """Moshoeshoe Road Maseru Central<br/>
+                P.O. Box 8971<br/>
+                Maseru Maseru 0101<br/>
+                Lesotho<br/>
+                +(266) 22315767<br/>
+                https://www.limkokwing.net/m/contact/limkokwing_lesotho""",
+                styles["header_text"],
+            )
+            elements.append(contact_info)
+
+        elements.append(
+            HRFlowable(
+                width="100%",
+                thickness=1,
+                color=colors.black,
+                spaceBefore=6,
+                spaceAfter=12,
+            )
+        )
+
+        return elements
+
+    @staticmethod
+    def _build_registration_header(styles: Dict[str, ParagraphStyle]) -> List[Any]:
+        """Build the registration proof header
+
+        Args:
+            styles: Dictionary of paragraph styles
+
+        Returns:
+            List of flowable elements for the registration header
+        """
+        elements = []
+
+        reg_header_data = [
+            [
+                Paragraph("PROOF OF REGISTRATION", styles["title"]),
+                Paragraph(
+                    f"Date: {datetime.now().strftime('%d %b %Y')}",
+                    styles["header_text"],
+                ),
+            ],
+        ]
+        reg_header_table = Table(reg_header_data, colWidths=[4 * inch, 2.5 * inch])
+        reg_header_table.setStyle(
+            TableStyle(
+                [
+                    ("ALIGN", (0, 0), (0, 0), "LEFT"),
+                    ("ALIGN", (1, 0), (1, 0), "RIGHT"),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ]
+            )
+        )
+        elements.append(reg_header_table)
+        elements.append(Spacer(1, 0.2 * inch))
+
+        return elements
+
+    @staticmethod
+    def _build_student_info(
+        student: Student,
+        program: Program,
+        term: Term,
+        semester_number: int,
+        styles: Dict[str, ParagraphStyle],
+    ) -> Table:
+        """Build the student information table
+
+        Args:
+            student: Student object
+            program: Program object
+            term: Term object
+            semester_number: Semester number
+            styles: Dictionary of paragraph styles
+
+        Returns:
+            Table object with student information
+        """
+        student_info = [
+            ["Student Number:", str(student.std_no)],
+            ["Student Name:", student.name],
+            ["Program:", program.name],
+            ["Term:", term.name if term else "N/A"],
+            ["Semester:", f"Semester {semester_number}"],
+        ]
+
+        student_info_table = Table(student_info, colWidths=[1.5 * inch, 5 * inch])
+        student_info_table.setStyle(
+            TableStyle(
+                [
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 3),  # Reduced padding
+                    ("TOPPADDING", (0, 0), (-1, -1), 3),  # Reduced padding
+                ]
+            )
+        )
+
+        return student_info_table
+
+    @staticmethod
+    def _build_modules_table(
+        modules: List[Module], styles: Dict[str, ParagraphStyle]
+    ) -> List[Any]:
+        """Build the registered modules table
+
+        Args:
+            modules: List of Module objects
+            styles: Dictionary of paragraph styles
+
+        Returns:
+            List containing module table and total credits table
+        """
+        elements = []
+
+        elements.append(Paragraph("REGISTERED MODULES", styles["section_header"]))
+
+        module_data = [["#", "Module Code & Description", "Type", "Credits"]]
+
+        for idx, module in enumerate(modules, 1):
+            module_data.append(
+                [
+                    idx,
+                    f"{module.code}\n{module.name}",
+                    module.type,
+                    str(module.credits),
+                ]
+            )
+
+        # Calculate total credits
+        total_credits = sum(module.credits for module in modules)
+
+        modules_table = Table(
+            module_data,
+            colWidths=[0.3 * inch, 4.7 * inch, 1 * inch, 0.7 * inch],
+            repeatRows=1,
+        )
+
+        modules_table.setStyle(
+            TableStyle(
+                [
+                    # Header row styling
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.gray),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    # Cell alignment
+                    ("ALIGN", (0, 0), (0, -1), "CENTER"),
+                    ("ALIGN", (2, 0), (3, -1), "CENTER"),
+                    # General styling
+                    ("FONTSIZE", (0, 0), (-1, -1), 10),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.lightgrey),
+                    ("LINEBELOW", (0, 0), (-1, 0), 1, colors.black),
+                    # Cell padding
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+                    ("TOPPADDING", (0, 0), (-1, -1), 8),
+                ]
+            )
+        )
+
+        elements.append(modules_table)
+
+        # Total credits row
+        total_data = [
+            ["", "", "Total Credits:", str(total_credits)],
+        ]
+        total_table = Table(
+            total_data, colWidths=[0.3 * inch, 4.7 * inch, 1 * inch, 0.7 * inch]
+        )
+        total_table.setStyle(
+            TableStyle(
+                [
+                    ("ALIGN", (2, 0), (2, -1), "RIGHT"),
+                    ("ALIGN", (3, 0), (3, -1), "CENTER"),
+                    ("FONTNAME", (2, 0), (3, -1), "Helvetica-Bold"),
+                    ("LINEABOVE", (2, 0), (3, 0), 1, colors.black),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                    ("TOPPADDING", (0, 0), (-1, -1), 6),
+                ]
+            )
+        )
+        elements.append(total_table)
+
+        return elements
+
+    @staticmethod
+    def _build_registration_status(request_status: str) -> Table:
+        """Build the registration status table
+
+        Args:
+            request_status: Status of the registration request
+
+        Returns:
+            Table object with registration status
+        """
+        status_data = [
+            ["Registration Status:", request_status.upper()],
+            ["Processed On:", datetime.now().strftime("%d %B %Y")],
+        ]
+
+        status_table = Table(status_data, colWidths=[1.5 * inch, 5 * inch])
+        status_table.setStyle(
+            TableStyle(
+                [
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                ]
+            )
+        )
+
+        return status_table
+
+    @staticmethod
+    def _build_signature() -> Table:
+        """Build the signature section with only registry signature
+
+        Returns:
+            Table object with signature line
+        """
+        signature_data = [
+            ["_______________________________"],
+            ["Registry Department"],
+        ]
+
+        signature_table = Table(signature_data, colWidths=[6 * inch])
+        signature_table.setStyle(
+            TableStyle(
+                [
+                    ("ALIGN", (0, 0), (0, 1), "CENTER"),
+                    ("VALIGN", (0, 0), (0, 1), "MIDDLE"),
+                    ("FONTNAME", (0, 1), (0, 1), "Helvetica"),
+                    ("FONTSIZE", (0, 1), (0, 1), 9),
+                    ("TOPPADDING", (0, 1), (0, 1), 2),
+                ]
+            )
+        )
+
+        return signature_table
+
+    @staticmethod
+    def _build_footer(doc_id: str, styles: Dict[str, ParagraphStyle]) -> List[Any]:
+        """Build the document footer
+
+        Args:
+            doc_id: Document ID
+            styles: Dictionary of paragraph styles
+
+        Returns:
+            List of flowable elements for the footer
+        """
+        elements = []
+
+        elements.append(
+            HRFlowable(
+                width="100%",
+                thickness=0.5,
+                color=colors.lightgrey,
+                spaceBefore=6,
+                spaceAfter=6,
+            )
+        )
+
+        footer_text = (
+            f"Document ID: {doc_id} | "
+            f"This document serves as official proof of registration for the above student. "
+            f"Registration processed through the official university system on {datetime.now().strftime('%d %B %Y')}."
+        )
+        elements.append(Paragraph(footer_text, styles["small"]))
+
+        return elements
