@@ -6,29 +6,22 @@ from registry_cli.commands.enroll.enrollment import enroll_student
 from registry_cli.models import RegistrationClearance, RegistrationRequest
 
 
-def enroll_by_student_number(db: Session, std_no: str) -> None:
+def enroll_by_student_number(db: Session, std_no: int) -> None:
     registration_request = (
         db.query(RegistrationRequest)
-        .join(RegistrationClearance)
         .filter(
-            and_(
-                RegistrationRequest.std_no == std_no,
-                not_(RegistrationRequest.status.in_(["registered", "rejected"])),
-                RegistrationRequest.id == RegistrationClearance.registration_request_id,
-                RegistrationClearance.status == "approved",
-                RegistrationClearance.id.in_(
-                    db.query(RegistrationClearance.registration_request_id)
-                    .filter(
-                        and_(
-                            RegistrationClearance.department.in_(
-                                ["finance", "library"]
-                            ),
-                            RegistrationClearance.status == "approved",
-                        )
-                    )
-                    .group_by(RegistrationClearance.registration_request_id)
-                    .having(func.count(RegistrationClearance.id) == 2)
-                ),
+            RegistrationRequest.std_no == std_no,
+            not_(RegistrationRequest.status.in_(["registered", "rejected"])),
+        )
+        .filter(
+            RegistrationRequest.id.in_(
+                db.query(RegistrationClearance.registration_request_id)
+                .filter(
+                    RegistrationClearance.department.in_(["finance", "library"]),
+                    RegistrationClearance.status == "approved",
+                )
+                .group_by(RegistrationClearance.registration_request_id)
+                .having(func.count(RegistrationClearance.registration_request_id) == 2)
             )
         )
         .first()

@@ -9,25 +9,16 @@ from registry_cli.models import RegistrationClearance, RegistrationRequest
 def enroll_approved(db: Session) -> None:
     approved_requests = (
         db.query(RegistrationRequest)
-        .join(RegistrationClearance)
+        .filter(not_(RegistrationRequest.status.in_(["registered", "rejected"])))
         .filter(
-            and_(
-                not_(RegistrationRequest.status.in_(["registered", "rejected"])),
-                RegistrationRequest.id == RegistrationClearance.registration_request_id,
-                RegistrationClearance.status == "approved",
-                RegistrationClearance.id.in_(
-                    db.query(RegistrationClearance.registration_request_id)
-                    .filter(
-                        and_(
-                            RegistrationClearance.department.in_(
-                                ["finance", "library"]
-                            ),
-                            RegistrationClearance.status == "approved",
-                        )
-                    )
-                    .group_by(RegistrationClearance.registration_request_id)
-                    .having(func.count(RegistrationClearance.id) == 2)
-                ),
+            RegistrationRequest.id.in_(
+                db.query(RegistrationClearance.registration_request_id)
+                .filter(
+                    RegistrationClearance.department.in_(["finance", "library"]),
+                    RegistrationClearance.status == "approved",
+                )
+                .group_by(RegistrationClearance.registration_request_id)
+                .having(func.count(RegistrationClearance.registration_request_id) == 2)
             )
         )
         .all()
