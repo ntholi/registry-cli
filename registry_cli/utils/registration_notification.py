@@ -89,7 +89,7 @@ Limkokwing University of Creative Technology
     <head>
         <style>
             body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
-            .header {{ background-color: #003366; color: white; padding: 20px; text-align: center; }}
+            .header {{ background-color: #212121; color: white; padding: 20px; text-align: center; }}
             .content {{ padding: 20px; }}
             .footer {{ font-size: 12px; color: #666; padding: 20px; border-top: 1px solid #eee; }}
             .details {{ margin: 15px 0; }}
