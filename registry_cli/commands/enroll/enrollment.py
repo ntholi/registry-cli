@@ -13,6 +13,7 @@ from registry_cli.models import (
     Structure,
     Student,
     StudentProgram,
+    Term,
 )
 from registry_cli.utils.registration_notification import send_registration_confirmation
 
@@ -21,6 +22,11 @@ def enroll_student(db: Session, request: RegistrationRequest) -> None:
     student = db.query(Student).filter(Student.std_no == request.std_no).first()
     if not student:
         raise ValueError(f"Student {request.std_no} not found")
+
+    active_term = db.query(Term).filter(Term.is_active == True).first()
+    if not active_term:
+        click.secho("Error: No active term found in the database", fg="red")
+        return
 
     crawler = Crawler(db)
     result = (
@@ -111,6 +117,7 @@ def enroll_student(db: Session, request: RegistrationRequest) -> None:
             request=request,
             student=student,
             registered_modules=registered_module_codes,
+            term=active_term.name,
         )
 
         if email_sent:

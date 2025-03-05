@@ -74,6 +74,7 @@ def send_proof_registration(db: Session, std_no: int) -> None:
             request=request,
             student=student,
             registered_modules=registered_modules,
+            term=active_term.name,
         )
 
         if email_sent:

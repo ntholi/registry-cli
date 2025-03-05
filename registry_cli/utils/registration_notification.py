@@ -19,6 +19,7 @@ def send_registration_confirmation(
     request: RegistrationRequest,
     student: Student,
     registered_modules: List[str],
+    term: str,
 ) -> Tuple[bool, Optional[str]]:
     """
     Generate a registration PDF and send an email confirmation to the student.
@@ -65,7 +66,8 @@ Your registration for Semester {request.semester_number} has been successfully c
 
 Registration details:
 - Student Number: {student.std_no}
-- Term: {request.sponsor.name if hasattr(request, 'sponsor') and request.sponsor else 'N/A'}
+- Term: {term}
+- Sponsor: {request.sponsor.name if hasattr(request, 'sponsor') and request.sponsor else 'N/A'}
 - Status: {request.status.upper()}
 - Number of Modules: {len(registered_modules)}
 
