@@ -17,6 +17,7 @@ reportlab = "^4.0.8"
 python-dotenv = "^1.0.1"
 libsql-client = "^0.3.1"
 sqlalchemy-libsql = "^0.1.0"
+openpyxl = "^3.1.5"
 
 [tool.poetry.scripts]
 registry = "registry_cli.main:cli"

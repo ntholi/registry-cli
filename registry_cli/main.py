@@ -12,6 +12,7 @@ from registry_cli.commands.pull.structures import structure_pull
 from registry_cli.commands.pull.student import student_pull
 from registry_cli.commands.push.students import student_push
 from registry_cli.commands.send.proof import send_proof_registration
+from registry_cli.commands.update.marks import update_marks_from_excel
 from registry_cli.db.config import get_engine
 
 
@@ -132,6 +133,25 @@ def proof(std_no: int) -> None:
     """Send proof of registration to the specified student."""
     db = get_db()
     send_proof_registration(db, std_no)
+
+
+@cli.group()
+def update() -> None:
+    """Commands for updating existing records."""
+    pass
+
+
+@update.command()
+@click.argument("file_path", type=click.Path(exists=True))
+def marks(file_path: str) -> None:
+    """
+    Update student module marks from an Excel file.
+
+    FILE_PATH should be the path to an Excel file with columns:
+    ModuleID, Final Mark, and Grade
+    """
+    db = get_db()
+    update_marks_from_excel(db, file_path)
 
 
 if __name__ == "__main__":
