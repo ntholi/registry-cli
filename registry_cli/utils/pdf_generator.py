@@ -346,6 +346,11 @@ class RegistrationPDFGenerator:
         Returns:
             Table object with student information
         """
+        # Calculate year and semester based on semester_number
+        year = ((semester_number - 1) // 2) + 1
+        semester = ((semester_number - 1) % 2) + 1
+        semester_display = f"Year {year} Semester {semester}"
+
         # Create formatted student info with styling
         student_info = [
             [
@@ -366,7 +371,7 @@ class RegistrationPDFGenerator:
             ],
             [
                 Paragraph("Semester:", styles["data_label"]),
-                Paragraph(f"Semester {semester_number}", styles["data_value"]),
+                Paragraph(semester_display, styles["data_value"]),
             ],
         ]
 
