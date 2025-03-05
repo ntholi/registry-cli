@@ -479,7 +479,7 @@ class RegistrationPDFGenerator:
                         "BACKGROUND",
                         (0, 0),
                         (-1, 0),
-                        RegistrationPDFGenerator.BRAND_PRIMARY,
+                        colors.HexColor("#424242"),
                     ),
                     ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
                     # Cell alignment
@@ -487,7 +487,7 @@ class RegistrationPDFGenerator:
                     ("ALIGN", (2, 0), (3, -1), "CENTER"),
                     ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                     # Border styling
-                    ("GRID", (0, 0), (-1, -1), 0.5, colors.lightgrey),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.gray),
                     ("LINEBELOW", (0, 0), (-1, 0), 1, colors.black),
                     # Removed alternating row colors for cleaner appearance
                     # Padding
