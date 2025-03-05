@@ -36,6 +36,7 @@ def send_registration_confirmation(
     pdf_path = RegistrationPDFGenerator.generate_registration_pdf(
         db, request, student, registered_modules
     )
+    exit(0)
 
     if not pdf_path:
         logger.error(
