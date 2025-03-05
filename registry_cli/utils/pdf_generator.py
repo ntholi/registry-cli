@@ -565,21 +565,20 @@ class RegistrationPDFGenerator:
             f"Registration processed through the official university system on <b>{datetime.now().strftime('%d %B %Y')}</b>."
         )
 
-        # Create two-column footer
+        # Create footer with single column, explicitly aligned left
         footer_table = Table(
             [
                 [
                     Paragraph(footer_text, styles["small"]),
                 ]
             ],
-            colWidths=[4.5 * inch, 2.5 * inch],
+            colWidths=[7 * inch],  # Use full width for a single column
             style=TableStyle(
                 [
-                    ("ALIGN", (0, 0), (0, 0), "LEFT"),
-                    ("ALIGN", (1, 0), (1, 0), "RIGHT"),
+                    ("ALIGN", (0, 0), (0, 0), "LEFT"),  # Force left alignment
                     ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                    ("LEFTPADDING", (0, 0), (0, 0), 0),
-                    ("RIGHTPADDING", (1, 0), (1, 0), 0),
+                    ("LEFTPADDING", (0, 0), (0, 0), 0.2 * inch),
+                    ("RIGHTPADDING", (0, 0), (0, 0), 0),
                 ]
             ),
         )
