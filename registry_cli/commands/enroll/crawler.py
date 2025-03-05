@@ -26,7 +26,7 @@ class Crawler:
         program_id: int,
         structure_id: int,
         std_program_id: int,
-        semester: str,
+        semester_number: int,
     ) -> int | None:
         logger.info(f"Adding semester for student '{std_program_id}'")
         url = f"{BASE_URL}/r_stdsemesterlist.php?showmaster=1&StdProgramID={std_program_id}"
@@ -48,7 +48,7 @@ class Crawler:
             program_id=program_id,
             structure_id=structure_id,
             std_program_id=std_program_id,
-            semester_id=self.read_semester_id(form, semester),
+            semester_id=self.read_semester_id(form, f"0{semester_number}"),
             term=term.name,
         )
         response = self.browser.post(f"{BASE_URL}/r_stdsemesteradd.php", payload)
@@ -142,13 +142,13 @@ class Crawler:
         return None
 
     @staticmethod
-    def read_semester_id(form: Tag, target: str):
+    def read_semester_id(form: Tag, sem: str):
         sem_options = form.select("#x_SemesterID option")
         for option in sem_options:
             option_str = option.get_text(strip=True)
-            if target in option_str:
+            if option_str.startswith(sem):
                 return option.attrs["value"]
 
         raise ValueError(
-            f"semester_id cannot be empty was expecting 'Year 1 Sem 1' but not found"
+            f"semester_id cannot be empty was expecting {sem} but not found"
         )

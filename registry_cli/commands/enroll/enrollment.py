@@ -46,16 +46,12 @@ def enroll_student(db: Session, request: RegistrationRequest) -> None:
 
     program, structure, program_details = result
 
-    year = (request.semester_number - 1) // 2 + 1
-    sem = (request.semester_number - 1) % 2 + 1
-    semester_name = f"Year {year} Sem {sem}"
-
     semester_id = crawler.add_semester(
         school_id=program_details.school_id,
         program_id=program_details.id,
         structure_id=structure.id,
         std_program_id=program.id,
-        semester=semester_name,
+        semester_number=request.semester_number,
     )
 
     if not semester_id:
