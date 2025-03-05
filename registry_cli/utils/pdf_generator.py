@@ -501,7 +501,7 @@ class RegistrationPDFGenerator:
             [
                 "",
                 "",
-                Paragraph("<b>Total Credits:</b>", styles["data_label"]),
+                Paragraph("<b>Credits:</b>", styles["data_label"]),
                 Paragraph(f"<b>{total_credits}</b>", styles["data_value"]),
             ]
         ]
@@ -565,18 +565,11 @@ class RegistrationPDFGenerator:
             f"Registration processed through the official university system on <b>{datetime.now().strftime('%d %B %Y')}</b>."
         )
 
-        # Add styled verification stamp
-        verification_text = (
-            f"<i>This is a computer-generated document and requires no signature.</i><br/>"
-            f"<b>Verified by:</b> Registry Office, Limkokwing University of Creative Technology"
-        )
-
         # Create two-column footer
         footer_table = Table(
             [
                 [
                     Paragraph(footer_text, styles["small"]),
-                    Paragraph(verification_text, styles["small"]),
                 ]
             ],
             colWidths=[4.5 * inch, 2.5 * inch],
