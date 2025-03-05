@@ -88,44 +88,60 @@ Limkokwing University of Creative Technology
     <html>
     <head>
         <style>
-            body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
-            .header {{ background-color: #212121; color: white; padding: 20px; text-align: center; }}
-            .content {{ padding: 20px; }}
-            .footer {{ font-size: 12px; color: #666; padding: 20px; border-top: 1px solid #eee; }}
-            .details {{ margin: 15px 0; }}
-            .details div {{ margin: 5px 0; }}
+            body {{ font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }}
+            .email-container {{ max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 4px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }}
+            .header {{ background-color: #222222; color: white; padding: 25px 20px; text-align: center; }}
+            .header h2 {{ margin: 0; font-size: 22px; letter-spacing: 0.5px; }}
+            .content {{ padding: 25px 20px; }}
+            .student-name {{ font-weight: 600; color: #222; }}
+            .message-box {{ background-color: #f9f9f9; border-left: 3px solid #444; padding: 12px; margin: 15px 0; }}
+            .details {{ margin: 20px 0; padding: 15px; background-color: #f7f7f7; border: 1px solid #eaeaea; }}
+            .details-title {{ font-weight: bold; margin-bottom: 10px; color: #222; }}
+            .details div {{ margin: 6px 0; }}
+            .details strong {{ color: #444; }}
+            .note {{ font-style: italic; color: #555; margin: 15px 0; }}
+            .footer {{ font-size: 12px; color: #777; padding: 15px; border-top: 1px solid #eaeaea; background-color: #f9f9f9; text-align: center; }}
+            .signature {{ margin-top: 15px; }}
+            .highlight {{ color: #222; font-weight: bold; }}
         </style>
     </head>
     <body>
-        <div class="header">
-            <h2>Registration Confirmation</h2>
-        </div>
-        <div class="content">
-            <p>Dear {student.name},</p>
-            
-            <p>Your registration for <strong>Semester {request.semester_number}</strong> has been successfully completed.</p>
-            
-            <div class="details">
-                <strong>Registration Details:</strong>
-                <div>Student Number: {student.std_no}</div>
-                <div>Term: {request.sponsor.name if hasattr(request, 'sponsor') and request.sponsor else 'N/A'}</div>
-                <div>Status: <strong>{request.status.upper()}</strong></div>
-                <div>Number of Modules: {len(registered_modules)}</div>
+        <div class="email-container">
+            <div class="header">
+                <h2>Registration Confirmation</h2>
             </div>
-            
-            <p>Please find attached your official <strong>Proof of Registration</strong>. This document serves as confirmation 
-            of your enrollment in the courses listed therein.</p>
-            
-            <p>If you have any questions or concerns regarding your registration, please contact the Registry office.</p>
-            
-            <p>Thank you.</p>
-        </div>
-        <div class="footer">
-            <p>
-                Regards,<br>
-                Registry Department<br>
-                Limkokwing University of Creative Technology
-            </p>
+            <div class="content">
+                <p>Dear <span class="student-name">{student.name}</span>,</p>
+                
+                <div class="message-box">
+                    Your registration for <strong>Semester {request.semester_number}</strong> has been successfully completed.
+                </div>
+                
+                <div class="details">
+                    <div class="details-title">Registration Details:</div>
+                    <div>Student Number: <strong>{student.std_no}</strong></div>
+                    <div>Term: <strong>{term}</strong></div>
+                    <div>Sponsor: <strong>{request.sponsor.name if hasattr(request, 'sponsor') and request.sponsor else 'N/A'}</strong></div>
+                    <div>Status: <span class="highlight">{request.status.upper()}</span></div>
+                    <div>Number of Modules: <strong>{len(registered_modules)}</strong></div>
+                </div>
+                
+                <p>Please find attached your official <strong>Proof of Registration</strong>. This document serves as confirmation 
+                of your enrollment in the courses listed therein.</p>
+                
+                <p class="note">If you have any questions or concerns regarding your registration, please contact the Registry office.</p>
+                
+                <p>Thank you.</p>
+                
+                <div class="signature">
+                    Regards,<br>
+                    <strong>Registry Department</strong><br>
+                    Limkokwing University of Creative Technology
+                </div>
+            </div>
+            <div class="footer">
+                © Limkokwing University of Creative Technology | This is an automated message, please do not reply to this email.
+            </div>
         </div>
     </body>
     </html>
