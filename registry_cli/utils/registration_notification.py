@@ -58,11 +58,15 @@ def send_registration_confirmation(
     # Prepare email content
     subject = f"Registration Confirmation - Semester {request.semester_number}"
 
+    year = (request.semester_number - 1) // 2 + 1
+    sem = (request.semester_number - 1) % 2 + 1
+    semester_name = f"Year {year} Sem {sem}"
+
     # Plain text email body
     body = f"""
 Dear {student.name},
 
-Your registration for Semester {request.semester_number} has been successfully completed.
+Your registration for {semester_name} has been successfully completed.
 
 Registration details:
 - Student Number: {student.std_no}
