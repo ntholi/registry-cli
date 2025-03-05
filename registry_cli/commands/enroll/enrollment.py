@@ -58,8 +58,8 @@ def enroll_student(db: Session, request: RegistrationRequest) -> None:
         raise RuntimeError("Failed to add semester")
 
     requested_modules = (
-        db.query(Module)
-        .join(RequestedModule)
+        db.query(RequestedModule)
+        .join(Module, RequestedModule.module_id == Module.id)
         .filter(RequestedModule.registration_request_id == request.id)
         .all()
     )

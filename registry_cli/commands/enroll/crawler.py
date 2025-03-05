@@ -1,5 +1,5 @@
 import logging
-from typing import Optional
+from typing import Optional, Union
 
 import requests
 from bs4 import BeautifulSoup, Tag
@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from registry_cli.browser import BASE_URL, Browser, get_form_payload
 from registry_cli.commands.enroll.payloads import add_semester_payload
-from registry_cli.models import Module, Term
+from registry_cli.models import Module, RequestedModule, Term
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -77,12 +77,13 @@ class Crawler:
         return existing_modules
 
     def add_modules(
-        self, std_semester_id: int, requested_modules: list[Module]
+        self, std_semester_id: int, requested_modules: list[RequestedModule]
     ) -> list[str]:
         existing_modules = self.get_existing_modules(std_semester_id)
 
+        # Filter out modules that are already registered
         modules_to_add = [
-            m for m in requested_modules if m.code not in existing_modules
+            rm for rm in requested_modules if rm.module.code not in existing_modules
         ]
 
         if not modules_to_add:
@@ -93,32 +94,19 @@ class Crawler:
         self.browser.fetch(url)
         add_response = self.browser.fetch(f"{BASE_URL}/r_stdmoduleadd1.php")
         page = BeautifulSoup(add_response.text, "lxml")
-        checkboxes = page.find_all("input", type="checkbox")
-
-        modules = []
-        for _, checkbox in enumerate(checkboxes):
-            row = checkbox.find_parent("tr")
-            if row:
-                module_name = row.find("td").text.strip()
-                is_requested_module = any(
-                    module.name == module_name for module in modules_to_add
-                )
-                if is_requested_module:
-                    modules.append(checkbox.attrs["value"])
 
         modules_with_amounts = []
-        for module in modules:
-            parts = module.split("-")
-            parts[-1] = "1200"
-            modules_with_amounts.append("-".join(parts))
+        for rm in modules_to_add:
+            module_id = rm.module.id
+            module_status = rm.module_status
+            module_credits = rm.module.credits
+            module_string = f"{module_id}-{module_status}-{module_credits}-1200"
+            modules_with_amounts.append(module_string)
 
         payload = get_form_payload(page) | {
             "Submit": "Add+Modules",
             "take[]": modules_with_amounts,
         }
-        hidden_inputs = page.find_all("input", type="hidden")
-        for hidden in hidden_inputs:
-            payload.update({hidden["name"]: hidden["value"]})
 
         self.browser.post(f"{BASE_URL}/r_stdmoduleadd1.php", payload)
 
