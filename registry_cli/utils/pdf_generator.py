@@ -253,7 +253,13 @@ class RegistrationPDFGenerator:
         elements.append(title)
         elements.append(Spacer(1, 0.1 * inch))
 
-        # Create contact info paragraph with enhanced formatting
+        # Create contact info paragraph with enhanced formatting and increased left padding
+        contact_info_style = ParagraphStyle(
+            "ContactInfoIndented",
+            parent=styles["contact_info"],
+            leftIndent=0.2 * inch,
+        )
+
         contact_info = Paragraph(
             """Moshoeshoe Road Maseru Central<br/>
             P.O. Box 8971<br/>
@@ -261,7 +267,7 @@ class RegistrationPDFGenerator:
             Lesotho<br/>
             +(266) 22315767 | Ext. 116<br/>
             registry@limkokwing.ac.ls""",
-            styles["contact_info"],
+            contact_info_style,
         )
 
         # Logo with maintained aspect ratio
