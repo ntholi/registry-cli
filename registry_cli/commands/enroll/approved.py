@@ -48,5 +48,4 @@ def enroll_approved(db: Session) -> None:
             click.secho(
                 f"Failed to enroll student {request.std_no}: {str(e)}", fg="red"
             )
-        exit(0)
     click.secho("Done!", fg="green")
