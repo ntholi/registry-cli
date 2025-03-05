@@ -42,6 +42,11 @@ OUTPUT_DIR.mkdir(exist_ok=True)
 class RegistrationPDFGenerator:
     """Class for generating registration confirmation PDFs"""
 
+    # Define university brand colors
+    BRAND_PRIMARY = colors.HexColor("#212121")
+    BRAND_SECONDARY = colors.HexColor("#333333")
+    BRAND_GRAY = colors.HexColor("#333333")
+
     @staticmethod
     def generate_registration_pdf(
         db: Session,
@@ -99,14 +104,16 @@ class RegistrationPDFGenerator:
             # Create document styles
             styles = RegistrationPDFGenerator._create_styles()
 
-            # Create document
+            # Create document with enhanced margins
             doc = SimpleDocTemplate(
                 pdf_path,
                 pagesize=A4,
-                rightMargin=30,
-                leftMargin=30,
-                topMargin=30,
-                bottomMargin=30,
+                rightMargin=0.75 * inch,
+                leftMargin=0.75 * inch,
+                topMargin=0.5 * inch,
+                bottomMargin=0.5 * inch,
+                title=f"Registration Confirmation - {student.name}",
+                author="Limkokwing University",
             )
 
             # Build the document elements
@@ -115,7 +122,7 @@ class RegistrationPDFGenerator:
             # Add header
             elements.extend(RegistrationPDFGenerator._build_header(styles))
 
-            # Add registration header
+            # Add registration header with enhanced styling
             elements.extend(RegistrationPDFGenerator._build_registration_header(styles))
 
             # Add student information
@@ -124,16 +131,15 @@ class RegistrationPDFGenerator:
                     student, program, term, request.semester_number, styles
                 )
             )
-            elements.append(Spacer(1, 0.2 * inch))  # Reduced spacing
+            elements.append(Spacer(1, 0.3 * inch))
 
-            # Add modules table
+            # Add modules table with enhanced styling
             elements.extend(
                 RegistrationPDFGenerator._build_modules_table(module_details, styles)
             )
-            elements.append(Spacer(1, 0.2 * inch))  # Reduced spacing
-            elements.append(Spacer(1, 0.3 * inch))  # Reduced spacing
+            elements.append(Spacer(1, 0.5 * inch))
 
-            # Add footer
+            # Add footer with enhanced styling
             elements.extend(
                 RegistrationPDFGenerator._build_footer(
                     pdf_filename.split(".")[0], styles
@@ -152,7 +158,7 @@ class RegistrationPDFGenerator:
 
     @staticmethod
     def _create_styles() -> Dict[str, ParagraphStyle]:
-        """Create and return all document styles
+        """Create and return all document styles with enhanced typography
 
         Returns:
             Dict of style names to ParagraphStyle objects
@@ -164,24 +170,64 @@ class RegistrationPDFGenerator:
                 "Title",
                 fontSize=16,
                 alignment=0,
+                spaceAfter=8,
+                fontName="Helvetica-Bold",
+                textColor=RegistrationPDFGenerator.BRAND_PRIMARY,
+                leading=18,
+            ),
+            "subtitle": ParagraphStyle(
+                "Subtitle",
+                fontSize=12,
+                alignment=0,
                 spaceAfter=6,
                 fontName="Helvetica-Bold",
-                textColor=colors.black,
+                textColor=RegistrationPDFGenerator.BRAND_GRAY,
+                leading=14,
             ),
-            "normal": base_styles["Normal"],
-            "small": ParagraphStyle("Small", fontSize=8, fontName="Helvetica"),
+            "normal": ParagraphStyle(
+                "Normal",
+                fontSize=10,
+                fontName="Helvetica",
+                leading=12,
+            ),
+            "small": ParagraphStyle(
+                "Small",
+                fontSize=8,
+                fontName="Helvetica",
+                leading=10,
+                textColor=RegistrationPDFGenerator.BRAND_GRAY,
+            ),
             "header_text": ParagraphStyle(
-                "HeaderText", fontSize=10, fontName="Helvetica"
+                "HeaderText",
+                fontSize=10,
+                fontName="Helvetica",
+                textColor=RegistrationPDFGenerator.BRAND_GRAY,
             ),
             "contact_info": ParagraphStyle(
-                "ContactInfo", fontSize=6, fontName="Helvetica"
+                "ContactInfo",
+                fontSize=8,
+                fontName="Helvetica",
+                leading=10,
+                textColor=RegistrationPDFGenerator.BRAND_GRAY,
             ),
             "section_header": ParagraphStyle(
                 "SectionHeader",
                 fontSize=12,
                 fontName="Helvetica-Bold",
-                spaceAfter=6,
-                textColor=colors.black,
+                spaceAfter=8,
+                textColor=RegistrationPDFGenerator.BRAND_PRIMARY,
+                leading=14,
+            ),
+            "data_label": ParagraphStyle(
+                "DataLabel",
+                fontSize=10,
+                fontName="Helvetica-Bold",
+                textColor=RegistrationPDFGenerator.BRAND_GRAY,
+            ),
+            "data_value": ParagraphStyle(
+                "DataValue",
+                fontSize=10,
+                fontName="Helvetica",
             ),
         }
 
@@ -189,7 +235,7 @@ class RegistrationPDFGenerator:
 
     @staticmethod
     def _build_header(styles: Dict[str, ParagraphStyle]) -> List[Any]:
-        """Build the document header
+        """Build the document header with enhanced styling
 
         Args:
             styles: Dictionary of paragraph styles
@@ -199,90 +245,56 @@ class RegistrationPDFGenerator:
         """
         elements = []
         logo_path = "resource/logo.jpg"
-        has_logo = os.path.exists(logo_path)
 
-        # Title
+        # University name with brand color
         title = Paragraph(
             "Limkokwing University of Creative Technology", styles["title"]
         )
         elements.append(title)
         elements.append(Spacer(1, 0.1 * inch))
 
-        # Contact info and logo
-        if has_logo:
-            # Create contact info paragraph
-            contact_info = Paragraph(
-                """Moshoeshoe Road Maseru Central<br/>
-                P.O. Box 8971<br/>
-                Maseru Maseru 0101<br/>
-                Lesotho<br/>
-                +(266) 22315767<br/>
-                registry@limkokwing.ac.ls""",
-                styles["contact_info"],
+        # Create contact info paragraph with enhanced formatting
+        contact_info = Paragraph(
+            """Moshoeshoe Road Maseru Central<br/>
+            P.O. Box 8971<br/>
+            Maseru Maseru 0101<br/>
+            Lesotho<br/>
+            +(266) 22315767 | Ext. 116<br/>
+            registry@limkokwing.ac.ls""",
+            styles["contact_info"],
+        )
+
+        # Logo with maintained aspect ratio
+        logo = Image(logo_path, width=1.8 * inch, height=1 * inch)
+
+        # Create header table with better spacing
+        header_table = Table([[contact_info, logo]], colWidths=[5 * inch, 2 * inch])
+
+        # Set styling for better alignment
+        header_table.setStyle(
+            TableStyle(
+                [
+                    ("VALIGN", (0, 0), (0, 0), "TOP"),
+                    ("VALIGN", (1, 0), (1, 0), "TOP"),
+                    ("ALIGN", (1, 0), (1, 0), "RIGHT"),
+                    ("LEFTPADDING", (0, 0), (0, 0), 0),
+                    ("RIGHTPADDING", (0, 0), (0, 0), 0),
+                    ("LEFTPADDING", (1, 0), (1, 0), 0),
+                    ("RIGHTPADDING", (1, 0), (1, 0), 0),
+                ]
             )
+        )
 
-            logo = Image(logo_path, width=1.8 * inch, height=1 * inch)
+        elements.append(header_table)
 
-            header_table = Table(
-                [[contact_info, logo]], colWidths=[5.5 * inch, 1.5 * inch]
-            )
-
-            # Set styling to ensure proper positioning
-            header_table.setStyle(
-                TableStyle(
-                    [
-                        ("VALIGN", (0, 0), (0, 0), "TOP"),  # Top-align contact info
-                        ("VALIGN", (1, 0), (1, 0), "TOP"),  # Top-align logo
-                        (
-                            "ALIGN",
-                            (1, 0),
-                            (1, 0),
-                            "RIGHT",
-                        ),  # Right-align logo in its cell
-                        (
-                            "LEFTPADDING",
-                            (0, 0),
-                            (0, 0),
-                            0,
-                        ),  # No left padding for contact info
-                        (
-                            "RIGHTPADDING",
-                            (0, 0),
-                            (0, 0),
-                            0,
-                        ),  # No right padding for contact info
-                        ("LEFTPADDING", (1, 0), (1, 0), 0),  # No left padding for logo
-                        (
-                            "RIGHTPADDING",
-                            (1, 0),
-                            (1, 0),
-                            0,
-                        ),  # No right padding for logo
-                    ]
-                )
-            )
-
-            elements.append(header_table)
-        else:
-            # Fallback without logo
-            contact_info = Paragraph(
-                """Moshoeshoe Road Maseru Central<br/>
-                P.O. Box 8971<br/>
-                Maseru Maseru 0101<br/>
-                Lesotho<br/>
-                +(266) 22315767<br/>
-                https://www.limkokwing.net/m/contact/limkokwing_lesotho""",
-                styles["contact_info"],
-            )
-            elements.append(contact_info)
-
+        # Add decorative separator with brand color
         elements.append(
             HRFlowable(
                 width="100%",
-                thickness=1,
-                color=colors.black,
-                spaceBefore=6,
-                spaceAfter=12,
+                thickness=2,
+                color=RegistrationPDFGenerator.BRAND_PRIMARY,
+                spaceBefore=8,
+                spaceAfter=16,
             )
         )
 
@@ -290,7 +302,7 @@ class RegistrationPDFGenerator:
 
     @staticmethod
     def _build_registration_header(styles: Dict[str, ParagraphStyle]) -> List[Any]:
-        """Build the registration proof header
+        """Build the registration proof header with enhanced styling
 
         Args:
             styles: Dictionary of paragraph styles
@@ -300,27 +312,11 @@ class RegistrationPDFGenerator:
         """
         elements = []
 
-        reg_header_data = [
-            [
-                Paragraph("PROOF OF REGISTRATION", styles["title"]),
-                Paragraph(
-                    f"Date: {datetime.now().strftime('%d %b %Y')}",
-                    styles["header_text"],
-                ),
-            ],
-        ]
-        reg_header_table = Table(reg_header_data, colWidths=[4 * inch, 2.5 * inch])
-        reg_header_table.setStyle(
-            TableStyle(
-                [
-                    ("ALIGN", (0, 0), (0, 0), "LEFT"),
-                    ("ALIGN", (1, 0), (1, 0), "RIGHT"),
-                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                ]
-            )
+        # Create registration header - removed date row
+        elements.append(
+            Paragraph("<b>PROOF OF REGISTRATION</b>", styles["section_header"])
         )
-        elements.append(reg_header_table)
-        elements.append(Spacer(1, 0.2 * inch))
+        elements.append(Spacer(1, 0.3 * inch))
 
         return elements
 
@@ -332,7 +328,7 @@ class RegistrationPDFGenerator:
         semester_number: int,
         styles: Dict[str, ParagraphStyle],
     ) -> Table:
-        """Build the student information table
+        """Build the student information table with enhanced styling
 
         Args:
             student: Student object
@@ -344,24 +340,54 @@ class RegistrationPDFGenerator:
         Returns:
             Table object with student information
         """
+        # Create formatted student info with styling
         student_info = [
-            ["Student Number:", str(student.std_no)],
-            ["Student Name:", student.name],
-            ["Program:", program.name],
-            ["Term:", term.name if term else "N/A"],
-            ["Semester:", f"Semester {semester_number}"],
+            [
+                Paragraph("Student Number:", styles["data_label"]),
+                Paragraph(str(student.std_no), styles["data_value"]),
+            ],
+            [
+                Paragraph("Student Name:", styles["data_label"]),
+                Paragraph(student.name, styles["data_value"]),
+            ],
+            [
+                Paragraph("Program:", styles["data_label"]),
+                Paragraph(program.name, styles["data_value"]),
+            ],
+            [
+                Paragraph("Term:", styles["data_label"]),
+                Paragraph(term.name if term else "N/A", styles["data_value"]),
+            ],
+            [
+                Paragraph("Semester:", styles["data_label"]),
+                Paragraph(f"Semester {semester_number}", styles["data_value"]),
+            ],
         ]
 
-        student_info_table = Table(student_info, colWidths=[1.5 * inch, 5 * inch])
-        student_info_table.setStyle(
-            TableStyle(
+        # Create student info table with better styling, removed background color
+        student_info_table = Table(
+            student_info,
+            colWidths=[1.5 * inch, 5 * inch],
+            style=TableStyle(
                 [
                     ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                    ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 3),  # Reduced padding
-                    ("TOPPADDING", (0, 0), (-1, -1), 3),  # Reduced padding
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                    ("TOPPADDING", (0, 0), (-1, -1), 6),
+                    ("LEFTPADDING", (0, 0), (0, -1), 10),
+                    ("LEFTPADDING", (1, 0), (1, -1), 10),
+                    # Removed background color
+                    # Added more defined borders for structure without background
+                    ("LINEBELOW", (0, 0), (-1, -2), 0.5, colors.lightgrey),
+                    (
+                        "LINEBELOW",
+                        (0, -1),
+                        (-1, -1),
+                        1,
+                        RegistrationPDFGenerator.BRAND_PRIMARY,
+                    ),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.lightgrey),
                 ]
-            )
+            ),
         )
 
         return student_info_table
@@ -370,7 +396,7 @@ class RegistrationPDFGenerator:
     def _build_modules_table(
         modules: List[Module], styles: Dict[str, ParagraphStyle]
     ) -> List[Any]:
-        """Build the registered modules table
+        """Build the registered modules table with enhanced styling
 
         Args:
             modules: List of Module objects
@@ -381,15 +407,19 @@ class RegistrationPDFGenerator:
         """
         elements = []
 
+        # Add section header with enhanced styling
         elements.append(Paragraph("REGISTERED MODULES", styles["section_header"]))
+        elements.append(Spacer(1, 0.1 * inch))
 
+        # Create module data table with styled headers
         module_data = [["#", "Module Code & Description", "Type", "Credits"]]
 
+        # Add modules with improved formatting
         for idx, module in enumerate(modules, 1):
             module_data.append(
                 [
                     idx,
-                    f"{module.code}\n{module.name}",
+                    f"<b>{module.code}</b><br/>{module.name}",
                     module.type,
                     str(module.credits),
                 ]
@@ -398,41 +428,109 @@ class RegistrationPDFGenerator:
         # Calculate total credits
         total_credits = sum(module.credits for module in modules)
 
-        modules_table = Table(
-            module_data,
-            colWidths=[0.3 * inch, 4.7 * inch, 1 * inch, 0.7 * inch],
-            repeatRows=1,
+        # Convert module data to paragraphs for better styling
+        formatted_module_data = []
+        # Create a specific style for table headers with white text
+        header_style = ParagraphStyle(
+            "HeaderStyle",
+            parent=styles["data_label"],
+            textColor=colors.white,
         )
 
-        modules_table.setStyle(
-            TableStyle(
+        formatted_module_data.append(
+            [
+                Paragraph("#", header_style),
+                Paragraph("Module Code & Description", header_style),
+                Paragraph("Type", header_style),
+                Paragraph("Credits", header_style),
+            ]
+        )
+
+        for row in module_data[1:]:
+            formatted_module_data.append(
                 [
-                    # Header row styling
-                    ("BACKGROUND", (0, 0), (-1, 0), colors.gray),
+                    Paragraph(str(row[0]), styles["normal"]),
+                    Paragraph(row[1], styles["normal"]),
+                    Paragraph(row[2], styles["normal"]),
+                    Paragraph(str(row[3]), styles["normal"]),
+                ]
+            )
+
+        # Create enhanced modules table - keeping header row background for readability
+        modules_table = Table(
+            formatted_module_data,
+            colWidths=[0.4 * inch, 4.6 * inch, 1 * inch, 0.7 * inch],
+            repeatRows=1,
+            style=TableStyle(
+                [
+                    # Header row styling with brand colors
+                    (
+                        "BACKGROUND",
+                        (0, 0),
+                        (-1, 0),
+                        RegistrationPDFGenerator.BRAND_PRIMARY,
+                    ),
                     ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
                     # Cell alignment
                     ("ALIGN", (0, 0), (0, -1), "CENTER"),
                     ("ALIGN", (2, 0), (3, -1), "CENTER"),
-                    # General styling
-                    ("FONTSIZE", (0, 0), (-1, -1), 10),
                     ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    # Border styling
                     ("GRID", (0, 0), (-1, -1), 0.5, colors.lightgrey),
                     ("LINEBELOW", (0, 0), (-1, 0), 1, colors.black),
-                    # Cell padding
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+                    # Removed alternating row colors for cleaner appearance
+                    # Padding
                     ("TOPPADDING", (0, 0), (-1, -1), 8),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 8),
                 ]
-            )
+            ),
         )
 
         elements.append(modules_table)
+
+        # Add total credits row without background color
+        total_data = [
+            [
+                "",
+                "",
+                Paragraph("<b>Total Credits:</b>", styles["data_label"]),
+                Paragraph(f"<b>{total_credits}</b>", styles["data_value"]),
+            ]
+        ]
+
+        total_table = Table(
+            total_data,
+            colWidths=[0.4 * inch, 4.6 * inch, 1 * inch, 0.7 * inch],
+            style=TableStyle(
+                [
+                    ("ALIGN", (2, 0), (2, 0), "CENTER"),
+                    ("ALIGN", (3, 0), (3, 0), "CENTER"),
+                    # Removed background color
+                    ("TOPPADDING", (0, 0), (-1, -1), 6),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                    ("LEFTPADDING", (2, 0), (3, 0), 8),
+                    ("RIGHTPADDING", (2, 0), (3, 0), 8),
+                    # Add border for definition
+                    (
+                        "LINEABOVE",
+                        (2, 0),
+                        (3, 0),
+                        1,
+                        RegistrationPDFGenerator.BRAND_PRIMARY,
+                    ),
+                ]
+            ),
+        )
+
+        elements.append(total_table)
 
         return elements
 
     @staticmethod
     def _build_footer(doc_id: str, styles: Dict[str, ParagraphStyle]) -> List[Any]:
-        """Build the document footer
+        """Build the document footer with enhanced styling
 
         Args:
             doc_id: Document ID
@@ -443,21 +541,50 @@ class RegistrationPDFGenerator:
         """
         elements = []
 
+        # Add decorative separator before footer
         elements.append(
             HRFlowable(
                 width="100%",
-                thickness=0.5,
-                color=colors.lightgrey,
-                spaceBefore=6,
-                spaceAfter=6,
+                thickness=1,
+                color=RegistrationPDFGenerator.BRAND_PRIMARY,
+                spaceBefore=8,
+                spaceAfter=8,
             )
         )
 
+        # Create styled footer text
         footer_text = (
-            f"Document ID: {doc_id} | "
+            f"<b>Document ID:</b> {doc_id} | "
             f"This document serves as official proof of registration for the above student. "
-            f"Registration processed through the official university system on {datetime.now().strftime('%d %B %Y')}."
+            f"Registration processed through the official university system on <b>{datetime.now().strftime('%d %B %Y')}</b>."
         )
-        elements.append(Paragraph(footer_text, styles["small"]))
+
+        # Add styled verification stamp
+        verification_text = (
+            f"<i>This is a computer-generated document and requires no signature.</i><br/>"
+            f"<b>Verified by:</b> Registry Office, Limkokwing University of Creative Technology"
+        )
+
+        # Create two-column footer
+        footer_table = Table(
+            [
+                [
+                    Paragraph(footer_text, styles["small"]),
+                    Paragraph(verification_text, styles["small"]),
+                ]
+            ],
+            colWidths=[4.5 * inch, 2.5 * inch],
+            style=TableStyle(
+                [
+                    ("ALIGN", (0, 0), (0, 0), "LEFT"),
+                    ("ALIGN", (1, 0), (1, 0), "RIGHT"),
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("LEFTPADDING", (0, 0), (0, 0), 0),
+                    ("RIGHTPADDING", (1, 0), (1, 0), 0),
+                ]
+            ),
+        )
+
+        elements.append(footer_table)
 
         return elements
