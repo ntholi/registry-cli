@@ -1,5 +1,5 @@
 import click
-from sqlalchemy import and_, func, not_
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from registry_cli.commands.enroll.enrollment import enroll_student
@@ -9,7 +9,7 @@ from registry_cli.models import RegistrationClearance, RegistrationRequest
 def enroll_approved(db: Session) -> None:
     approved_requests = (
         db.query(RegistrationRequest)
-        .filter(not_(RegistrationRequest.status.in_(["registered", "rejected"])))
+        .filter(RegistrationRequest.status == "pending")
         .filter(
             RegistrationRequest.id.in_(
                 db.query(RegistrationClearance.registration_request_id)
