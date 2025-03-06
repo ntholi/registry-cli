@@ -114,11 +114,11 @@ class Browser:
         if self.session is None:
             raise ValueError("Session is not initialized")
         logger.info(f"Posting to {url}")
-        logger.info(f"Data: {data}")
+        logger.info(f"Payload: {str(data)[:70]}...")
         response = self.session.post(url, data, timeout=120)
         is_logged_in = check_logged_in(response.text)
         if not is_logged_in:
-            logger.info("Not logged in")
+            logger.info("Not logged in, attempting to re-login...")
             self.login()
             logger.info(f"Logged in, re-posting to {url}")
             response = self.session.post(url, data, timeout=120)
