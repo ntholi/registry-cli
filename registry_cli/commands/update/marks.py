@@ -19,7 +19,7 @@ def update_marks_from_excel(db: Session, file_path: str) -> None:
         worksheet = workbook.active
 
         header_row = [cell.value for cell in worksheet[1]]
-        required_columns = ["ModuleID", "Final Mark", "Grade"]
+        required_columns = ["StdModuleID", "Final Mark", "Grade"]
         column_indices = {}
         missing_columns = []
 
@@ -41,7 +41,7 @@ def update_marks_from_excel(db: Session, file_path: str) -> None:
 
         for row_index, row in enumerate(worksheet.iter_rows(min_row=2), start=2):
             try:
-                module_id_cell = row[column_indices["ModuleID"] - 1]
+                module_id_cell = row[column_indices["StdModuleID"] - 1]
                 marks_cell = row[column_indices["Final Mark"] - 1]
                 grade_cell = row[column_indices["Grade"] - 1]
 
@@ -52,7 +52,7 @@ def update_marks_from_excel(db: Session, file_path: str) -> None:
                     module_id = int(module_id_cell.value)
                 except (ValueError, TypeError):
                     click.secho(
-                        f"Warning: Invalid ModuleID at row {row_index}: {module_id_cell.value}",
+                        f"Warning: Invalid StdModuleID at row {row_index}: {module_id_cell.value}",
                         fg="yellow",
                     )
                     error_count += 1
@@ -68,7 +68,7 @@ def update_marks_from_excel(db: Session, file_path: str) -> None:
                 )
 
                 if module:
-                    module.marks = marks
+                    module.marks = str(int(float(marks)))
                     module.grade = grade
                     update_count += 1
                 else:
