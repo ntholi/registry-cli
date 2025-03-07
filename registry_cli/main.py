@@ -8,7 +8,7 @@ from registry_cli.commands.pull.modules import modules_pull
 from registry_cli.commands.pull.programs import program_pull
 from registry_cli.commands.pull.schools import school_pull
 from registry_cli.commands.pull.semesters import semesters_pull
-from registry_cli.commands.pull.structures import structure_pull
+from registry_cli.commands.pull.structures import single_structure_pull, structure_pull
 from registry_cli.commands.pull.student import student_pull
 from registry_cli.commands.push.students import student_push
 from registry_cli.commands.send.proof import send_proof_registration
@@ -48,6 +48,13 @@ def schools() -> None:
 def structures(program_id: int) -> None:
     db = get_db()
     structure_pull(db, program_id)
+
+
+@pull.command()
+@click.argument("structure_id", type=int)
+def structure(structure_id: int) -> None:
+    db = get_db()
+    single_structure_pull(db, structure_id)
 
 
 @pull.command()
@@ -115,8 +122,8 @@ def approved() -> None:
 
 
 @enroll.command(name="student")
-@click.argument("std_no")
-def enroll_student(std_no: str) -> None:
+@click.argument("std_no", type=int)
+def enroll_student(std_no: int) -> None:
     db = get_db()
     enroll_by_student_number(db, std_no)
 
