@@ -11,7 +11,6 @@ def enroll_by_student_number(db: Session, std_no: int) -> None:
         db.query(RegistrationRequest)
         .filter(
             RegistrationRequest.std_no == std_no,
-            not_(RegistrationRequest.status.in_(["registered", "rejected"])),
         )
         .filter(
             RegistrationRequest.id.in_(
