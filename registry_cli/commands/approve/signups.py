@@ -29,6 +29,27 @@ def approve_signups(db: Session) -> None:
         print(f"{i+1}/{len(data)}] {signup.name} ({signup.std_no})")
         try:
             student_id = int(signup.std_no)
+
+            existing_student = (
+                db.query(Student)
+                .filter(
+                    Student.std_no == student_id,
+                    Student.user_id != None,
+                    Student.user_id != signup.user_id,
+                )
+                .first()
+            )
+
+            if existing_student and existing_student.user:
+                signup.status = "rejected"
+                signup.message = f"Student number already linked to user: {existing_student.user.email}"
+                db.commit()
+                click.secho(
+                    f"Rejected signup for {signup.name} - student number already linked to user: {existing_student.user.email}",
+                    fg="red",
+                )
+                continue
+
             student = db.query(Student).filter(Student.std_no == student_id).first()
             if not student:
                 passed = student_pull(db, student_id)
@@ -61,7 +82,7 @@ def approve_signups(db: Session) -> None:
                     click.echo(f"Approved signup for {student.name} ({student.std_no})")
             else:
                 signup.status = "rejected"
-                signup.message = "Student Number does not match provided name"
+                signup.message = "Student number does not match provided name"
                 db.commit()
                 click.secho(
                     f"Rejected signup for {signup.name} - name mismatch with student records",
