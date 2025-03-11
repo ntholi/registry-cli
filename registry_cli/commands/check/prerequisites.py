@@ -2,6 +2,7 @@ from typing import List, Set, Tuple
 
 import click
 from sqlalchemy import and_
+from sqlalchemy.engine import Row
 from sqlalchemy.orm import Session
 
 from registry_cli.models import (
@@ -87,8 +88,9 @@ def get_failed_prerequisites(
             continue
 
         # Get all the student's past modules with their grades
-        past_modules = (
-            db.query(StudentModule)
+        past_modules: List[Row[Tuple[StudentModule, Module]]] = (
+            db.query(StudentModule, Module)
+            .join(Module, StudentModule.module_id == Module.id)
             .join(StudentSemester)
             .join(
                 StudentProgram, StudentSemester.student_program_id == StudentProgram.id
@@ -109,11 +111,14 @@ def get_failed_prerequisites(
 
             # Check if student passed this prerequisite
             passed = False
-            for past_module in past_modules:
-                failing_grades = ["F", "X", "FX", "DNC", "DNA", "DNS", "PX"]
+            failing_grades = ["F", "X", "FX", "DNC", "DNA", "DNS", "PP"]
+            for row in past_modules:
+                student_module: StudentModule
+                module: Module
+                student_module, module = row._mapping.values()
                 if (
-                    past_module.module_id == prereq_module.id
-                    and past_module.grade not in failing_grades
+                    module.name.lower() == prereq_module.name.lower()
+                    and student_module.grade not in failing_grades
                 ):
                     passed = True
                     break
@@ -122,8 +127,10 @@ def get_failed_prerequisites(
                 failed_prereqs.add(prereq_module)
 
         if failed_prereqs:
-            module = db.query(Module).filter(Module.id == req_module.module_id).first()
-            if module:
-                failed_prerequisites.append((module, failed_prereqs))
+            maybe_module = (
+                db.query(Module).filter(Module.id == req_module.module_id).first()
+            )
+            if maybe_module:
+                failed_prerequisites.append((maybe_module, failed_prereqs))
 
     return failed_prerequisites
