@@ -77,11 +77,13 @@ def student(std_no: int, info: bool) -> None:
 
 
 @pull.command()
-@click.argument("std_no", type=int)
+@click.argument("std_nos", type=int, nargs=-1)
 @click.option("--term", required=True, help="Academic term (e.g. 2024-07)")
-def modules(std_no: int, term: str) -> None:
+def modules(std_nos: tuple[int, ...], term: str) -> None:
     db = get_db()
-    modules_pull(db, std_no, term)
+    for i, std_no in enumerate(std_nos):
+        print(f"{i+1}/{len(std_nos)}) {std_no}...")
+        modules_pull(db, std_no, term)
 
 
 @pull.command()
