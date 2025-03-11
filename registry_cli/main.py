@@ -2,6 +2,7 @@ import click
 from sqlalchemy.orm import sessionmaker
 
 from registry_cli.commands.approve.signups import approve_signups
+from registry_cli.commands.check.prerequisites import check_prerequisites
 from registry_cli.commands.enroll.approved import enroll_approved
 from registry_cli.commands.enroll.student import enroll_by_student_number
 from registry_cli.commands.pull.modules import modules_pull
@@ -161,6 +162,18 @@ def marks(file_path: str) -> None:
     """
     db = get_db()
     update_marks_from_excel(db, file_path)
+
+
+@cli.group()
+def check() -> None:
+    """Commands for checking and validating data."""
+    pass
+
+
+@check.command()
+def prerequisites() -> None:
+    db = get_db()
+    check_prerequisites(db)
 
 
 if __name__ == "__main__":
