@@ -1,10 +1,11 @@
 import os
+from typing import cast
 
 import click
 import openpyxl
 from sqlalchemy.orm import Session
 
-from registry_cli.models import StudentModule
+from registry_cli.models import GradeType, StudentModule
 
 
 def update_marks_from_excel(db: Session, file_path: str) -> None:
@@ -17,6 +18,10 @@ def update_marks_from_excel(db: Session, file_path: str) -> None:
         click.echo(f"Reading data from {file_path}...")
         workbook = openpyxl.load_workbook(file_path, data_only=True)
         worksheet = workbook.active
+
+        if worksheet is None:
+            click.secho(f"Error: No active worksheet found in {file_path}", fg="red")
+            return
 
         header_row = [cell.value for cell in worksheet[1]]
         required_columns = ["StdModuleID", "Final Mark", "Grade"]
@@ -36,11 +41,24 @@ def update_marks_from_excel(db: Session, file_path: str) -> None:
             )
             return
 
+        status_column_index = None
+        if "Status" in header_row:
+            status_column_index = header_row.index("Status") + 1
+        else:
+            status_column_index = len(header_row) + 1
+            worksheet.cell(row=1, column=status_column_index, value="Status")
+
         update_count = 0
+        skipped_count = 0
         error_count = 0
 
         for row_index, row in enumerate(worksheet.iter_rows(min_row=2), start=2):
             try:
+                status_cell = worksheet.cell(row=row_index, column=status_column_index)
+                if status_cell.value == "done":
+                    skipped_count += 1
+                    continue
+
                 module_id_cell = row[column_indices["StdModuleID"] - 1]
                 marks_cell = row[column_indices["Final Mark"] - 1]
                 grade_cell = row[column_indices["Grade"] - 1]
@@ -69,8 +87,20 @@ def update_marks_from_excel(db: Session, file_path: str) -> None:
 
                 if module:
                     module.marks = str(int(float(marks)))
-                    module.grade = grade
+                    try:
+                        module.grade = cast(GradeType, grade)
+                    except ValueError:
+                        click.secho(
+                            f"Warning: Invalid grade '{grade}' at row {row_index}, skipping grade update",
+                            fg="yellow",
+                        )
+                        error_count += 1
+                        continue
+
                     update_count += 1
+                    worksheet.cell(
+                        row=row_index, column=status_column_index, value="done"
+                    )
                 else:
                     click.secho(
                         f"Warning: No StudentModule found with ID {module_id}",
@@ -81,9 +111,16 @@ def update_marks_from_excel(db: Session, file_path: str) -> None:
                 click.secho(f"Error processing row {row_index}: {str(e)}", fg="red")
                 error_count += 1
 
-        # Commit changes to database
         db.commit()
+
+        workbook.save(file_path)
         click.secho(f"Successfully updated {update_count} modules", fg="green")
+
+        if skipped_count > 0:
+            click.secho(
+                f"Skipped {skipped_count} rows that were already marked as done",
+                fg="blue",
+            )
 
         if error_count > 0:
             click.secho(f"Encountered {error_count} errors while updating", fg="red")
