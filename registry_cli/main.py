@@ -12,6 +12,7 @@ from registry_cli.commands.pull.semesters import semesters_pull
 from registry_cli.commands.pull.structures import single_structure_pull, structure_pull
 from registry_cli.commands.pull.student import student_pull
 from registry_cli.commands.push.students import student_push
+from registry_cli.commands.send.notifications import send_notifications
 from registry_cli.commands.send.proof import send_proof_registration
 from registry_cli.commands.update.marks import update_marks_from_excel
 from registry_cli.db.config import get_engine
@@ -143,6 +144,13 @@ def proof(std_no: int) -> None:
     """Send proof of registration to the specified student."""
     db = get_db()
     send_proof_registration(db, std_no)
+
+
+@send.command()
+def notifications() -> None:
+    """Send notifications to students with rejected registration clearances."""
+    db = get_db()
+    send_notifications(db)
 
 
 @cli.group()
