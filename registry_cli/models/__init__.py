@@ -662,6 +662,7 @@ class RegistrationClearance(Base):
         String, nullable=False, default="pending"
     )
     message: Mapped[Optional[str]] = mapped_column(String)
+    email_sent: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     responded_by: Mapped[Optional[str]] = mapped_column(
         ForeignKey("users.id", ondelete="cascade")
     )
