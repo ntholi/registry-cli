@@ -116,10 +116,10 @@ def get_failed_prerequisites(
                 student_module: StudentModule
                 module: Module
                 student_module, module = row._mapping.values()
+                module_code = fix_module_code(module.code)
                 if (
-                    module.name.lower() == prereq_module.name.lower()
-                    and student_module.grade not in failing_grades
-                ):
+                    module_code == prereq_module.code
+                ) and student_module.grade not in failing_grades:
                     passed = True
                     break
 
@@ -134,3 +134,9 @@ def get_failed_prerequisites(
                 failed_prerequisites.append((maybe_module, failed_prereqs))
 
     return failed_prerequisites
+
+
+def fix_module_code(module_code: str) -> str:
+    if module_code == "DDDR110":
+        return "DDDR1110"
+    return module_code
