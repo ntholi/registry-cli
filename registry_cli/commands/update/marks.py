@@ -52,8 +52,16 @@ def update_marks_from_excel(db: Session, file_path: str) -> None:
         skipped_count = 0
         error_count = 0
 
+        total_rows = sum(1 for _ in worksheet.iter_rows(min_row=2)) or 1
+
         for row_index, row in enumerate(worksheet.iter_rows(min_row=2), start=2):
             try:
+                progress_percent = int((row_index - 1) / total_rows * 100)
+                click.echo(
+                    f"\rProcessing row {row_index-1}/{total_rows} ({progress_percent}%) ",
+                    nl=False,
+                )
+
                 status_cell = worksheet.cell(row=row_index, column=status_column_index)
                 if status_cell.value == "done":
                     skipped_count += 1
@@ -112,6 +120,8 @@ def update_marks_from_excel(db: Session, file_path: str) -> None:
                 error_count += 1
 
         db.commit()
+
+        click.echo("\r" + " " * 80)
 
         workbook.save(file_path)
         click.secho(f"Successfully updated {update_count} modules", fg="green")
