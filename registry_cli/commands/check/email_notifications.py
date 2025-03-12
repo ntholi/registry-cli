@@ -37,10 +37,8 @@ def send_prerequisite_notification(
         )
         return False
 
-    # Prepare email subject
     subject = "Important: Registration Module Prerequisites Not Met"
 
-    # Prepare email body - plain text version
     body = f"""
 Dear {student.name},
 
@@ -50,7 +48,6 @@ The following modules have prerequisite requirements that must be met:
 
 """
 
-    # Add details of each module and its prerequisites
     for module, prereqs in failed_prereqs:
         body += f"MODULE: {module.code} - {module.name}\n"
         body += "MISSING PREREQUISITES:\n"
@@ -70,7 +67,6 @@ Registry Department
 Limkokwing University of Creative Technology
 """
 
-    # Create HTML version for better formatting
     html_content = f"""
     <html>
     <head>
@@ -99,7 +95,6 @@ Limkokwing University of Creative Technology
                 <p><strong>The following modules have prerequisite requirements that must be met:</strong></p>
     """
 
-    # Add module details in HTML
     for module, prereqs in failed_prereqs:
         html_content += f"""
                 <div class="module">
@@ -132,7 +127,6 @@ Limkokwing University of Creative Technology
     </html>
     """
 
-    # Send the email
     success = EmailSender.send_email(
         recipient_email=email,
         subject=subject,
@@ -140,9 +134,7 @@ Limkokwing University of Creative Technology
         html_content=html_content,
     )
 
-    # Mark modules that will be removed
     if success:
-        # For each module with missing prerequisites, mark it for removal
         for module, _ in failed_prereqs:
             requested_module = (
                 db.query(RequestedModule)

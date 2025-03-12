@@ -26,13 +26,11 @@ def check_prerequisites(db: Session) -> None:
     List students who have registered for modules but failed their prerequisites.
     Options to send email notifications to students about the failed prerequisites.
     """
-    # Get active term
     active_term = db.query(Term).filter(Term.is_active == True).first()
     if not active_term:
         click.secho("No active term found", fg="red")
         return
 
-    # Get pending registration requests for current term
     requests = (
         db.query(RegistrationRequest)
         .filter(
@@ -48,7 +46,6 @@ def check_prerequisites(db: Session) -> None:
     issues_found = False
     students_with_prereq_issues = []
 
-    # First, collect all students with failed prerequisites
     for request in requests:
         failed_prereqs = get_failed_prerequisites(db, request)
         if failed_prereqs:
@@ -66,7 +63,6 @@ def check_prerequisites(db: Session) -> None:
         f"\nFound {total_students} students with prerequisite issues", fg="yellow"
     )
 
-    # Now process each student one by one with confirmation prompt
     for idx, (student, request, failed_prereqs) in enumerate(
         students_with_prereq_issues, 1
     ):
@@ -76,13 +72,11 @@ def check_prerequisites(db: Session) -> None:
         click.echo(f"Registration Request ID: {request.id}")
         click.echo("Failed Prerequisites:")
 
-        # Display the failed prerequisites for this student
         for module, prereqs in failed_prereqs:
             click.echo(f"  Module: {module.code} - {module.name}")
             for prereq in prereqs:
                 click.echo(f"    ↳ {prereq.code} - {prereq.name}")
 
-        # Prompt for confirmation to send email
         if click.confirm(f"\nSend email notification to this student?", default=False):
             send_prerequisite_notification(db, student, request, failed_prereqs)
             click.secho("Email sent.", fg="green")
@@ -98,7 +92,6 @@ def get_failed_prerequisites(
     """
     failed_prerequisites = []
 
-    # Get all requested modules
     requested_modules = (
         db.query(RequestedModule)
         .filter(RequestedModule.registration_request_id == request.id)
@@ -106,7 +99,6 @@ def get_failed_prerequisites(
     )
 
     for req_module in requested_modules:
-        # Get prerequisites for this module
         prerequisites = (
             db.query(ModulePrerequisite)
             .filter(ModulePrerequisite.module_id == req_module.module_id)
@@ -116,7 +108,6 @@ def get_failed_prerequisites(
         if not prerequisites:
             continue
 
-        # Get all the student's past modules with their grades
         past_modules: List[Row[Tuple[StudentModule, Module]]] = (
             db.query(StudentModule, Module)
             .join(Module, StudentModule.module_id == Module.id)
@@ -128,7 +119,6 @@ def get_failed_prerequisites(
             .all()
         )
 
-        # Track failed prerequisites
         failed_prereqs = set()
 
         for pre in prerequisites:
@@ -138,7 +128,6 @@ def get_failed_prerequisites(
             if not prereq_module:
                 continue
 
-            # Check if student passed this prerequisite
             passed = False
             failing_grades = ["F", "X", "FX", "DNC", "DNA", "DNS", "PP"]
             for row in past_modules:
