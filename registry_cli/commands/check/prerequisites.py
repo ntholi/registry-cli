@@ -137,6 +137,7 @@ def get_failed_prerequisites(
                 module_code = fix_module_code(module.code)
                 if (
                     module_code == prereq_module.code
+                    or module.name == prereq_module.name
                 ) and student_module.grade not in failing_grades:
                     passed = True
                     break
