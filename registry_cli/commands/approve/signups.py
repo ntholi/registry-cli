@@ -91,4 +91,18 @@ def approve_signups(db: Session) -> None:
 
         except Exception as e:
             click.secho(f"Error processing signup {signup.std_no}: {str(e)}", fg="red")
+            try:
+                student_id = int(signup.std_no)
+                student = db.query(Student).filter(Student.std_no == student_id).first()
+                if student:
+                    click.secho(
+                        f"Deleting student record for {student.name} ({student.std_no})",
+                        fg="yellow",
+                    )
+                    db.delete(student)
+                    db.commit()
+                    click.secho(f"Student record deleted successfully", fg="green")
+            except Exception as delete_error:
+                click.secho(f"Failed to delete student: {str(delete_error)}", fg="red")
+                db.rollback()
             continue
