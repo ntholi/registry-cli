@@ -17,6 +17,112 @@ from registry_cli.scrapers.structure import (
 )
 
 
+def _process_modules_and_prerequisites(
+    db: Session, semester: StructureSemester, modules_data: list
+) -> None:
+    """Helper function to process modules and their prerequisites for a semester."""
+    modules_needing_prerequisites = []
+
+    for module_data in modules_data:
+        module = db.query(Module).filter(Module.id == module_data["id"]).first()
+        if not module:
+            module = Module(
+                id=module_data["id"],
+                code=module_data["code"],
+                name=module_data["name"],
+                type=module_data["type"],
+                credits=module_data["credits"],
+                semester_id=semester.id,
+            )
+            db.add(module)
+        else:
+            module.code = module_data["code"]
+            module.name = module_data["name"]
+            module.type = module_data["type"]
+            module.credits = module_data["credits"]
+            module.semester_id = semester.id
+
+        if module_data.get("prerequisite_code"):
+            modules_needing_prerequisites.append(
+                {
+                    "module": module,
+                    "prerequisite_code": module_data["prerequisite_code"],
+                }
+            )
+
+    db.flush()
+
+    for item in modules_needing_prerequisites:
+        module = item["module"]
+        prerequisite_code = item["prerequisite_code"]
+
+        prerequisite = db.query(Module).filter(Module.code == prerequisite_code).first()
+
+        if prerequisite:
+            existing_prerequisite = (
+                db.query(ModulePrerequisite)
+                .filter(
+                    ModulePrerequisite.module_id == module.id,
+                    ModulePrerequisite.prerequisite_id == prerequisite.id,
+                )
+                .first()
+            )
+            if not existing_prerequisite:
+                module_prerequisite = ModulePrerequisite(
+                    module_id=module.id,
+                    prerequisite_id=prerequisite.id,
+                )
+                db.add(module_prerequisite)
+        else:
+            click.secho(
+                f"Warning: Prerequisite module {prerequisite_code} not found in database",
+                fg="red",
+            )
+
+
+def _process_semesters(db: Session, structure: Structure, structure_id: int) -> bool:
+    """Helper function to process semesters and their modules for a structure."""
+    semester_url = (
+        f"{BASE_URL}/f_semesterlist.php?showmaster=1&StructureID={structure_id}"
+    )
+    semester_scraper = SemesterScraper(semester_url)
+    semesters_data = semester_scraper.scrape()
+
+    if not semesters_data:
+        click.echo("No semesters found for this structure.")
+        return False
+
+    for semester_data in semesters_data:
+        semester = (
+            db.query(StructureSemester)
+            .filter(StructureSemester.id == semester_data["id"])
+            .first()
+        )
+
+        if not semester:
+            semester = StructureSemester(
+                id=semester_data["id"],
+                structure_id=structure.id,
+                name=semester_data["name"],
+                semester_number=semester_data["semester_number"],
+                total_credits=semester_data["total_credits"],
+            )
+            db.add(semester)
+        else:
+            semester.structure_id = structure.id
+            semester.name = semester_data["name"]
+            semester.semester_number = semester_data["semester_number"]
+            semester.total_credits = semester_data["total_credits"]
+
+        module_url = f"{BASE_URL}/f_semmodulelist.php?showmaster=1&SemesterID={semester_data['id']}"
+        module_scraper = SemesterModuleScraper(module_url)
+        modules_data = module_scraper.scrape()
+
+        _process_modules_and_prerequisites(db, semester, modules_data)
+
+    return True
+
+
 def structure_pull(db: Session, program_id: int) -> None:
     program = db.query(Program).filter(Program.id == program_id).first()
     if not program:
@@ -43,8 +149,6 @@ def structure_pull(db: Session, program_id: int) -> None:
             click.echo("No program structures found.")
             return
 
-        modules_needing_prerequisites = []
-
         for structure_data in structures_data:
             structure = (
                 db.query(Structure)
@@ -63,94 +167,7 @@ def structure_pull(db: Session, program_id: int) -> None:
                 structure.code = structure_data["code"]
                 structure.program_id = program_id
 
-            semester_url = f"{BASE_URL}/f_semesterlist.php?showmaster=1&StructureID={structure_data['id']}"
-            semester_scraper = SemesterScraper(semester_url)
-            semesters_data = semester_scraper.scrape()
-
-            for semester_data in semesters_data:
-                semester = (
-                    db.query(StructureSemester)
-                    .filter(StructureSemester.id == semester_data["id"])
-                    .first()
-                )
-
-                if not semester:
-                    semester = StructureSemester(
-                        id=semester_data["id"],
-                        structure_id=structure.id,
-                        name=semester_data["name"],
-                        semester_number=semester_data["semester_number"],
-                        total_credits=semester_data["total_credits"],
-                    )
-                    db.add(semester)
-                else:
-                    semester.structure_id = structure.id
-                    semester.name = semester_data["name"]
-                    semester.semester_number = semester_data["semester_number"]
-                    semester.total_credits = semester_data["total_credits"]
-
-                module_url = f"{BASE_URL}/f_semmodulelist.php?showmaster=1&SemesterID={semester_data['id']}"
-                module_scraper = SemesterModuleScraper(module_url)
-                modules_data = module_scraper.scrape()
-
-                for module_data in modules_data:
-                    module = (
-                        db.query(Module).filter(Module.id == module_data["id"]).first()
-                    )
-                    if not module:
-                        module = Module(
-                            id=module_data["id"],
-                            code=module_data["code"],
-                            name=module_data["name"],
-                            type=module_data["type"],
-                            credits=module_data["credits"],
-                            semester_id=semester.id,
-                        )
-                        db.add(module)
-                    else:
-                        module.code = module_data["code"]
-                        module.name = module_data["name"]
-                        module.type = module_data["type"]
-                        module.credits = module_data["credits"]
-                        module.semester_id = semester.id
-
-                    if module_data.get("prerequisite_code"):
-                        modules_needing_prerequisites.append(
-                            {
-                                "module": module,
-                                "prerequisite_code": module_data["prerequisite_code"],
-                            }
-                        )
-        db.flush()
-
-        for item in modules_needing_prerequisites:
-            module = item["module"]
-            prerequisite_code = item["prerequisite_code"]
-
-            prerequisite = (
-                db.query(Module).filter(Module.code == prerequisite_code).first()
-            )
-
-            if prerequisite:
-                existing_prerequisite = (
-                    db.query(ModulePrerequisite)
-                    .filter(
-                        ModulePrerequisite.module_id == module.id,
-                        ModulePrerequisite.prerequisite_id == prerequisite.id,
-                    )
-                    .first()
-                )
-                if not existing_prerequisite:
-                    module_prerequisite = ModulePrerequisite(
-                        module_id=module.id,
-                        prerequisite_id=prerequisite.id,
-                    )
-                    db.add(module_prerequisite)
-            else:
-                click.secho(
-                    f"Warning: Prerequisite module {prerequisite_code} not found in database",
-                    fg="red",
-                )
+            _process_semesters(db, structure, int(structure_data["id"]))
 
         db.commit()
         click.echo(
@@ -170,27 +187,14 @@ def single_structure_pull(db: Session, structure_id: int) -> None:
         db: Database session
         structure_id: ID of the structure to pull
     """
-    structure = db.query(Structure).filter(Structure.id == structure_id).first()
-
-    if not structure:
-        click.secho(
-            f"Structure {structure_id} not found in database. This will create a new structure record.",
-            fg="yellow",
-        )
-
-    # We don't need to look up by program first since we have the structure ID directly
-    semester_url = (
-        f"{BASE_URL}/f_semesterlist.php?showmaster=1&StructureID={structure_id}"
-    )
-    semester_scraper = SemesterScraper(semester_url)
-
     try:
-        semesters_data = semester_scraper.scrape()
-        if not semesters_data:
-            click.echo("No semesters found for this structure.")
-            return
+        structure = db.query(Structure).filter(Structure.id == structure_id).first()
 
         if not structure:
+            click.secho(
+                f"Structure {structure_id} not found in database. This will create a new structure record.",
+                fg="yellow",
+            )
             program_id = click.prompt(
                 "Enter the program ID for this structure", type=int
             )
@@ -203,96 +207,11 @@ def single_structure_pull(db: Session, structure_id: int) -> None:
             db.add(structure)
             db.flush()
 
-        modules_needing_prerequisites = []
-
-        for semester_data in semesters_data:
-            semester = (
-                db.query(StructureSemester)
-                .filter(StructureSemester.id == semester_data["id"])
-                .first()
+        if _process_semesters(db, structure, structure_id):
+            db.commit()
+            click.echo(
+                f"Successfully pulled structure {structure_id} with all semesters and modules."
             )
-
-            if not semester:
-                semester = StructureSemester(
-                    id=semester_data["id"],
-                    structure_id=structure.id,
-                    name=semester_data["name"],
-                    semester_number=semester_data["semester_number"],
-                    total_credits=semester_data["total_credits"],
-                )
-                db.add(semester)
-            else:
-                semester.structure_id = structure.id
-                semester.name = semester_data["name"]
-                semester.semester_number = semester_data["semester_number"]
-                semester.total_credits = semester_data["total_credits"]
-
-            module_url = f"{BASE_URL}/f_semmodulelist.php?showmaster=1&SemesterID={semester_data['id']}"
-            module_scraper = SemesterModuleScraper(module_url)
-            modules_data = module_scraper.scrape()
-
-            for module_data in modules_data:
-                module = db.query(Module).filter(Module.id == module_data["id"]).first()
-                if not module:
-                    module = Module(
-                        id=module_data["id"],
-                        code=module_data["code"],
-                        name=module_data["name"],
-                        type=module_data["type"],
-                        credits=module_data["credits"],
-                        semester_id=semester.id,
-                    )
-                    db.add(module)
-                else:
-                    module.code = module_data["code"]
-                    module.name = module_data["name"]
-                    module.type = module_data["type"]
-                    module.credits = module_data["credits"]
-                    module.semester_id = semester.id
-
-                if module_data.get("prerequisite_code"):
-                    modules_needing_prerequisites.append(
-                        {
-                            "module": module,
-                            "prerequisite_code": module_data["prerequisite_code"],
-                        }
-                    )
-
-        db.flush()
-
-        for item in modules_needing_prerequisites:
-            module = item["module"]
-            prerequisite_code = item["prerequisite_code"]
-
-            prerequisite = (
-                db.query(Module).filter(Module.code == prerequisite_code).first()
-            )
-
-            if prerequisite:
-                existing_prerequisite = (
-                    db.query(ModulePrerequisite)
-                    .filter(
-                        ModulePrerequisite.module_id == module.id,
-                        ModulePrerequisite.prerequisite_id == prerequisite.id,
-                    )
-                    .first()
-                )
-                if not existing_prerequisite:
-                    module_prerequisite = ModulePrerequisite(
-                        module_id=module.id,
-                        prerequisite_id=prerequisite.id,
-                    )
-                    db.add(module_prerequisite)
-            else:
-                click.secho(
-                    f"Warning: Prerequisite module {prerequisite_code} not found in database",
-                    fg="red",
-                )
-
-        db.commit()
-        click.echo(
-            f"Successfully pulled structure {structure_id} with all semesters and modules."
-        )
 
     except Exception as e:
         db.rollback()
