@@ -96,6 +96,21 @@ def semesters(std_no: int, program: str) -> None:
     semesters_pull(db, std_no, program)
 
 
+@pull.command()
+@click.argument("std_nos", type=int, nargs=-1)
+@click.option(
+    "--info",
+    is_flag=True,
+    help="Only update student information without programs and modules",
+)
+def students(std_nos: tuple[int, ...], info: bool) -> None:
+    """Pull multiple student records from the registry system."""
+    db = get_db()
+    for i, std_no in enumerate(std_nos):
+        print(f"{i+1}/{len(std_nos)}) {std_no}...")
+        student_pull(db, std_no, info)
+
+
 @cli.group()
 def approve() -> None:
     pass
