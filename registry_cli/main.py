@@ -1,3 +1,5 @@
+import time
+
 import click
 from sqlalchemy.orm import sessionmaker
 
@@ -119,7 +121,15 @@ def approve() -> None:
 @approve.command()
 def signups() -> None:
     db = get_db()
-    approve_signups(db)
+    try:
+        while True:
+            print("Running signup approvals...")
+            approve_signups(db)
+            print("Waiting 5 minutes before next check...")
+            time.sleep(5 * 60)
+    except KeyboardInterrupt:
+        print("\nStopping signup approval loop...")
+        db.close()
 
 
 @cli.command()
@@ -137,7 +147,15 @@ def enroll() -> None:
 @enroll.command()
 def approved() -> None:
     db = get_db()
-    enroll_approved(db)
+    try:
+        while True:
+            print("Running enrollment for approved students...")
+            enroll_approved(db)
+            print("Waiting 5 minutes before next check...")
+            time.sleep(5 * 60)
+    except KeyboardInterrupt:
+        print("\nStopping enrollment loop...")
+        db.close()
 
 
 @enroll.command(name="student")
@@ -165,7 +183,15 @@ def proof(std_no: int) -> None:
 def notifications() -> None:
     """Send notifications to students with rejected registration clearances."""
     db = get_db()
-    send_notifications(db)
+    try:
+        while True:
+            print("Checking for pending notifications...")
+            send_notifications(db)
+            print("Waiting 5 minutes before next check...")
+            time.sleep(5 * 60)
+    except KeyboardInterrupt:
+        print("\nStopping notifications loop...")
+        db.close()
 
 
 @cli.group()
