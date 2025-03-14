@@ -1,8 +1,9 @@
 from typing import Any, Dict, List
 
-from bs4 import Tag
+from bs4 import Comment, Tag
 from bs4.element import NavigableString
 
+from registry_cli.browser import BASE_URL
 from registry_cli.models import ModuleType
 from registry_cli.scrapers.base import BaseScraper
 
@@ -27,7 +28,7 @@ class ProgramStructureScraper(BaseScraper):
 
         for row in table.find_all("tr", {"class": ["ewTableRow", "ewTableAltRow"]}):
             cells = row.find_all("td")
-            if len(cells) < 6:  # Skip rows without enough cells
+            if len(cells) < 6:
                 continue
 
             code = cells[0].get_text(strip=True)
@@ -74,7 +75,6 @@ class SemesterScraper(BaseScraper):
             except ValueError:
                 credits = 0.0
 
-            # Extract semester ID from the view link
             view_link = cells[4].find("a")
             if not view_link:
                 continue
@@ -83,7 +83,7 @@ class SemesterScraper(BaseScraper):
             parts: List[str] = semester.split()
 
             if semester.startswith(("B", "F")):
-                semester_number = 0  # Special case for Bridging and Foundation
+                semester_number = 0
             else:
                 if len(parts) >= 2 and parts[0].isdigit():
                     semester_number = int(parts[0])
@@ -108,7 +108,7 @@ class SemesterModuleScraper(BaseScraper):
     """Scraper for module information within a semester."""
 
     def scrape(self) -> List[Dict[str, Any]]:
-        """Scrape module data from the URL.
+        """Scrape module data from all pages of the URL.
 
         Returns:
             List of dictionaries containing module data with keys:
@@ -119,20 +119,48 @@ class SemesterModuleScraper(BaseScraper):
             - credits: Module credits
             - prerequisite: Module prerequisite code (if any)
         """
-        soup = self._get_soup()
-        modules = []
+        all_modules = []
+        current_url = self.url
 
+        while True:
+            soup = self._get_soup()
+            modules = self._scrape_page(soup)
+            all_modules.extend(modules)
+
+            # Check for next page link
+            next_link = None
+            pager_form = soup.find("form", {"name": "ewpagerform"})
+            if pager_form and isinstance(pager_form, Tag):
+                links = pager_form.find_all("a")
+                for link in links:
+                    if link.get_text(strip=True) == "Next":
+                        next_link = link["href"]
+                        break
+
+            if not next_link:
+                break
+
+            # Update URL for next page
+            if next_link.startswith("/"):
+                self.url = f"{BASE_URL}{next_link}"
+            else:
+                base_path = "/".join(current_url.split("/")[:-1])
+                self.url = f"{base_path}/{next_link}"
+
+        return all_modules
+
+    def _scrape_page(self, soup) -> List[Dict[str, Any]]:
+        """Scrape module data from a single page."""
+        modules = []
         table: Tag | NavigableString | None = soup.find("table", {"id": "ewlistmain"})
         if not table or isinstance(table, NavigableString):
             return modules
 
         for row in table.find_all("tr", {"class": ["ewTableRow", "ewTableAltRow"]}):
             cells = row.find_all("td")
-            if len(cells) < 7:  # Skip rows without enough cells
+            if len(cells) < 7:
                 continue
 
-            # Parse module code and name
-            # Format: "DDC112 Creative and Innovation Studies"
             module_text = cells[0].get_text(strip=True)
             code_end = module_text.find(" ")
             if code_end == -1:
@@ -148,7 +176,6 @@ class SemesterModuleScraper(BaseScraper):
             except ValueError:
                 module_type = "Core"
 
-            # Skip modules marked as "Delete"
             if type_text == "Delete":
                 continue
 
@@ -159,16 +186,13 @@ class SemesterModuleScraper(BaseScraper):
             except ValueError:
                 credits = 0.0
 
-            # Get prerequisite
             prerequisite_text = cells[4].get_text(strip=True)
             prerequisite_code = None
             if prerequisite_text:
-                # Format: "01 DIAL1110 Algebra" - extract the module code
                 parts = prerequisite_text.split()
                 if len(parts) >= 2:
                     prerequisite_code = parts[1]
 
-            # Get module ID from view link
             view_link = cells[5].find("a")
             if not view_link:
                 continue

@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Comment
 
 from registry_cli.browser import Browser
 
@@ -16,7 +16,11 @@ class BaseScraper(ABC):
     def _get_soup(self) -> BeautifulSoup:
         """Get BeautifulSoup object from URL."""
         response = self.browser.fetch(self.url)
-        return BeautifulSoup(response.text, "lxml")
+        soup = BeautifulSoup(response.text, "lxml")
+        # Remove all HTML comments
+        for comment in soup.find_all(string=lambda text: isinstance(text, Comment)):
+            comment.extract()
+        return soup
 
     @abstractmethod
     def scrape(self) -> List[Dict[str, Any]]:
