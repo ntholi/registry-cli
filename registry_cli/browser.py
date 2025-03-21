@@ -99,13 +99,13 @@ class Browser:
         if self.session is None:
             raise ValueError("Session is not initialized")
         logger.info(f"Fetching {url}")
-        response = self.session.get(url, timeout=60)
+        response = self.session.get(url, timeout=120)
         is_logged_in = check_logged_in(response.text)
         if not is_logged_in:
             logger.info("Session expired, logging in again")
             self.login()
             logger.info(f"Logged in, re-fetching {url}")
-            response = self.session.get(url)
+            response = self.session.get(url, timeout=120)
         if response.status_code != 200:
             logger.warning(f"Unexpected status code: {response.status_code}")
         return response
