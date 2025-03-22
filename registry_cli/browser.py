@@ -45,6 +45,7 @@ def check_logged_in(html: str) -> bool:
 class Browser:
     _instance = None
     logged_in = False
+    max_retries = 3
     session: requests.Session | None = None
 
     def __new__(cls):
@@ -99,12 +100,12 @@ class Browser:
         if self.session is None:
             raise ValueError("Session is not initialized")
 
-        max_retries = 3
+
         retry_count = 0
 
-        while retry_count < max_retries:
+        while retry_count < self.max_retries:
             try:
-                logger.info(f"Fetching {url} (Attempt {retry_count + 1}/{max_retries})")
+                logger.info(f"Fetching {url} (Attempt {retry_count + 1}/{self.max_retries})")
                 response = self.session.get(url, timeout=120)
 
                 is_logged_in = check_logged_in(response.text)
@@ -117,26 +118,26 @@ class Browser:
                 if response.status_code != 200:
                     logger.error(f"Unexpected status code: {response.status_code}")
                     retry_count += 1
-                    if retry_count < max_retries:
-                        logger.info(f"Retrying... ({retry_count}/{max_retries})")
+                    if retry_count < self.max_retries:
+                        logger.info(f"Retrying... ({retry_count}/{self.max_retries})")
                         continue
 
                 return response
 
             except (requests.RequestException, TimeoutError) as e:
                 retry_count += 1
-                if retry_count < max_retries:
+                if retry_count < self.max_retries:
                     logger.error(
-                        f"Request failed: {str(e)}. Retrying... ({retry_count}/{max_retries})"
+                        f"Request failed: {str(e)}. Retrying... ({retry_count}/{self.max_retries})"
                     )
                 else:
                     logger.error(
-                        f"Request failed after {max_retries} attempts: {str(e)}"
+                        f"Request failed after {self.max_retries} attempts: {str(e)}"
                     )
                     raise
 
         raise requests.RequestException(
-            f"Failed to fetch {url} after {max_retries} attempts"
+            f"Failed to fetch {url} after {self.max_retries} attempts"
         )
 
     def post(self, url: str, data: dict | str) -> Response:
