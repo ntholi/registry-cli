@@ -105,7 +105,12 @@ class Browser:
 
         while retry_count < self.max_retries:
             try:
-                logger.info(f"Fetching {url} (Attempt {retry_count + 1}/{self.max_retries})")
+                attempt_info = (
+                    f"(Attempt {retry_count + 1}/{self.max_retries})"
+                    if retry_count > 0
+                    else ""
+                )
+                logger.info(f"Fetching {url} {attempt_info}")
                 response = self.session.get(url, timeout=120)
 
                 is_logged_in = check_logged_in(response.text)
