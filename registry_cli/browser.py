@@ -107,7 +107,7 @@ class Browser:
             logger.info(f"Logged in, re-fetching {url}")
             response = self.session.get(url, timeout=120)
         if response.status_code != 200:
-            logger.warning(f"Unexpected status code: {response.status_code}")
+            logger.error(f"Unexpected status code: {response.status_code}")
         return response
 
     def post(self, url: str, data: dict | str) -> Response:
@@ -123,5 +123,5 @@ class Browser:
             logger.info(f"Logged in, re-posting to {url}")
             response = self.session.post(url, data, timeout=120)
         if response.status_code != 200:
-            logger.warning(f"Unexpected status code: {response.status_code}")
+            logger.error(f"Unexpected status code: {response.status_code}")
         return response
