@@ -100,7 +100,6 @@ class Browser:
         if self.session is None:
             raise ValueError("Session is not initialized")
 
-
         retry_count = 0
 
         while retry_count < self.max_retries:
