@@ -1,3 +1,5 @@
+from tabnanny import check
+
 import click
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -33,6 +35,12 @@ def enroll_approved(db: Session) -> None:
         print("-" * 30)
         print(f"{i}/{len(approved_requests)}] {request.std_no}")
         try:
+            if len(request.requested_modules) < 1:
+                click.secho(
+                    f"Skipping request for {request.std_no}, requested for zero modules",
+                    fg="yellow",
+                )
+                continue
             enroll_student(db, request)
             print(f"Successfully enrolled student {request.std_no}")
         except Exception as e:
