@@ -11,11 +11,14 @@ TURSO_DATABASE_URL = os.getenv("TURSO_DATABASE_URL")
 TURSO_AUTH_TOKEN = os.getenv("TURSO_AUTH_TOKEN")
 
 
+TIMEOUT_SECONDS = 120
+
+
 def get_engine(use_local: bool = False) -> Engine:
     if use_local:
         return create_engine(
             "sqlite:///local.db",
-            connect_args={"check_same_thread": False},
+            connect_args={"check_same_thread": False, "timeout": TIMEOUT_SECONDS},
             echo=False,
         )
     else:
@@ -24,7 +27,7 @@ def get_engine(use_local: bool = False) -> Engine:
             url = f"{TURSO_DATABASE_URL}?authToken={TURSO_AUTH_TOKEN}"
             return create_engine(
                 f"sqlite+{url}",
-                connect_args={"check_same_thread": False, "timeout": 30},
+                connect_args={"check_same_thread": False, "timeout": TIMEOUT_SECONDS},
                 echo=False,
             )
         else:
