@@ -2,16 +2,8 @@ from datetime import datetime
 from typing import Literal, Optional
 from uuid import uuid4
 
-from sqlalchemy import (
-    JSON,
-    Boolean,
-    DateTime,
-    Float,
-    ForeignKey,
-    Integer,
-    String,
-    UniqueConstraint,
-)
+from sqlalchemy import (JSON, Boolean, DateTime, Float, ForeignKey, Integer,
+                        String, UniqueConstraint)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -322,7 +314,7 @@ class StudentModule(Base):
     __tablename__ = "student_modules"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    module_id: Mapped[int] = mapped_column(
+    semester_module_id: Mapped[int] = mapped_column(
         ForeignKey("modules.id", ondelete="cascade"), nullable=False
     )
     status: Mapped[ModuleStatus] = mapped_column(String, nullable=False)
@@ -339,7 +331,7 @@ class StudentModule(Base):
 
     def __repr__(self) -> str:
         return (
-            f"<StudentModule id={self.id!r} module_id={self.module_id!r} status={self.status!r} "
+            f"<StudentModule id={self.id!r} semester_module_id={self.semester_module_id!r} status={self.status!r} "
             f"marks={self.marks!r} grade={self.grade!r}>"
         )
 
@@ -409,8 +401,8 @@ class Structure(Base):
         return f"<Structure id={self.id!r} code={self.code!r} program_id={self.program_id!r}>"
 
 
-class Module(Base):
-    __tablename__ = "modules"
+class SemesterModule(Base):
+    __tablename__ = "semester_modules"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     code: Mapped[str] = mapped_column(String, nullable=False)
@@ -430,7 +422,7 @@ class Module(Base):
     )
     prerequisites: Mapped[list["ModulePrerequisite"]] = relationship(
         back_populates="module",
-        foreign_keys="[ModulePrerequisite.module_id]",
+        foreign_keys="[ModulePrerequisite.semester_module_id]",
         cascade="all, delete",
     )
     is_prerequisite_for: Mapped[list["ModulePrerequisite"]] = relationship(
@@ -450,7 +442,7 @@ class ModulePrerequisite(Base):
     __tablename__ = "module_prerequisites"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    module_id: Mapped[int] = mapped_column(
+    semester_module_id: Mapped[int] = mapped_column(
         ForeignKey("modules.id", ondelete="cascade"), nullable=False
     )
     prerequisite_id: Mapped[int] = mapped_column(
@@ -460,23 +452,23 @@ class ModulePrerequisite(Base):
         Integer, nullable=False, default=lambda: int(datetime.now().timestamp())
     )
 
-    module: Mapped["Module"] = relationship(
-        "Module", foreign_keys=[module_id], back_populates="prerequisites"
+    module: Mapped["SemesterModule"] = relationship(
+        "SemesterModule", foreign_keys=[semester_module_id], back_populates="prerequisites"
     )
-    prerequisite: Mapped["Module"] = relationship(
-        "Module", foreign_keys=[prerequisite_id], back_populates="is_prerequisite_for"
+    prerequisite: Mapped["SemesterModule"] = relationship(
+        "SemesterModule", foreign_keys=[prerequisite_id], back_populates="is_prerequisite_for"
     )
 
     __table_args__ = (
         UniqueConstraint(
-            "module_id",
+            "semester_module_id",
             "prerequisite_id",
             name="unique_module_prerequisite",
         ),
     )
 
     def __repr__(self) -> str:
-        return f"<ModulePrerequisite id={self.id!r} module_id={self.module_id!r} prerequisite_id={self.prerequisite_id!r}>"
+        return f"<ModulePrerequisite id={self.id!r} semester_module_id={self.semester_module_id!r} prerequisite_id={self.prerequisite_id!r}>"
 
 
 class StructureSemester(Base):
@@ -494,8 +486,8 @@ class StructureSemester(Base):
     )
 
     structure: Mapped["Structure"] = relationship(back_populates="semesters")
-    semester_modules: Mapped[list["Module"]] = relationship(
-        back_populates="semester", foreign_keys="[Module.semester_id]"
+    semester_modules: Mapped[list["SemesterModule"]] = relationship(
+        back_populates="semester", foreign_keys="[SemesterModule.semester_id]"
     )
 
     def __repr__(self) -> str:
@@ -627,7 +619,7 @@ class RequestedModule(Base):
     registration_request_id: Mapped[int] = mapped_column(
         ForeignKey("registration_requests.id", ondelete="cascade"), nullable=False
     )
-    module_id: Mapped[int] = mapped_column(
+    semester_module_id: Mapped[int] = mapped_column(
         ForeignKey("modules.id", ondelete="cascade"), nullable=False
     )
     status: Mapped[RequestedModuleStatus] = mapped_column(
@@ -640,12 +632,12 @@ class RequestedModule(Base):
     registration_request: Mapped["RegistrationRequest"] = relationship(
         back_populates="requested_modules"
     )
-    module: Mapped["Module"] = relationship()
+    module: Mapped["SemesterModule"] = relationship()
 
     def __repr__(self) -> str:
         return (
             f"<RequestedModule id={self.id!r} module_status={self.module_status!r} "
-            f"registration_request_id={self.registration_request_id!r} module_id={self.module_id!r} "
+            f"registration_request_id={self.registration_request_id!r} semester_module_id={self.semester_module_id!r} "
             f"status={self.status!r}>"
         )
 
