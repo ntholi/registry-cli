@@ -7,6 +7,7 @@ from registry_cli.commands.approve.signups import approve_signups
 from registry_cli.commands.check.prerequisites import check_prerequisites
 from registry_cli.commands.enroll.approved import enroll_approved
 from registry_cli.commands.enroll.student import enroll_by_student_number
+from registry_cli.commands.pull.module import module_pull
 from registry_cli.commands.pull.modules import modules_pull
 from registry_cli.commands.pull.programs import program_pull
 from registry_cli.commands.pull.schools import school_pull
@@ -112,6 +113,13 @@ def students(std_nos: tuple[int, ...], info: bool) -> None:
     for i, std_no in enumerate(std_nos):
         print(f"{i+1}/{len(std_nos)}) {std_no}...")
         student_pull(db, std_no, info)
+
+
+@pull.command()
+def module() -> None:
+    """Pull all modules from the registry system."""
+    db = get_db()
+    module_pull(db)
 
 
 @cli.group()
