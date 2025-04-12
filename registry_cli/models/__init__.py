@@ -420,7 +420,7 @@ class Module(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     code: Mapped[str] = mapped_column(String, nullable=False)
     name: Mapped[str] = mapped_column(String, nullable=False)
-    status: Mapped[str] = mapped_column(String, nullable=False, default="Active")
+    status: Mapped[Optional[str]] = mapped_column(String, default="Active")
     timestamp: Mapped[int] = mapped_column(Integer)
 
     semester_modules: Mapped[list["SemesterModule"]] = relationship(
