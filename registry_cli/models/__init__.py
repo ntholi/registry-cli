@@ -401,12 +401,34 @@ class Structure(Base):
         return f"<Structure id={self.id!r} code={self.code!r} program_id={self.program_id!r}>"
 
 
-class SemesterModule(Base):
-    __tablename__ = "semester_modules"
+
+class Module(Base):
+    __tablename__ = "modules"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     code: Mapped[str] = mapped_column(String, nullable=False)
     name: Mapped[str] = mapped_column(String, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False)
+    timestamp: Mapped[int] = mapped_column(Integer)
+
+    semester_modules: Mapped[list["SemesterModule"]] = relationship(
+        back_populates="module"
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<Module id={self.id!r} code={self.code!r} name={self.name!r} "
+            f"status={self.status!r}>"
+        )
+
+
+class SemesterModule(Base):
+    __tablename__ = "semester_modules"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    module_id: Mapped[int] = mapped_column(
+        ForeignKey("modules.id")
+    )
     type: Mapped[ModuleType] = mapped_column(String, nullable=False)
     credits: Mapped[float] = mapped_column(Float, nullable=False)
     semester_id: Mapped[Optional[int]] = mapped_column(
@@ -433,8 +455,7 @@ class SemesterModule(Base):
 
     def __repr__(self) -> str:
         return (
-            f"<Module id={self.id!r} code={self.code!r} name={self.name!r} "
-            f"type={self.type!r} credits={self.credits!r}>"
+            f"<Module id={self.id!r} type={self.type!r} credits={self.credits!r}>"
         )
 
 
