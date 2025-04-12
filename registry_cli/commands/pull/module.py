@@ -11,15 +11,24 @@ from registry_cli.scrapers.module import ModuleScraper
 def module_pull(db: Session) -> None:
     """Pull all modules from the registry system and save them to the database."""
     try:
-        # Scrape modules
+        # Scrape modules page by page
         scraper = ModuleScraper()
-        modules = scraper.scrape()
+        total_modules = 0
+        total_pages = 0
 
-        # Save modules to database
-        save_modules(db, modules)
+        # Process each page of modules as they are scraped
+        for page_modules in scraper.scrape():
+            total_pages += 1
+            total_modules += len(page_modules)
+
+            # Save modules from this page to database
+            save_modules(db, page_modules)
+
+            click.echo(f"Saved page {total_pages} with {len(page_modules)} modules")
 
         click.secho(
-            f"Successfully pulled {len(modules)} modules from registry.", fg="green"
+            f"Successfully pulled {total_modules} modules from {total_pages} pages.",
+            fg="green",
         )
     except Exception as e:
         db.rollback()

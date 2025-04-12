@@ -14,13 +14,13 @@ class ModuleScraper(BaseScraper):
     def __init__(self):
         super().__init__(f"{BASE_URL}/f_modulelist.php")
 
-    def scrape(self) -> List[Dict[str, Any]]:
+    def scrape(self):
         """Scrape modules from all pages of the registry system.
 
-        Returns:
-            List of dictionaries containing module data.
+        Yields:
+            List of dictionaries containing module data from each page.
         """
-        modules = []
+        total_modules = 0
         current_page = 0
         total_pages = 1  # Will be updated in the loop
 
@@ -34,7 +34,7 @@ class ModuleScraper(BaseScraper):
 
             # Collect modules from current page
             page_modules = self._parse_modules(soup)
-            modules.extend(page_modules)
+            total_modules += len(page_modules)
 
             # Determine total pages
             pager = soup.find("form", {"name": "ewpagerform"})
@@ -58,8 +58,10 @@ class ModuleScraper(BaseScraper):
                 f"Scraped page {current_page}/{total_pages}, found {len(page_modules)} modules"
             )
 
-        print(f"Total modules scraped: {len(modules)}")
-        return modules
+            # Yield modules from this page
+            yield page_modules
+
+        print(f"Total modules scraped: {total_modules}")
 
     def _parse_modules(self, soup: BeautifulSoup) -> List[Dict[str, Any]]:
         """Parse modules from the HTML soup object.
