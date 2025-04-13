@@ -26,7 +26,7 @@ class ModuleScraper(BaseScraper):
 
         while current_page <= total_pages:
             if current_page == 1:
-                url = f"{BASE_URL}/f_modulelist.php"
+                url = f"{BASE_URL}/f_modulelist.php?start=1"
             else:
                 start_index = (current_page - 1) * 10 + 1
                 url = f"{BASE_URL}/f_modulelist.php?start={start_index}"
