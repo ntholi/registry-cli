@@ -19,23 +19,12 @@ def scrape_and_save_modules(db: Session, semester: StudentSemester):
 
         for mod in module_data:
             try:
-                # I did this because if a module has been deleted in the program structure
-                # that module will not show the code and name of that module when in the
-                # student academic/semesters/modules view
-                # Ideally this query should just be: filter(Module.code == mod["code"])
-                filter_query = Module.code == mod["code"]
-                if mod["code"].isdigit():
-                    filter_query = Module.id == int(mod["code"])
-                db_module = db.query(Module).filter(filter_query).first()
-                if not db_module:
-                    raise ValueError(f"Module with code {mod['code']} not found")
-
                 module = StudentModule(
                     id=mod["id"],
                     status=mod["status"],
                     marks=mod["marks"],
                     grade=mod["grade"],
-                    semester_module_id=db_module.id,
+                    semester_module_id=mod["semester_module_id"],
                     semester=semester,
                 )
                 db.add(module)

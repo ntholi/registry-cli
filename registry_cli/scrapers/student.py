@@ -206,19 +206,31 @@ class StudentSemesterScraper(BaseScraper):
             if link and "href" in link.attrs:
                 semester_id = link["href"].split("SemesterID=")[-1]
 
+            semester_number = None
+            try:
+                semester_text = cells[1].get_text(strip=True)
+                if semester_text:
+                    parts = semester_text.split("-")
+                    if len(parts) >= 3:
+                        year_sem = parts[2].split()[0]
+                        year = int(year_sem[1])
+                        sem = int(year_sem[-1])
+                        semester_number = (year - 1) * 2 + sem
+            except ValueError:
+                print(
+                    f"Error! Failed to parse semester_number: {semester_text}, setting to None"
+                )
+                semester_number = None
+            if semester_number is None and semester_id:
+                semester_number = self._get_semester_number(semester_id)
+
             semester = {
                 "id": semester_id,
                 "term": cells[0].get_text(strip=True),
                 "status": status,
                 "credits": credits,
-                "semester_number": None,  # Will be updated below if semester_id exists
+                "semester_number": semester_number,
             }
-
-            # Fetch semester_number from the semester view page if we have an ID
-            if semester_id:
-                semester_number = self._get_semester_number(semester_id)
-                if semester_number is not None:
-                    semester["semester_number"] = semester_number
 
             semesters.append(semester)
 
