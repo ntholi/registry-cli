@@ -7,13 +7,13 @@ from registry_cli.commands.approve.signups import approve_signups
 from registry_cli.commands.check.prerequisites import check_prerequisites
 from registry_cli.commands.enroll.approved import enroll_approved
 from registry_cli.commands.enroll.student import enroll_by_student_number
-from registry_cli.commands.pull.module import module_pull
 from registry_cli.commands.pull.modules import modules_pull
 from registry_cli.commands.pull.programs import program_pull
 from registry_cli.commands.pull.schools import school_pull
 from registry_cli.commands.pull.semesters import semesters_pull
 from registry_cli.commands.pull.structures import single_structure_pull, structure_pull
 from registry_cli.commands.pull.student import student_pull
+from registry_cli.commands.pull.student_modules import student_modules_pull
 from registry_cli.commands.push.students import student_push
 from registry_cli.commands.send.notifications import send_notifications
 from registry_cli.commands.send.proof import send_proof_registration
@@ -86,11 +86,11 @@ def student(std_no: int, info: bool) -> None:
 @pull.command()
 @click.argument("std_nos", type=int, nargs=-1)
 @click.option("--term", required=True, help="Academic term (e.g. 2024-07)")
-def modules(std_nos: tuple[int, ...], term: str) -> None:
+def student_modules(std_nos: tuple[int, ...], term: str) -> None:
     db = get_db()
     for i, std_no in enumerate(std_nos):
         print(f"{i+1}/{len(std_nos)}) {std_no}...")
-        modules_pull(db, std_no, term)
+        student_modules_pull(db, std_no, term)
 
 
 @pull.command()
@@ -117,10 +117,10 @@ def students(std_nos: tuple[int, ...], info: bool) -> None:
 
 
 @pull.command()
-def module() -> None:
+def modules() -> None:
     """Pull all modules from the registry system."""
     db = get_db()
-    module_pull(db)
+    modules_pull(db)
 
 
 @cli.group()
