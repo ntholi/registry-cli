@@ -21,45 +21,45 @@ class ModuleScraper(BaseScraper):
             List of dictionaries containing module data from each page.
         """
         total_modules = 0
-        current_page = 0
-        total_pages = 1  # Will be updated in the loop
+        current_page = 1
+        total_pages = 1
 
-        while current_page < total_pages:
-            url = self.url
-            if current_page > 0:
-                url = f"{BASE_URL}/f_modulelist.php?start={current_page * 10}"
-                self.url = url
+        while current_page <= total_pages:
+            if current_page == 1:
+                url = f"{BASE_URL}/f_modulelist.php"
+            else:
+                start_index = (current_page - 1) * 10 + 1
+                url = f"{BASE_URL}/f_modulelist.php?start={start_index}"
 
+            self.url = url
             soup = self._get_soup()
 
-            # Collect modules from current page
             page_modules = self._parse_modules(soup)
             total_modules += len(page_modules)
 
-            # Determine total pages
             pager = soup.find("form", {"name": "ewpagerform"})
             if pager:
-                # Look for the last page reference
                 page_links = pager.find_all("a", href=True)
                 if page_links:
-                    # Try to find the highest page number
                     highest_page = 0
                     for link in page_links:
                         href = link.get("href", "")
                         match = re.search(r"start=(\d+)", href)
                         if match:
-                            page_num = int(int(match.group(1)) / 10) + 1
+                            start_idx = int(match.group(1))
+                            page_num = (start_idx - 1) // 10 + 1
                             highest_page = max(highest_page, page_num)
 
                     total_pages = max(total_pages, highest_page)
 
-            current_page += 1
             print(
                 f"Scraped page {current_page}/{total_pages}, found {len(page_modules)} modules"
             )
 
             # Yield modules from this page
             yield page_modules
+
+            current_page += 1
 
         print(f"Total modules scraped: {total_modules}")
 
