@@ -5,8 +5,14 @@ from bs4 import ResultSet, Tag
 from sqlalchemy.orm import Session
 
 from registry_cli.browser import BASE_URL
-from registry_cli.models import (Gender, MaritalStatus, Program, ProgramStatus,
-                                 SemesterStatus, Structure)
+from registry_cli.models import (
+    Gender,
+    MaritalStatus,
+    Program,
+    ProgramStatus,
+    SemesterStatus,
+    Structure,
+)
 from registry_cli.scrapers.base import BaseScraper
 from registry_cli.scrapers.structure import ProgramStructureScraper
 
@@ -200,32 +206,53 @@ class StudentSemesterScraper(BaseScraper):
             if link and "href" in link.attrs:
                 semester_id = link["href"].split("SemesterID=")[-1]
 
-            semester_number = None
-            try:
-                semester_text = cells[1].get_text(strip=True)
-                if semester_text:
-                    parts = semester_text.split("-")
-                    if len(parts) >= 3:
-                        year_sem = parts[2].split()[0]
-                        year = int(year_sem[1])
-                        sem = int(year_sem[-1])
-                        semester_number = (year - 1) * 2 + sem
-            except ValueError:
-                print(
-                    f"Error! Failed to parse semester_number: {semester_text}, setting to None"
-                )
-                semester_number = None
-
             semester = {
                 "id": semester_id,
                 "term": cells[0].get_text(strip=True),
                 "status": status,
                 "credits": credits,
-                "semester_number": semester_number,
+                "semester_number": None,  # Will be updated below if semester_id exists
             }
+
+            # Fetch semester_number from the semester view page if we have an ID
+            if semester_id:
+                semester_number = self._get_semester_number(semester_id)
+                if semester_number is not None:
+                    semester["semester_number"] = semester_number
+
             semesters.append(semester)
 
         return semesters
+
+    def _get_semester_number(self, semester_id: str) -> int:
+        """Get the semester number directly from the semester view page.
+
+        Args:
+            semester_id: The ID of the semester
+
+        Returns:
+            The semester number or None if not found
+        """
+        view_url = f"{BASE_URL}/r_stdsemesterview.php?StdSemesterID={semester_id}"
+        self.url = view_url
+        soup = self._get_soup()
+
+        rows = soup.find_all("tr")
+        for row in rows:
+            cells = row.find_all("td")
+            if len(cells) == 2:
+                header = cells[0].get_text(strip=True)
+                if header == "Semester":
+                    value = cells[1].get_text(strip=True)
+                    try:
+                        # Extract semester number (e.g. "04" from "04 ")
+                        semester_number = int(value.strip())
+                        return semester_number
+                    except (ValueError, TypeError):
+                        print(f"Error parsing semester number from '{value}'")
+                        return None
+
+        return None
 
 
 class StudentModuleScraper(BaseScraper):
