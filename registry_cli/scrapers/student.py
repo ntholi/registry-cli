@@ -245,10 +245,13 @@ class StudentSemesterScraper(BaseScraper):
                 if header == "Semester":
                     value = cells[1].get_text(strip=True)
                     try:
-                        # Extract semester number (e.g. "04" from "04 ")
-                        semester_number = int(value.strip())
+                        value = value.strip()
+                        if " " in value:
+                            semester_number = int(value.split(" ")[0])
+                        else:
+                            semester_number = int(value)
                         return semester_number
-                    except (ValueError, TypeError):
+                    except (ValueError, TypeError, IndexError):
                         print(f"Error parsing semester number from '{value}'")
                         return None
 
