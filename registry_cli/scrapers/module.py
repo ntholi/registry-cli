@@ -82,11 +82,16 @@ class ModuleScraper(BaseScraper):
         # Skip header row
         for row in rows[1:]:
             cells = row.find_all("td")
-            if len(cells) < 7:  # Ensure we have enough cells
+            if len(cells) < 6:  # Ensure we have at least the minimum required cells
                 continue
 
             # Extract module ID from the View link
-            view_link = cells[5].find("a", href=True)
+            view_link = None
+            for cell in cells[5:]:
+                view_link = cell.find("a", href=True)
+                if view_link and "moduleview" in view_link.get("href", "").lower():
+                    break
+
             if not view_link:
                 continue
 
