@@ -7,6 +7,7 @@ from registry_cli.models import (
     Module,
     ModulePrerequisite,
     Program,
+    SemesterModule,
     Structure,
     StructureSemester,
 )
@@ -21,58 +22,87 @@ def _process_modules_and_prerequisites(
     db: Session, semester: StructureSemester, modules_data: list
 ) -> None:
     """Helper function to process modules and their prerequisites for a semester."""
-    modules_needing_prerequisites = []
+    semester_modules_needing_prerequisites = []
 
     for module_data in modules_data:
-        module = db.query(Module).filter(Module.id == module_data["id"]).first()
-        if not module:
-            module = Module(
+        # Find the base Module record based on code - throw exception if not found
+        base_module = (
+            db.query(Module).filter(Module.code == module_data["code"]).first()
+        )
+        if not base_module:
+            raise ValueError(
+                f"Module with code {module_data['code']} not found in database"
+            )
+
+        # Now handle the SemesterModule which references the Module
+        semester_module = (
+            db.query(SemesterModule)
+            .filter(SemesterModule.id == module_data["id"])
+            .first()
+        )
+        if not semester_module:
+            semester_module = SemesterModule(
                 id=module_data["id"],
+                module_id=base_module.id,
                 code=module_data["code"],
-                name=module_data["name"],
                 type=module_data["type"],
                 credits=module_data["credits"],
                 semester_id=semester.id,
             )
-            db.add(module)
+            db.add(semester_module)
         else:
-            module.code = module_data["code"]
-            module.name = module_data["name"]
-            module.type = module_data["type"]
-            module.credits = module_data["credits"]
-            module.semester_id = semester.id
+            semester_module.module_id = base_module.id
+            semester_module.code = module_data["code"]
+            semester_module.type = module_data["type"]
+            semester_module.credits = module_data["credits"]
+            semester_module.semester_id = semester.id
 
         if module_data.get("prerequisite_code"):
-            modules_needing_prerequisites.append(
+            semester_modules_needing_prerequisites.append(
                 {
-                    "module": module,
+                    "semester_module": semester_module,
                     "prerequisite_code": module_data["prerequisite_code"],
                 }
             )
 
     db.flush()
 
-    for item in modules_needing_prerequisites:
-        module = item["module"]
+    for item in semester_modules_needing_prerequisites:
+        semester_module = item["semester_module"]
         prerequisite_code = item["prerequisite_code"]
 
+        # Find the prerequisite module by code
         prerequisite = db.query(Module).filter(Module.code == prerequisite_code).first()
 
         if prerequisite:
-            existing_prerequisite = (
-                db.query(ModulePrerequisite)
-                .filter(
-                    ModulePrerequisite.module_id == module.id,
-                    ModulePrerequisite.prerequisite_id == prerequisite.id,
-                )
+            # Find the corresponding SemesterModule for this prerequisite module
+            prerequisite_sem_module = (
+                db.query(SemesterModule)
+                .filter(SemesterModule.module_id == prerequisite.id)
                 .first()
             )
-            if not existing_prerequisite:
-                module_prerequisite = ModulePrerequisite(
-                    module_id=module.id,
-                    prerequisite_id=prerequisite.id,
+
+            if prerequisite_sem_module:
+                existing_prerequisite = (
+                    db.query(ModulePrerequisite)
+                    .filter(
+                        ModulePrerequisite.semester_module_id == semester_module.id,
+                        ModulePrerequisite.prerequisite_id
+                        == prerequisite_sem_module.id,
+                    )
+                    .first()
                 )
-                db.add(module_prerequisite)
+                if not existing_prerequisite:
+                    module_prerequisite = ModulePrerequisite(
+                        semester_module_id=semester_module.id,
+                        prerequisite_id=prerequisite_sem_module.id,
+                    )
+                    db.add(module_prerequisite)
+            else:
+                click.secho(
+                    f"Warning: Prerequisite semester module for {prerequisite_code} not found in database",
+                    fg="yellow",
+                )
         else:
             click.secho(
                 f"Warning: Prerequisite module {prerequisite_code} not found in database",

@@ -35,7 +35,7 @@ def scrape_and_save_modules(db: Session, semester: StudentSemester):
                     status=mod["status"],
                     marks=mod["marks"],
                     grade=mod["grade"],
-                    module_id=db_module.id,
+                    semester_module_id=db_module.id,
                     semester=semester,
                 )
                 db.add(module)
