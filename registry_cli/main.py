@@ -83,10 +83,11 @@ def student(std_no: int, info: bool) -> None:
     student_pull(db, std_no, info)
 
 
-@pull.command()
+@pull.command(name="student-semester")
 @click.argument("std_nos", type=int, nargs=-1)
 @click.option("--term", required=True, help="Academic term (e.g. 2024-07)")
-def student_modules(std_nos: tuple[int, ...], term: str) -> None:
+def student_semester(std_nos: tuple[int, ...], term: str) -> None:
+    """Pull student semester and modules for a specific term and update in database."""
     db = get_db()
     for i, std_no in enumerate(std_nos):
         print(f"{i+1}/{len(std_nos)}) {std_no}...")
