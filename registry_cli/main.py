@@ -18,6 +18,7 @@ from registry_cli.commands.push.students import student_push
 from registry_cli.commands.send.notifications import send_notifications
 from registry_cli.commands.send.proof import send_proof_registration
 from registry_cli.commands.update.marks import update_marks_from_excel
+from registry_cli.commands.update.module_refs import update_semester_module_refs
 from registry_cli.commands.update.structure import update_structure_id
 from registry_cli.db.config import get_engine
 
@@ -238,6 +239,24 @@ def update_student_structure(std_nos: tuple[int, ...], id: int) -> None:
     """
     db = get_db()
     update_structure_id(db, list(std_nos), id)
+
+
+@update.command(name="module-refs")
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Only show what would be updated without making actual changes",
+)
+def update_module_references(dry_run: bool) -> None:
+    """
+    Update semester_module module_id references by matching codes.
+
+    This command goes through all semester_modules and finds the corresponding
+    module by using the code, then assigns the semester_module's module_id
+    to the found module's id.
+    """
+    db = get_db()
+    update_semester_module_refs(db, dry_run)
 
 
 @cli.group()
