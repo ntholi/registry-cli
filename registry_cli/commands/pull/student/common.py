@@ -3,7 +3,7 @@ from typing import Any, Dict, List
 import click
 from sqlalchemy.orm import Session
 
-from registry_cli.models import Module, StudentModule, StudentSemester
+from registry_cli.models import Module, SemesterModule, StudentModule, StudentSemester
 from registry_cli.scrapers.student import StudentModuleScraper
 
 
@@ -12,12 +12,19 @@ def scrape_and_save_modules(db: Session, semester: StudentSemester):
     module_scraper = StudentModuleScraper(semester.id)
     try:
         module_data = module_scraper.scrape()
-        db.query(StudentModule).filter(
-            StudentModule.student_semester_id == semester.id
-        ).delete()
-        db.commit()
 
         for mod in module_data:
+            semester_module = (
+                db.query(SemesterModule)
+                .filter(SemesterModule.id == mod["semester_module_id"])
+                .first()
+            )
+            if not semester_module:
+                click.secho(
+                    f"SemesterModule with id: {mod['semester_module_id']} not found",
+                    fg="red",
+                )
+                continue
             try:
                 module = StudentModule(
                     id=mod["id"],
