@@ -26,15 +26,28 @@ def scrape_and_save_modules(db: Session, semester: StudentSemester):
                 )
                 continue
             try:
-                module = StudentModule(
-                    id=mod["id"],
-                    status=mod["status"],
-                    marks=mod["marks"],
-                    grade=mod["grade"],
-                    semester_module_id=mod["semester_module_id"],
-                    semester=semester,
+                existing_module = (
+                    db.query(StudentModule)
+                    .filter(StudentModule.id == mod["id"])
+                    .first()
                 )
-                db.add(module)
+
+                if existing_module:
+                    existing_module.status = mod["status"]
+                    existing_module.marks = mod["marks"]
+                    existing_module.grade = mod["grade"]
+                    existing_module.semester_module_id = mod["semester_module_id"]
+                    existing_module.semester = semester
+                else:
+                    module = StudentModule(
+                        id=mod["id"],
+                        status=mod["status"],
+                        marks=mod["marks"],
+                        grade=mod["grade"],
+                        semester_module_id=mod["semester_module_id"],
+                        semester=semester,
+                    )
+                    db.add(module)
             except Exception as e:
                 db.rollback()
                 click.secho(
