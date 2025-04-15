@@ -383,6 +383,16 @@ class StudentModuleScraper(BaseScraper):
                         module["status"] = semester_module_data["status"]
                     if "type" in semester_module_data:
                         module["type"] = semester_module_data["type"]
+                    if (
+                        "alter_mark" in semester_module_data
+                        and semester_module_data["alter_mark"]
+                    ):
+                        module["marks"] = semester_module_data["alter_mark"]
+                    if (
+                        "alter_grade" in semester_module_data
+                        and semester_module_data["alter_grade"]
+                    ):
+                        module["grade"] = semester_module_data["alter_grade"]
                 except Exception as e:
                     print(
                         f"Error fetching semester module data for ID {std_module_id}: {str(e)}"
