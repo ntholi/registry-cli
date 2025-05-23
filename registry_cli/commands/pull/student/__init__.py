@@ -45,22 +45,12 @@ def student_pull(db: Session, std_no: int, info_only: bool = False) -> bool:
                     .first()
                 )
                 if program:
-                    program.status = prog["status"]
-                    program.structure_id = prog["structure_id"]
-                    program.start_term = prog["start_term"]
-                    program.stream = prog["stream"]
-                    program.assist_provider = prog["assist_provider"]
                     program.std_no = student.std_no
+                    for key, value in prog.items():
+                        setattr(program, key, value)
                 else:
-                    program = StudentProgram(
-                        id=prog["id"],
-                        start_term=prog["start_term"],
-                        structure_id=prog["structure_id"],
-                        stream=prog["stream"],
-                        status=prog["status"],
-                        assist_provider=prog["assist_provider"],
-                        std_no=student.std_no,
-                    )
+                    program = StudentProgram(**prog)
+                    program.std_no = student.std_no
                     db.add(program)
                 db.commit()
 
