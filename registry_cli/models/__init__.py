@@ -213,11 +213,14 @@ class StudentProgram(Base):
     std_no: Mapped[int] = mapped_column(
         ForeignKey("students.std_no", ondelete="cascade"), nullable=False
     )
+    intake_date: Mapped[Optional[str]] = mapped_column(String)
+    reg_date: Mapped[Optional[str]] = mapped_column(String)
     start_term: Mapped[Optional[str]] = mapped_column(String)
     structure_id: Mapped[int] = mapped_column(
         ForeignKey("structures.id", ondelete="cascade"), nullable=False
     )
     stream: Mapped[Optional[str]] = mapped_column(String)
+    graduation_date: Mapped[Optional[str]] = mapped_column(String)
     status: Mapped[ProgramStatus] = mapped_column(String, nullable=False)
     assist_provider: Mapped[Optional[str]] = mapped_column(String)
     created_at: Mapped[int] = mapped_column(
