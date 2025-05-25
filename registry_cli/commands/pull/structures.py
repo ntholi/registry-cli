@@ -25,7 +25,6 @@ def _process_modules_and_prerequisites(
     semester_modules_needing_prerequisites = []
 
     for module_data in modules_data:
-        # Find the base Module record based on code - throw exception if not found
         base_module = (
             db.query(Module).filter(Module.code == module_data["code"]).first()
         )
@@ -34,7 +33,6 @@ def _process_modules_and_prerequisites(
                 f"Module with code {module_data['code']} not found in database"
             )
 
-        # Now handle the SemesterModule which references the Module
         semester_module = (
             db.query(SemesterModule)
             .filter(SemesterModule.id == module_data["id"])
@@ -65,17 +63,15 @@ def _process_modules_and_prerequisites(
                 }
             )
 
-    db.flush()
+    db.commit()
 
     for item in semester_modules_needing_prerequisites:
         semester_module = item["semester_module"]
         prerequisite_code = item["prerequisite_code"]
 
-        # Find the prerequisite module by code
         prerequisite = db.query(Module).filter(Module.code == prerequisite_code).first()
 
         if prerequisite:
-            # Find the corresponding SemesterModule for this prerequisite module
             prerequisite_sem_module = (
                 db.query(SemesterModule)
                 .filter(SemesterModule.module_id == prerequisite.id)
@@ -109,6 +105,8 @@ def _process_modules_and_prerequisites(
                 fg="red",
             )
 
+    db.commit()
+
 
 def _process_semesters(db: Session, structure: Structure, structure_id: int) -> bool:
     """Helper function to process semesters and their modules for a structure."""
@@ -122,33 +120,53 @@ def _process_semesters(db: Session, structure: Structure, structure_id: int) -> 
         click.echo("No semesters found for this structure.")
         return False
 
-    for semester_data in semesters_data:
-        semester = (
-            db.query(StructureSemester)
-            .filter(StructureSemester.id == semester_data["id"])
-            .first()
-        )
-
-        if not semester:
-            semester = StructureSemester(
-                id=semester_data["id"],
-                structure_id=structure.id,
-                name=semester_data["name"],
-                semester_number=semester_data["semester_number"],
-                total_credits=semester_data["total_credits"],
+    for i, semester_data in enumerate(semesters_data, 1):
+        try:
+            click.echo(
+                f"  Processing semester {i}/{len(semesters_data)}: {semester_data['name']}"
             )
-            db.add(semester)
-        else:
-            semester.structure_id = structure.id
-            semester.name = semester_data["name"]
-            semester.semester_number = semester_data["semester_number"]
-            semester.total_credits = semester_data["total_credits"]
 
-        module_url = f"{BASE_URL}/f_semmodulelist.php?showmaster=1&SemesterID={semester_data['id']}"
-        module_scraper = SemesterModuleScraper(module_url)
-        modules_data = module_scraper.scrape()
+            semester = (
+                db.query(StructureSemester)
+                .filter(StructureSemester.id == semester_data["id"])
+                .first()
+            )
 
-        _process_modules_and_prerequisites(db, semester, modules_data)
+            if not semester:
+                semester = StructureSemester(
+                    id=semester_data["id"],
+                    structure_id=structure.id,
+                    name=semester_data["name"],
+                    semester_number=semester_data["semester_number"],
+                    total_credits=semester_data["total_credits"],
+                )
+                db.add(semester)
+            else:
+                semester.structure_id = structure.id
+                semester.name = semester_data["name"]
+                semester.semester_number = semester_data["semester_number"]
+                semester.total_credits = semester_data["total_credits"]
+
+            db.commit()
+
+            module_url = f"{BASE_URL}/f_semmodulelist.php?showmaster=1&SemesterID={semester_data['id']}"
+            module_scraper = SemesterModuleScraper(module_url)
+            modules_data = module_scraper.scrape()
+
+            if modules_data:
+                click.echo(f"    Processing {len(modules_data)} modules...")
+                _process_modules_and_prerequisites(db, semester, modules_data)
+                click.echo(
+                    f"    Completed modules for semester {semester_data['name']}"
+                )
+
+        except Exception as e:
+            db.rollback()
+            click.secho(
+                f"    Error processing semester {semester_data['name']}: {str(e)}",
+                fg="red",
+            )
+            continue
 
     return True
 
@@ -179,29 +197,53 @@ def structure_pull(db: Session, program_id: int) -> None:
             click.echo("No program structures found.")
             return
 
-        for structure_data in structures_data:
-            structure = (
-                db.query(Structure)
-                .filter(Structure.id == int(structure_data["id"]))
-                .first()
-            )
+        successful_structures = 0
+        total_structures = len(structures_data)
 
-            if not structure:
-                structure = Structure(
-                    id=int(structure_data["id"]),
-                    code=structure_data["code"],
-                    program_id=program_id,
+        for i, structure_data in enumerate(structures_data, 1):
+            try:
+                click.echo(
+                    f"Processing structure {i}/{total_structures}: {structure_data['code']}"
                 )
-                db.add(structure)
-            else:
-                structure.code = structure_data["code"]
-                structure.program_id = program_id
 
-            _process_semesters(db, structure, int(structure_data["id"]))
+                structure = (
+                    db.query(Structure)
+                    .filter(Structure.id == int(structure_data["id"]))
+                    .first()
+                )
 
-        db.commit()
+                if not structure:
+                    structure = Structure(
+                        id=int(structure_data["id"]),
+                        code=structure_data["code"],
+                        program_id=program_id,
+                    )
+                    db.add(structure)
+                else:
+                    structure.code = structure_data["code"]
+                    structure.program_id = program_id
+
+                db.commit()
+
+                if _process_semesters(db, structure, int(structure_data["id"])):
+                    successful_structures += 1
+                    click.echo(f"Completed structure {structure_data['code']}")
+                else:
+                    click.secho(
+                        f"No semesters found for structure {structure_data['code']}",
+                        fg="yellow",
+                    )
+
+            except Exception as e:
+                db.rollback()
+                click.secho(
+                    f"Error processing structure {structure_data['code']}: {str(e)}",
+                    fg="red",
+                )
+                continue
+
         click.echo(
-            f"Successfully added {len(structures_data)} program structures to the database."
+            f"Successfully processed {successful_structures}/{total_structures} program structures."
         )
 
     except Exception as e:
@@ -235,13 +277,14 @@ def single_structure_pull(db: Session, structure_id: int) -> None:
                 program_id=program_id,
             )
             db.add(structure)
-            db.flush()
+            db.commit()
 
         if _process_semesters(db, structure, structure_id):
-            db.commit()
             click.echo(
                 f"Successfully pulled structure {structure_id} with all semesters and modules."
             )
+        else:
+            click.secho(f"No semesters found for structure {structure_id}", fg="yellow")
 
     except Exception as e:
         db.rollback()
