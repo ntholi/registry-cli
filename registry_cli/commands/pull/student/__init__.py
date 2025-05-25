@@ -69,6 +69,7 @@ def student_pull(db: Session, std_no: int, info_only: bool = False) -> bool:
                             term=sem["term"],
                             status=sem["status"],
                             semester_number=sem["semester_number"],
+                            caf_date=sem["caf_date"],
                             student_program_id=program.id,
                         )
                         db.add(semester)

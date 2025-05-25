@@ -20,14 +20,7 @@ class StudentSemesterScraper(BaseScraper):
         )
 
     def scrape(self) -> List[Dict[str, Any]]:
-        """Scrape student semester data.
-
-        Returns:
-            List of dictionaries containing semester data with keys:
-            - term: Term code (e.g. 2022-08)
-            - status: Semester status (e.g. Active)
-            - credits: Total credits for the semester
-        """
+        """Scrape student semester data using only _get_semester_details for each semester_id."""
         soup = self._get_soup()
         semesters = []
 
@@ -44,62 +37,19 @@ class StudentSemesterScraper(BaseScraper):
             if len(cells) < 8:
                 continue
 
-            credits_text = cells[6].get_text(strip=True).replace(",", "")
-            try:
-                credits = float(credits_text) if credits_text else 0.0
-            except ValueError:
-                credits = 0.0
-
-            status_text = cells[4].get_text(strip=True)
-            try:
-                status: SemesterStatus = status_text
-            except ValueError:
-                status = "Active"
-
             semester_id = None
             link = cells[-1].find("a")
             if link and "href" in link.attrs:
                 semester_id = link["href"].split("SemesterID=")[-1]
 
-            semester_number = None
-            try:
-                semester_text = cells[1].get_text(strip=True)
-                if semester_text:
-                    parts = semester_text.split("-")
-                    if len(parts) >= 3:
-                        year_sem = parts[2].split()[0]
-                        year = int(year_sem[1])
-                        sem = int(year_sem[-1])
-                        semester_number = (year - 1) * 2 + sem
-            except ValueError:
-                print(
-                    f"Error! Failed to parse semester_number: {semester_text}, setting to None"
-                )
-                semester_number = None
-            if semester_number is None and semester_id:
-                semester_details = self._get_semester_details(semester_id)
-                semester_number = semester_details.get("semester_number")
-
-            semester = {
-                "id": semester_id,
-                "term": cells[0].get_text(strip=True),
-                "status": status,
-                "credits": credits,
-                "semester_number": semester_number,
-            }
-
-            # If we have a semester ID, get detailed information
             if semester_id:
                 try:
                     semester_details = self._get_semester_details(semester_id)
-                    # Update the semester with detailed information
-                    semester.update(semester_details)
+                    semesters.append(semester_details)
                 except Exception as e:
                     print(
                         f"Error fetching semester details for ID {semester_id}: {str(e)}"
                     )
-
-            semesters.append(semester)
 
         return semesters
 
@@ -149,21 +99,9 @@ class StudentSemesterScraper(BaseScraper):
                 elif header == "CAF No":
                     details["caf_no"] = value
                 elif header == "CAF Date":
-                    if value:
-                        try:
-                            details["caf_date"] = datetime.strptime(
-                                value, "%Y-%m-%d"
-                            ).date()
-                        except ValueError:
-                            pass
+                    details["caf_date"] = value
                 elif header == "Approval Date":
-                    if value:
-                        try:
-                            details["approval_date"] = datetime.strptime(
-                                value, "%Y-%m-%d"
-                            ).date()
-                        except ValueError:
-                            pass
+                    details["approval_date"] = value
                 elif header == "GPA":
                     if value:
                         try:

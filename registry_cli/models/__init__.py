@@ -260,6 +260,7 @@ class StudentSemester(Base):
     student_program_id: Mapped[int] = mapped_column(
         ForeignKey("student_programs.id", ondelete="cascade"), nullable=False
     )
+    caf_date: Mapped[Optional[str]] = mapped_column(String)
     created_at: Mapped[int] = mapped_column(
         Integer, nullable=False, default=lambda: int(datetime.now().timestamp())
     )
