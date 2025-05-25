@@ -27,7 +27,7 @@ class StudentProgramScraper(BaseScraper):
         soup = BeautifulSoup(response.text, "lxml")
 
         header_to_field = {
-            "ID": "std_no",
+            "ID": "id",
             "Intake Date": "intake_date",
             "Reg Date": "reg_date",
             "Start Term": "start_term",
@@ -59,7 +59,7 @@ class StudentProgramScraper(BaseScraper):
                 field = header_to_field[header]
                 if field == "Version":
                     program_details["structure_id"] = find_structure_id(self.db, value)
-                elif field == "std_no":
+                elif field == "id":
                     try:
                         program_details[field] = int(value)
                     except Exception:
