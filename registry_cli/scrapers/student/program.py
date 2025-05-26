@@ -88,11 +88,12 @@ class StudentProgramScraper(BaseScraper):
             header = cells[0].get_text(strip=True)
             value = cells[1].get_text(strip=True)
 
+            if header == "Version":
+                program_details["structure_id"] = find_structure_id(self.db, value)
+
             if header in header_to_field:
                 field = header_to_field[header]
-                if field == "Version":
-                    program_details["structure_id"] = find_structure_id(self.db, value)
-                elif field == "id":
+                if field == "id":
                     try:
                         program_details[field] = int(value)
                     except Exception:
