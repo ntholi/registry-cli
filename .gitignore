@@ -174,3 +174,4 @@ cython_debug/
 *.xlsx
 registration_pdfs/
 local.zip
+/students_range_progress.json
