@@ -1,10 +1,9 @@
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Union, cast
 
-from bs4 import Tag
+from bs4 import BeautifulSoup, NavigableString, Tag
 
 from registry_cli.browser import BASE_URL
 from registry_cli.scrapers.base import BaseScraper
-from registry_cli.scrapers.semester_module import SemesterModuleScraper
 
 
 class StudentModuleScraper(BaseScraper):
@@ -28,8 +27,7 @@ class StudentModuleScraper(BaseScraper):
             - code: Module code (e.g. DBBM1106)
             - name: Module name
             - type: Module type (Major/Minor/Core)
-            - status: Module status (e.g. Compulsory)
-            - credits: Credit hours
+            - status: Module status (e.g. Compulsory)            - credits: Credit hours
             - marks: Module marks
             - grade: Module grade
             - fee: Module fee
@@ -50,17 +48,8 @@ class StudentModuleScraper(BaseScraper):
             if len(cells) < 6:
                 continue
 
-            # Extract module code and name from the first cell
-            module_text = cells[0].get_text(strip=True)
-            code_name = module_text.split(" ", 1)
-            code = code_name[0] if len(code_name) > 0 else ""
-            name = code_name[1] if len(code_name) > 1 else module_text
-
-            # Get the student module ID from the edit link
             std_module_id = None
-            edit_link = None
             for cell in cells:
-                # Make sure cell is a Tag, not a NavigableString
                 if not isinstance(cell, Tag):
                     continue
 
@@ -72,52 +61,188 @@ class StudentModuleScraper(BaseScraper):
                 if std_module_id:
                     break
 
-            # Basic module information from the list view
-            module = {
-                "id": std_module_id,
-                "code": code,
-                "name": name,
-                "type": cells[1].get_text(strip=True),
-                "status": cells[2].get_text(strip=True),
-                "credits": float(cells[3].get_text(strip=True) or 0),
-                "marks": cells[4].get_text(strip=True) or "0",
-                "grade": cells[5].get_text(strip=True) or "N/A",
-            }
-
-            # If we have a student module ID, get detailed information from the edit page
             if std_module_id:
                 try:
-                    semester_module_scraper = SemesterModuleScraper(std_module_id)
-                    semester_module_data = semester_module_scraper.scrape()
-
-                    # Add semester module ID and fee to the module data
-                    module["semester_module_id"] = semester_module_data.get(
-                        "semester_module_id"
-                    )
-                    module["fee"] = semester_module_data.get("fee")
-
-                    # Update other fields with more accurate data if available
-                    if "credits" in semester_module_data:
-                        module["credits"] = semester_module_data["credits"]
-                    if "status" in semester_module_data:
-                        module["status"] = semester_module_data["status"]
-                    if "type" in semester_module_data:
-                        module["type"] = semester_module_data["type"]
-                    if (
-                        "alter_mark" in semester_module_data
-                        and semester_module_data["alter_mark"]
-                    ):
-                        module["marks"] = semester_module_data["alter_mark"]
-                    if (
-                        "alter_grade" in semester_module_data
-                        and semester_module_data["alter_grade"]
-                    ):
-                        module["grade"] = semester_module_data["alter_grade"]
+                    module_data = self._scrape_module_details(std_module_id)
+                    modules.append(module_data)
                 except Exception as e:
                     print(
-                        f"Error fetching semester module data for ID {std_module_id}: {str(e)}"
+                        f"Error fetching module data for ID {std_module_id}: {str(e)}"
                     )
 
-            modules.append(module)
-
         return modules
+
+    def _scrape_module_details(self, std_module_id: str) -> Dict[str, Any]:
+        """Scrape detailed module data from the module edit page.
+
+        Args:
+            std_module_id: The ID of the student module to fetch details for
+
+        Returns:
+            Dictionary containing module data
+        """
+        url = f"{BASE_URL}/r_stdmoduleedit.php?StdModuleID={std_module_id}"
+        response = self.browser.fetch(url)
+        soup = BeautifulSoup(response.text, "html.parser")
+
+        module_data = {"id": std_module_id}
+
+        rows = soup.find_all("tr")
+        for row in rows:
+            if not isinstance(row, Tag):
+                continue
+
+            cells = row.find_all("td")
+            if len(cells) != 2:
+                continue
+
+            if not isinstance(cells[0], Tag) or not isinstance(cells[1], Tag):
+                continue
+
+            header = cells[0].get_text(strip=True)
+            value_cell = cells[1]
+
+            if header == "Semester":
+                semester_id = self._extract_hidden_value(value_cell, "x_StdSemesterID")
+                module_data["semester_id"] = (
+                    str(semester_id) if semester_id is not None else ""
+                )
+                module_data["semester_code"] = value_cell.get_text(strip=True)
+            elif header == "School":
+                school_id = self._extract_hidden_value(value_cell, "x_StdSchoolID")
+                module_data["school_id"] = (
+                    str(school_id) if school_id is not None else ""
+                )
+                module_data["school_code"] = value_cell.get_text(strip=True)
+            elif header == "Program":
+                program_id = self._extract_hidden_value(value_cell, "x_StdProgramID")
+                module_data["program_id"] = (
+                    str(program_id) if program_id is not None else ""
+                )
+                module_data["program_name"] = value_cell.get_text(strip=True)
+            elif header == "Module":
+                semester_module_id = self._extract_hidden_value(
+                    value_cell, "x_SemModuleID"
+                )
+                module_data["semester_module_id"] = (
+                    str(semester_module_id) if semester_module_id is not None else ""
+                )
+                module_text = value_cell.get_text(strip=True)
+                if " " in module_text:
+                    code, name = module_text.split(" ", 1)
+                    module_data["code"] = code
+                    module_data["name"] = name
+                else:
+                    module_data["code"] = module_text
+                    module_data["name"] = ""
+            elif header == "Type":
+                module_data["type"] = value_cell.get_text(strip=True)
+            elif header == "ModuleStatus":
+                select = value_cell.find("select")
+                if select:
+                    selected_option = select.find("option", selected=True)
+                    if selected_option:
+                        module_data["status"] = selected_option.get_text(strip=True)
+                else:
+                    module_data["status"] = value_cell.get_text(strip=True)
+            elif header == "Fee":
+                select = value_cell.find("select")
+                if select:
+                    selected_option = select.find("option", selected=True)
+                    if selected_option:
+                        module_data["fee"] = selected_option.get_text(strip=True)
+                else:
+                    module_data["fee"] = value_cell.get_text(strip=True)
+            elif header == "Credits":
+                select = value_cell.find("select")
+                if select:
+                    selected_option = select.find("option", selected=True)
+                    if selected_option:
+                        credits_str = selected_option.get_text(strip=True)
+                        try:
+                            module_data["credits"] = str(float(credits_str))
+                        except (ValueError, TypeError):
+                            module_data["credits"] = "0.0"
+                else:
+                    credits_text = value_cell.get_text(strip=True)
+                    try:
+                        module_data["credits"] = str(float(credits_text))
+                    except (ValueError, TypeError):
+                        module_data["credits"] = "0.0"
+            elif header == "Alter Mark":
+                input_field = value_cell.find("input", {"id": "x_AlterMark"})
+                if (
+                    input_field
+                    and isinstance(input_field, Tag)
+                    and "value" in input_field.attrs
+                ):
+                    value = input_field.attrs.get("value")
+                    if value is not None:
+                        try:
+                            module_data["alter_mark"] = str(int(value))
+                            module_data["marks"] = module_data["alter_mark"]
+                        except (ValueError, TypeError):
+                            module_data["alter_mark"] = ""
+                            module_data["marks"] = "0"
+            elif header == "Alter Grade":
+                input_field = value_cell.find("input", {"id": "x_AlterGrade"})
+                if (
+                    input_field
+                    and isinstance(input_field, Tag)
+                    and "value" in input_field.attrs
+                ):
+                    value = input_field.attrs.get("value")
+                    if value is not None:
+                        module_data["alter_grade"] = value
+                        module_data["grade"] = value
+
+        module_id_input = soup.find("input", {"id": "x_ModuleID"})
+        if (
+            module_id_input
+            and isinstance(module_id_input, Tag)
+            and "value" in module_id_input.attrs
+        ):
+            value = module_id_input.attrs.get("value")
+            if value is not None:
+                try:
+                    module_data["module_id"] = str(int(value))
+                except (ValueError, TypeError):
+                    pass
+
+        if "marks" not in module_data:
+            module_data["marks"] = "0"
+        if "grade" not in module_data:
+            module_data["grade"] = "N/A"
+
+        return module_data
+
+    def _extract_hidden_value(
+        self, cell: Union[Tag, NavigableString], input_id: str
+    ) -> Optional[int]:
+        """Extract a hidden input value from a table cell.
+
+        Args:
+            cell: The BeautifulSoup Tag containing the hidden input
+            input_id: The ID of the hidden input to extract
+
+        Returns:
+            The value as an integer, or None if not found
+        """
+        if isinstance(cell, NavigableString):
+            return None
+
+        cell_tag = cast(Tag, cell)
+        hidden_input = cell_tag.find("input", {"id": input_id})
+
+        if (
+            hidden_input
+            and isinstance(hidden_input, Tag)
+            and "value" in hidden_input.attrs
+        ):
+            try:
+                value = hidden_input.attrs.get("value")
+                if value is not None:
+                    return int(value)
+            except (ValueError, TypeError):
+                return None
+        return None
