@@ -83,7 +83,9 @@ class Crawler:
 
         # Filter out modules that are already registered
         modules_to_add = [
-            rm for rm in requested_modules if rm.module.code not in existing_modules
+            rm
+            for rm in requested_modules
+            if rm.semester_module.code not in existing_modules
         ]
 
         if not modules_to_add:
@@ -97,9 +99,9 @@ class Crawler:
 
         modules_with_amounts = []
         for rm in modules_to_add:
-            module_id = rm.module.id
+            module_id = rm.semester_module.id
             module_status = rm.module_status
-            module_credits = rm.module.credits
+            module_credits = rm.semester_module.credits
             module_string = f"{module_id}-{module_status}-{module_credits}-1200"
             modules_with_amounts.append(module_string)
 

@@ -81,9 +81,6 @@ class StudentScraper(BaseScraper):
             elif header == "Contact No 2":
                 data["phone2"] = value
             elif header == "Sem":
-                data["sem"] = int(value)
-            elif header == "Version":
-                if value:
-                    data["structure_id"] = int(value)
+                data["sem"] = int(value) if value else 1
 
         return data

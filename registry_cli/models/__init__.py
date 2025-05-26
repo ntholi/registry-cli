@@ -183,9 +183,6 @@ class Student(Base):
     gender: Mapped[Gender] = mapped_column(String)
     marital_status: Mapped[MaritalStatus] = mapped_column(String)
     religion: Mapped[Optional[str]] = mapped_column(String)
-    structure_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("structures.id", ondelete="SET NULL")
-    )
     user_id: Mapped[Optional[str]] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL")
     )
@@ -193,7 +190,6 @@ class Student(Base):
         Integer, nullable=False, default=lambda: int(datetime.now().timestamp())
     )
 
-    structure: Mapped[Optional["Structure"]] = relationship(back_populates="students")
     user: Mapped[Optional["User"]] = relationship(back_populates="student")
     programs: Mapped[list["StudentProgram"]] = relationship(
         back_populates="student", cascade="all, delete"
@@ -231,6 +227,7 @@ class StudentProgram(Base):
         back_populates="program", cascade="all, delete"
     )
     student: Mapped["Student"] = relationship(back_populates="programs")
+    structure: Mapped["Structure"] = relationship(back_populates="student_programs")
 
     def __repr__(self) -> str:
         return f"<StudentProgram id={self.id!r} std_no={self.std_no!r} status={self.status!r}>"
@@ -409,7 +406,9 @@ class Structure(Base):
     )
 
     program: Mapped["Program"] = relationship(back_populates="structures")
-    students: Mapped[list["Student"]] = relationship(back_populates="structure")
+    student_programs: Mapped[list["StudentProgram"]] = relationship(
+        back_populates="structure"
+    )
     semesters: Mapped[list["StructureSemester"]] = relationship(
         back_populates="structure"
     )
@@ -671,7 +670,7 @@ class RequestedModule(Base):
     registration_request: Mapped["RegistrationRequest"] = relationship(
         back_populates="requested_modules"
     )
-    module: Mapped["SemesterModule"] = relationship()
+    semester_module: Mapped["SemesterModule"] = relationship()
 
     def __repr__(self) -> str:
         return (
