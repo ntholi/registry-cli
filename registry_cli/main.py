@@ -14,6 +14,11 @@ from registry_cli.commands.pull.semesters import semesters_pull
 from registry_cli.commands.pull.structures import single_structure_pull, structure_pull
 from registry_cli.commands.pull.student import student_pull
 from registry_cli.commands.pull.student_modules import student_modules_pull
+from registry_cli.commands.pull.students_range import (
+    retry_failed,
+    show_progress,
+    students_range_pull,
+)
 from registry_cli.commands.push.students import student_push
 from registry_cli.commands.send.notifications import send_notifications
 from registry_cli.commands.send.proof import send_proof_registration
@@ -115,6 +120,53 @@ def students(std_nos: tuple[int, ...], info: bool) -> None:
     for i, std_no in enumerate(std_nos):
         print(f"{i+1}/{len(std_nos)}) {std_no}...")
         student_pull(db, std_no, info)
+
+
+@pull.command(name="students-range")
+@click.option(
+    "--start",
+    type=int,
+    default=901019990,
+    help="Starting student number (default: 901019990)",
+)
+@click.option(
+    "--end",
+    type=int,
+    default=901000001,
+    help="Ending student number (default: 901000001)",
+)
+@click.option(
+    "--info",
+    is_flag=True,
+    help="Only update student information without programs and modules",
+)
+@click.option(
+    "--reset",
+    is_flag=True,
+    help="Reset progress and start from beginning",
+)
+def students_range(start: int, end: int, info: bool, reset: bool) -> None:
+    """Pull student records from start number down to end number with progress persistence."""
+    db = get_db()
+    students_range_pull(db, start, end, info, reset)
+
+
+@pull.command(name="students-progress")
+def students_progress() -> None:
+    """Show progress of the students-range command."""
+    show_progress()
+
+
+@pull.command(name="students-retry")
+@click.option(
+    "--info",
+    is_flag=True,
+    help="Only update student information without programs and modules",
+)
+def students_retry(info: bool) -> None:
+    """Retry pulling students that previously failed."""
+    db = get_db()
+    retry_failed(db, info)
 
 
 @pull.command()
