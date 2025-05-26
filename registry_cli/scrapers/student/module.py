@@ -7,8 +7,6 @@ from registry_cli.scrapers.base import BaseScraper
 
 
 class StudentModuleScraper(BaseScraper):
-    """Scraper for student module information."""
-
     def __init__(self, semester_id: int):
         if not semester_id:
             raise ValueError("semester_id must be provided")
@@ -18,20 +16,6 @@ class StudentModuleScraper(BaseScraper):
         )
 
     def scrape(self) -> List[Dict[str, Any]]:
-        """Scrape student module data.
-
-        Returns:
-            List of dictionaries containing module data with keys:
-            - id: Module ID
-            - semester_module_id: SemesterModule ID
-            - code: Module code (e.g. DBBM1106)
-            - name: Module name
-            - type: Module type (Major/Minor/Core)
-            - status: Module status (e.g. Compulsory)            - credits: Credit hours
-            - marks: Module marks
-            - grade: Module grade
-            - fee: Module fee
-        """
         soup = self._get_soup()
         modules = []
 
@@ -73,14 +57,6 @@ class StudentModuleScraper(BaseScraper):
         return modules
 
     def _scrape_module_details(self, std_module_id: str) -> Dict[str, Any]:
-        """Scrape detailed module data from the module edit page.
-
-        Args:
-            std_module_id: The ID of the student module to fetch details for
-
-        Returns:
-            Dictionary containing module data
-        """
         url = f"{BASE_URL}/r_stdmoduleedit.php?StdModuleID={std_module_id}"
         response = self.browser.fetch(url)
         soup = BeautifulSoup(response.text, "html.parser")
@@ -169,8 +145,8 @@ class StudentModuleScraper(BaseScraper):
                         module_data["credits"] = str(float(credits_text))
                     except (ValueError, TypeError):
                         module_data["credits"] = "0.0"
-            elif header == "Alter Mark":
-                input_field = value_cell.find("input", {"id": "x_AlterMark"})
+            elif header == "Marks":
+                input_field = value_cell.find("input", {"id": "x_StdModMark"})
                 if (
                     input_field
                     and isinstance(input_field, Tag)
@@ -179,11 +155,33 @@ class StudentModuleScraper(BaseScraper):
                     value = input_field.attrs.get("value")
                     if value is not None:
                         try:
+                            module_data["marks"] = str(int(value))
+                        except (ValueError, TypeError):
+                            module_data["marks"] = "0"
+            elif header == "Grade":
+                input_field = value_cell.find("input", {"id": "x_StdModGrade"})
+                if (
+                    input_field
+                    and isinstance(input_field, Tag)
+                    and "value" in input_field.attrs
+                ):
+                    value = input_field.attrs.get("value")
+                    if value is not None:
+                        module_data["grade"] = value
+            elif header == "Alter Mark":
+                input_field = value_cell.find("input", {"id": "x_AlterMark"})
+                if (
+                    input_field
+                    and isinstance(input_field, Tag)
+                    and "value" in input_field.attrs
+                ):
+                    value = input_field.attrs.get("value")
+                    if value is not None and value.strip():
+                        try:
                             module_data["alter_mark"] = str(int(value))
                             module_data["marks"] = module_data["alter_mark"]
                         except (ValueError, TypeError):
                             module_data["alter_mark"] = ""
-                            module_data["marks"] = "0"
             elif header == "Alter Grade":
                 input_field = value_cell.find("input", {"id": "x_AlterGrade"})
                 if (
@@ -192,7 +190,7 @@ class StudentModuleScraper(BaseScraper):
                     and "value" in input_field.attrs
                 ):
                     value = input_field.attrs.get("value")
-                    if value is not None:
+                    if value is not None and value.strip():
                         module_data["alter_grade"] = value
                         module_data["grade"] = value
 
@@ -219,15 +217,6 @@ class StudentModuleScraper(BaseScraper):
     def _extract_hidden_value(
         self, cell: Union[Tag, NavigableString], input_id: str
     ) -> Optional[int]:
-        """Extract a hidden input value from a table cell.
-
-        Args:
-            cell: The BeautifulSoup Tag containing the hidden input
-            input_id: The ID of the hidden input to extract
-
-        Returns:
-            The value as an integer, or None if not found
-        """
         if isinstance(cell, NavigableString):
             return None
 
