@@ -24,7 +24,6 @@ from registry_cli.commands.send.notifications import send_notifications
 from registry_cli.commands.send.proof import send_proof_registration
 from registry_cli.commands.update.marks import update_marks_from_excel
 from registry_cli.commands.update.module_refs import update_semester_module_refs
-from registry_cli.commands.update.structure import update_structure_id
 from registry_cli.db.config import get_engine
 
 
@@ -274,24 +273,6 @@ def marks(file_path: str) -> None:
     """
     db = get_db()
     update_marks_from_excel(db, file_path)
-
-
-@update.command(name="student-structure")
-@click.argument("std_nos", type=int, nargs=-1)
-@click.option(
-    "--id",
-    required=True,
-    type=int,
-    help="Structure ID to apply to all students",
-)
-def update_student_structure(std_nos: tuple[int, ...], id: int) -> None:
-    """
-    Update structure_id for a list of students.
-
-    std_nos: One or more student numbers to update
-    """
-    db = get_db()
-    update_structure_id(db, list(std_nos), id)
 
 
 @update.command(name="module-refs")
