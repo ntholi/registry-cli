@@ -42,7 +42,6 @@ def _process_modules_and_prerequisites(
             semester_module = SemesterModule(
                 id=module_data["id"],
                 module_id=base_module.id,
-                code=module_data["code"],
                 type=module_data["type"],
                 credits=module_data["credits"],
                 semester_id=semester.id,
@@ -50,7 +49,6 @@ def _process_modules_and_prerequisites(
             db.add(semester_module)
         else:
             semester_module.module_id = base_module.id
-            semester_module.code = module_data["code"]
             semester_module.type = module_data["type"]
             semester_module.credits = module_data["credits"]
             semester_module.semester_id = semester.id

@@ -10,6 +10,7 @@ from registry_cli.models import (
     Program,
     RegistrationRequest,
     RequestedModule,
+    SemesterModule,
     Structure,
     Student,
     StudentProgram,
@@ -59,7 +60,7 @@ def enroll_student(db: Session, request: RegistrationRequest) -> None:
 
     requested_modules = (
         db.query(RequestedModule)
-        .join(Module, RequestedModule.module_id == Module.id)
+        .join(SemesterModule, RequestedModule.semester_module_id == SemesterModule.id)
         .filter(RequestedModule.registration_request_id == request.id)
         .all()
     )
@@ -68,7 +69,8 @@ def enroll_student(db: Session, request: RegistrationRequest) -> None:
 
     requested_module_records = (
         db.query(RequestedModule)
-        .join(Module)
+        .join(SemesterModule, RequestedModule.semester_module_id == SemesterModule.id)
+        .join(Module, SemesterModule.module_id == Module.id)
         .filter(
             RequestedModule.registration_request_id == request.id,
             Module.code.in_(registered_module_codes),

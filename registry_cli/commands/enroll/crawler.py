@@ -79,13 +79,13 @@ class Crawler:
     def add_modules(
         self, std_semester_id: int, requested_modules: list[RequestedModule]
     ) -> list[str]:
-        existing_modules = self.get_existing_modules(std_semester_id)
-
-        # Filter out modules that are already registered
+        existing_modules = self.get_existing_modules(
+            std_semester_id
+        )  # Filter out modules that are already registered
         modules_to_add = [
             rm
             for rm in requested_modules
-            if rm.semester_module.code not in existing_modules
+            if rm.semester_module.module.code not in existing_modules
         ]
 
         if not modules_to_add:
