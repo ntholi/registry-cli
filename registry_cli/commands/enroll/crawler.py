@@ -66,7 +66,7 @@ class Crawler:
 
         existing_modules = []
         table = page.find("table", id="ewlistmain")
-        if table:
+        if table and isinstance(table, Tag):
             rows = table.find_all("tr", class_=["ewTableRow", "ewTableAltRow"])
             for row in rows:
                 module_cell = row.find("td")
