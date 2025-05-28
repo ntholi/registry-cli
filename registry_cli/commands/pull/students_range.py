@@ -23,12 +23,10 @@ def load_progress() -> Dict:
             )
 
     return {
-        "successfully_pulled": [],
         "failed_pulls": [],
         "current_position": 901019990,
         "start_number": 901019990,
         "end_number": 901000001,
-        "total_processed": 0,
     }
 
 
@@ -67,18 +65,14 @@ def students_range_pull(
         progress["current_position"] = start
         click.echo(f"Updated range to {start} -> {end}")
 
-    successfully_pulled: Set[int] = set(progress["successfully_pulled"])
     failed_pulls: Set[int] = set(progress["failed_pulls"])
     current_position: int = progress["current_position"]
 
     total_range = start - end + 1
-    completed_count = len(successfully_pulled)
     failed_count = len(failed_pulls)
 
     click.echo(f"Range: {start} -> {end} (Total: {total_range:,} students)")
-    click.echo(
-        f"Progress: Successfully pulled: {completed_count:,}, Failed: {failed_count:,}"
-    )
+    click.echo(f"Failed: {failed_count:,}")
     click.echo(f"Current position: {current_position}")
 
     if current_position < end:
@@ -87,9 +81,6 @@ def students_range_pull(
 
     try:
         for std_no in range(current_position, end - 1, -1):
-            if std_no in successfully_pulled:
-                continue
-
             remaining = std_no - end + 1
             processed = total_range - remaining
             progress_percent = (processed / total_range) * 100
@@ -102,7 +93,6 @@ def students_range_pull(
                 success = student_pull(db, std_no, info_only)
 
                 if success:
-                    successfully_pulled.add(std_no)
                     if std_no in failed_pulls:
                         failed_pulls.remove(std_no)
                     click.secho(f"✓ Successfully pulled student {std_no}", fg="green")
@@ -118,27 +108,17 @@ def students_range_pull(
                 click.secho(f"✗ Error pulling student {std_no}: {str(e)}", fg="red")
 
             # Update progress
-            progress["successfully_pulled"] = list(successfully_pulled)
+            progress["current_position"] = std_no
             progress["failed_pulls"] = list(failed_pulls)
-            progress["current_position"] = std_no - 1
-            progress["total_processed"] = len(successfully_pulled) + len(failed_pulls)
+            save_progress(progress)
 
-            # Save progress every 10 students or on special numbers
-            if (total_range - remaining) % 10 == 0 or std_no % 1000 == 0:
-                save_progress(progress)
-
-        # Final save
+    finally:
+        # Final progress update
+        progress["failed_pulls"] = list(failed_pulls)
         save_progress(progress)
 
-        # Summary
-        click.echo("\n" + "=" * 50)
-        click.echo("SUMMARY")
-        click.echo("=" * 50)
-        click.secho(
-            f"Successfully pulled: {len(successfully_pulled):,} students", fg="green"
-        )
+        click.echo("\nSummary:")
         click.secho(f"Failed pulls: {len(failed_pulls):,} students", fg="red")
-        click.echo(f"Total processed: {len(successfully_pulled) + len(failed_pulls):,}")
 
         if failed_pulls:
             click.echo(
@@ -153,10 +133,6 @@ def students_range_pull(
                 f"Next run will continue from student {progress['current_position']}"
             )
 
-    except Exception as e:
-        click.secho(f"Fatal error: {str(e)}", fg="red")
-        save_progress(progress)
-
 
 def show_progress() -> None:
     """Show current progress without pulling any students."""
@@ -170,12 +146,10 @@ def show_progress() -> None:
 
     start = progress["start_number"]
     end = progress["end_number"]
-    successfully_pulled = set(progress["successfully_pulled"])
     failed_pulls = set(progress["failed_pulls"])
     current_position = progress["current_position"]
 
     total_range = start - end + 1
-    completed_count = len(successfully_pulled)
     failed_count = len(failed_pulls)
     remaining = current_position - end + 1
     processed = total_range - remaining
@@ -187,7 +161,6 @@ def show_progress() -> None:
     click.echo(f"Range: {start:,} -> {end:,} (Total: {total_range:,} students)")
     click.echo(f"Current position: {current_position:,}")
     click.echo(f"Progress: {processed:,}/{total_range:,} ({progress_percent:.1f}%)")
-    click.secho(f"Successfully pulled: {completed_count:,} students", fg="green")
     click.secho(f"Failed pulls: {failed_count:,} students", fg="red")
 
     if current_position < end:
@@ -218,7 +191,6 @@ def retry_failed(db: Session, info_only: bool = False) -> None:
 
     click.echo(f"Retrying {len(failed_pulls)} failed student pulls...")
 
-    successfully_pulled = set(progress["successfully_pulled"])
     retry_count = 0
 
     for std_no in sorted(failed_pulls, reverse=True):
@@ -228,7 +200,6 @@ def retry_failed(db: Session, info_only: bool = False) -> None:
             success = student_pull(db, std_no, info_only)
 
             if success:
-                successfully_pulled.add(std_no)
                 failed_pulls.remove(std_no)
                 retry_count += 1
                 click.secho(f"✓ Successfully pulled student {std_no}", fg="green")
@@ -239,7 +210,6 @@ def retry_failed(db: Session, info_only: bool = False) -> None:
             click.secho(f"✗ Error retrying student {std_no}: {str(e)}", fg="red")
 
     # Update progress
-    progress["successfully_pulled"] = list(successfully_pulled)
     progress["failed_pulls"] = list(failed_pulls)
     save_progress(progress)
 
