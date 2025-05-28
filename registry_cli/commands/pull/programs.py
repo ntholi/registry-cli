@@ -25,6 +25,8 @@ def program_pull(db: Session, school_id: int) -> None:
 
         updated_count = 0
         added_count = 0
+        processed_programs = []
+        
         for program_data in programs_data:
             program_id = int(program_data["program_id"])
             program = db.query(Program).filter(Program.id == program_id).first()
@@ -57,14 +59,22 @@ def program_pull(db: Session, school_id: int) -> None:
                 )
                 db.add(program)
                 added_count += 1
+            
+            processed_programs.append(program_id)
 
         db.commit()
         click.echo(
             f"Successfully updated {updated_count} and added {added_count} programs to the database."
         )
 
+        click.echo("\nPulling structures for programs...")
+        from registry_cli.commands.pull.structures import structure_pull
+        for program_id in processed_programs:
+            click.echo(f"\nPulling structures for program {program_id}...")
+            structure_pull(db, program_id)
+
     except Exception as e:
-        db.rollback()  # Rollback on error
+        db.rollback()
         click.secho(f"Error pulling programs: {str(e)}", fg="red")
 
 
