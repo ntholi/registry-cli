@@ -157,23 +157,44 @@ class SemesterModuleScraper(BaseScraper):
 
         for i, part in enumerate(parts):
             if not name_parts:
-                if (
-                    part.isalpha()
-                    or part.isdigit()
+                is_code_part = (
+                    part.isdigit()
                     or (
                         any(c.isdigit() for c in part)
                         and any(c.isalpha() for c in part)
                         and part.isalnum()
-                    )
-                ):
+                    )  # Alphanumeric like "BDSC1236"
+                    or (
+                        part.isalpha() and i == 0
+                    )  # First part if alphabetic like "BROD", "SETD304"
+                )
+
+                if is_code_part:
                     code_parts.append(part)
+                    # Check if we should start collecting name parts
                     if i + 1 < len(parts):
                         next_part = parts[i + 1]
+                        # Start name if next part is clearly a word (not a number, contains special chars, or is a long alphabetic word)
                         if (
-                            len(next_part) >= 4 and next_part.isalpha()
-                        ) or next_part.startswith("&"):
-                            name_parts.extend(parts[i + 1 :])
-                            break
+                            next_part.startswith("&")
+                            or (
+                                next_part.isalpha()
+                                and len(next_part) >= 3
+                                and not next_part.isdigit()
+                            )
+                            or not next_part.isalnum()
+                        ):
+                            # Look ahead to see if there are more code-like parts
+                            remaining_parts = parts[i + 1 :]
+                            if (
+                                len(remaining_parts) > 1
+                                and not remaining_parts[0].isdigit()
+                            ):
+                                name_parts.extend(remaining_parts)
+                                break
+                            elif len(remaining_parts) == 1:
+                                name_parts.extend(remaining_parts)
+                                break
                 else:
                     name_parts.extend(parts[i:])
                     break
