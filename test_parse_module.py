@@ -6,58 +6,16 @@ def _parse_module_code_and_name(module_text: str) -> tuple[str, str]:
     code_parts = []
     name_parts = []
 
-    for i, part in enumerate(parts):
-        if not name_parts:
-            # Check if this part looks like a module code component
-            is_code_part = (
-                part.isdigit()  # Pure numbers like "110", "1214"
-                or (
-                    any(c.isdigit() for c in part)
-                    and any(c.isalpha() for c in part)
-                    and part.isalnum()
-                )  # Alphanumeric like "BDSC1236"
-                or (
-                    part.isalpha() and i == 0
-                )  # First part if alphabetic like "BROD", "SETD304"
-            )
+    if parts[0].isalnum():
+        code_parts.append(parts[0])
+    else:
+        return "", module_text
 
-            if is_code_part:
-                code_parts.append(part)
-                # Check if we should start collecting name parts
-                if i + 1 < len(parts):
-                    next_part = parts[i + 1]
-                    # Start name if next part is clearly a word (not a number, contains special chars, or is a long alphabetic word)
-                    if (
-                        next_part.startswith("&")
-                        or (
-                            next_part.isalpha()
-                            and len(next_part) >= 3
-                            and not next_part.isdigit()
-                        )
-                        or not next_part.isalnum()
-                    ):
-                        # Look ahead to see if there are more code-like parts
-                        remaining_parts = parts[i + 1 :]
-                        if (
-                            len(remaining_parts) > 1
-                            and not remaining_parts[0].isdigit()
-                        ):
-                            name_parts.extend(remaining_parts)
-                            break
-                        elif len(remaining_parts) == 1:
-                            name_parts.extend(remaining_parts)
-                            break
-            else:
-                name_parts.extend(parts[i:])
-                break
-
-    if not name_parts:
-        if len(parts) >= 3:
-            code_parts = parts[:2]
-            name_parts = parts[2:]
-        else:
-            code_parts = [parts[0]]
-            name_parts = parts[1:]
+    if len(parts) > 1 and parts[1].isdigit():
+        code_parts.append(parts[1])
+        name_parts = parts[2:] if len(parts) > 2 else []
+    else:
+        name_parts = parts[1:]
 
     code = " ".join(code_parts)
     name = " ".join(name_parts)
@@ -65,7 +23,6 @@ def _parse_module_code_and_name(module_text: str) -> tuple[str, str]:
     return code, name
 
 
-# Test cases
 test_cases = [
     "BROD 110 Media & Society",
     "BDSC1236 Computer Graphics",
