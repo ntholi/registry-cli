@@ -1,5 +1,6 @@
 import json
 import os
+import time
 from typing import Dict, Set
 
 import click
@@ -10,8 +11,27 @@ from registry_cli.commands.pull.student import student_pull
 PROGRESS_FILE = "students_range_progress.json"
 
 
+def format_time_estimate(seconds: float) -> str:
+    if seconds < 60:
+        return f"{seconds:.0f} seconds"
+
+    minutes = seconds / 60
+    if minutes < 60:
+        return f"{minutes:.1f} minutes"
+
+    hours = minutes / 60
+    if hours < 24:
+        return f"{hours:.1f} hours"
+
+    days = hours / 24
+    if days < 7:
+        return f"{days:.1f} days"
+
+    weeks = days / 7
+    return f"{weeks:.1f} weeks"
+
+
 def load_progress() -> Dict:
-    """Load progress from the JSON file."""
     if os.path.exists(PROGRESS_FILE):
         try:
             with open(PROGRESS_FILE, "r") as f:
@@ -31,7 +51,6 @@ def load_progress() -> Dict:
 
 
 def save_progress(progress: Dict) -> None:
-    """Save progress to the JSON file."""
     try:
         with open(PROGRESS_FILE, "w") as f:
             json.dump(progress, f, indent=2)
@@ -46,8 +65,6 @@ def students_range_pull(
     info_only: bool = False,
     reset: bool = False,
 ) -> None:
-    """Pull student records from start number down to end number with progress persistence."""
-
     if start < end:
         click.secho("Error: Start number must be greater than end number", fg="red")
         return
@@ -58,12 +75,15 @@ def students_range_pull(
 
     progress = load_progress()
 
-    # Update range if different from saved progress
     if progress["start_number"] != start or progress["end_number"] != end:
         progress["start_number"] = start
         progress["end_number"] = end
         progress["current_position"] = start
         click.echo(f"Updated range to {start} -> {end}")
+
+    start_time = time.time()
+    total_processing_time = 0
+    students_processed = 0
 
     failed_pulls: Set[int] = set(progress["failed_pulls"])
     current_position: int = progress["current_position"]
@@ -81,12 +101,22 @@ def students_range_pull(
 
     try:
         for std_no in range(current_position, end - 1, -1):
+            student_start_time = time.time()
+
             remaining = std_no - end + 1
             processed = total_range - remaining
             progress_percent = (processed / total_range) * 100
 
+            time_estimate_str = ""
+            if students_processed > 0:
+                avg_time_per_student = total_processing_time / students_processed
+                estimated_remaining_time = avg_time_per_student * remaining
+                time_estimate_str = (
+                    f" ETA: {format_time_estimate(estimated_remaining_time)}"
+                )
+
             click.echo(
-                f"[{processed:,}/{total_range:,}] ({progress_percent:.1f}%) Processing student {std_no}..."
+                f"[{processed:,}/{total_range:,}] ({progress_percent:.1f}%){time_estimate_str} Processing student {std_no}..."
             )
 
             try:
@@ -107,13 +137,16 @@ def students_range_pull(
                 failed_pulls.add(std_no)
                 click.secho(f"✗ Error pulling student {std_no}: {str(e)}", fg="red")
 
-            # Update progress
+            student_end_time = time.time()
+            student_processing_time = student_end_time - student_start_time
+            total_processing_time += student_processing_time
+            students_processed += 1
+
             progress["current_position"] = std_no
             progress["failed_pulls"] = list(failed_pulls)
             save_progress(progress)
 
     finally:
-        # Final progress update
         progress["failed_pulls"] = list(failed_pulls)
         save_progress(progress)
 
@@ -135,7 +168,6 @@ def students_range_pull(
 
 
 def show_progress() -> None:
-    """Show current progress without pulling any students."""
     if not os.path.exists(PROGRESS_FILE):
         click.secho(
             "No progress file found. Run the students-range command first.", fg="yellow"
@@ -175,7 +207,6 @@ def show_progress() -> None:
 
 
 def retry_failed(db: Session, info_only: bool = False) -> None:
-    """Retry pulling students that previously failed."""
     if not os.path.exists(PROGRESS_FILE):
         click.secho(
             "No progress file found. Run the students-range command first.", fg="yellow"
@@ -209,7 +240,6 @@ def retry_failed(db: Session, info_only: bool = False) -> None:
         except Exception as e:
             click.secho(f"✗ Error retrying student {std_no}: {str(e)}", fg="red")
 
-    # Update progress
     progress["failed_pulls"] = list(failed_pulls)
     save_progress(progress)
 
