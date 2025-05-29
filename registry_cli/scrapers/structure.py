@@ -138,9 +138,7 @@ class SemesterModuleScraper(BaseScraper):
                         break
 
             if not next_link:
-                break
-
-            # Update URL for next page
+                break  # Update URL for next page
             if next_link.startswith("/"):
                 self.url = f"{BASE_URL}{next_link}"
             else:
@@ -148,6 +146,50 @@ class SemesterModuleScraper(BaseScraper):
                 self.url = f"{base_path}/{next_link}"
 
         return all_modules
+
+    def _parse_module_code_and_name(self, module_text: str) -> tuple[str, str]:
+        parts = module_text.split()
+        if len(parts) < 2:
+            return module_text, ""
+
+        code_parts = []
+        name_parts = []
+
+        for i, part in enumerate(parts):
+            if not name_parts:
+                if (
+                    part.isalpha()
+                    or part.isdigit()
+                    or (
+                        any(c.isdigit() for c in part)
+                        and any(c.isalpha() for c in part)
+                        and part.isalnum()
+                    )
+                ):
+                    code_parts.append(part)
+                    if i + 1 < len(parts):
+                        next_part = parts[i + 1]
+                        if (
+                            len(next_part) >= 4 and next_part.isalpha()
+                        ) or next_part.startswith("&"):
+                            name_parts.extend(parts[i + 1 :])
+                            break
+                else:
+                    name_parts.extend(parts[i:])
+                    break
+
+        if not name_parts:
+            if len(parts) >= 3:
+                code_parts = parts[:2]
+                name_parts = parts[2:]
+            else:
+                code_parts = [parts[0]]
+                name_parts = parts[1:]
+
+        code = " ".join(code_parts)
+        name = " ".join(name_parts)
+
+        return code, name
 
     def _scrape_page(self, soup) -> List[Dict[str, Any]]:
         """Scrape module data from a single page."""
@@ -162,12 +204,10 @@ class SemesterModuleScraper(BaseScraper):
                 continue
 
             module_text = cells[0].get_text(strip=True)
-            code_end = module_text.find(" ")
-            if code_end == -1:
+            if not module_text:
                 continue
 
-            code = module_text[:code_end]
-            name = module_text[code_end + 1 :]
+            code, name = self._parse_module_code_and_name(module_text)
 
             # Get module type
             type_text = cells[1].get_text(strip=True)
