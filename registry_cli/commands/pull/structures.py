@@ -25,12 +25,17 @@ def _process_modules_and_prerequisites(
     semester_modules_needing_prerequisites = []
 
     for module_data in modules_data:
-        base_module = (
-            db.query(Module).filter(Module.code == module_data["code"]).first()
-        )
+        if module_data["code"].isdigit():
+            base_module = (
+                db.query(Module).filter(Module.id == module_data["code"]).first()
+            )
+        else:
+            base_module = (
+                db.query(Module).filter(Module.code == module_data["code"]).first()
+            )
         if not base_module:
             raise ValueError(
-                f"Module with code {module_data['code']} not found in database"
+                f"Module with code '{module_data['code']}' not found in database"
             )
 
         semester_module = (

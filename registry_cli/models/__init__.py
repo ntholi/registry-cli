@@ -443,8 +443,8 @@ class SemesterModule(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     module_id: Mapped[int] = mapped_column(ForeignKey("modules.id"))
     code: Mapped[Optional[str]] = mapped_column(
-        String
-    )  # TODO: THIS IS TEMPORARY, DELETE IT ASAP
+        String, nullable=True
+    )  # TODO: THIS IS TEMPORARY, DELETE IT ASAP DELETE IT IN THE .DB FILE
     type: Mapped[ModuleType] = mapped_column(String, nullable=False)
     credits: Mapped[float] = mapped_column(Float, nullable=False)
     semester_id: Mapped[Optional[int]] = mapped_column(
@@ -454,7 +454,6 @@ class SemesterModule(Base):
     created_at: Mapped[int] = mapped_column(
         Integer, nullable=False, default=lambda: int(datetime.now().timestamp())
     )
-
     semester: Mapped[Optional["StructureSemester"]] = relationship(
         back_populates="semester_modules", foreign_keys=[semester_id]
     )
