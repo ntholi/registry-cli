@@ -442,7 +442,9 @@ class SemesterModule(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     module_id: Mapped[int] = mapped_column(ForeignKey("modules.id"))
-    code: Mapped[str] = mapped_column(String)  # TODO: DELETE THIS
+    code: Mapped[Optional[str]] = mapped_column(
+        String
+    )  # TODO: THIS IS TEMPORARY, DELETE IT ASAP
     type: Mapped[ModuleType] = mapped_column(String, nullable=False)
     credits: Mapped[float] = mapped_column(Float, nullable=False)
     semester_id: Mapped[Optional[int]] = mapped_column(
