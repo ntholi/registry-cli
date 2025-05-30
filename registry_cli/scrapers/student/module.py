@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, List, Optional, Union, cast
 
 from bs4 import BeautifulSoup, NavigableString, Tag
@@ -23,7 +24,9 @@ class StudentModuleScraper(BaseScraper):
         if not table or not isinstance(table, Tag):
             return modules
 
+        module_tasks = []
         rows = table.find_all("tr")[1:-1]
+
         for row in rows:
             if not isinstance(row, Tag):
                 continue
@@ -51,15 +54,24 @@ class StudentModuleScraper(BaseScraper):
                 module_status = cells[2].get_text(strip=True)
 
             if std_module_id:
+                module_tasks.append((std_module_id, module_status))
+
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            future_to_module = {
+                executor.submit(self._scrape_module_details, module_id, status): (
+                    module_id,
+                    status,
+                )
+                for module_id, status in module_tasks
+            }
+
+            for future in as_completed(future_to_module):
+                module_id, status = future_to_module[future]
                 try:
-                    module_data = self._scrape_module_details(
-                        std_module_id, module_status
-                    )
+                    module_data = future.result()
                     modules.append(module_data)
                 except Exception as e:
-                    print(
-                        f"Error fetching module data for ID {std_module_id}: {str(e)}"
-                    )
+                    print(f"Error fetching module data for ID {module_id}: {str(e)}")
 
         return modules
 
