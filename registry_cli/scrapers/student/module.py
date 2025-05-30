@@ -33,6 +33,8 @@ class StudentModuleScraper(BaseScraper):
                 continue
 
             std_module_id = None
+            module_status = None
+
             for cell in cells:
                 if not isinstance(cell, Tag):
                     continue
@@ -45,9 +47,14 @@ class StudentModuleScraper(BaseScraper):
                 if std_module_id:
                     break
 
+            if len(cells) >= 3 and isinstance(cells[2], Tag):
+                module_status = cells[2].get_text(strip=True)
+
             if std_module_id:
                 try:
-                    module_data = self._scrape_module_details(std_module_id)
+                    module_data = self._scrape_module_details(
+                        std_module_id, module_status
+                    )
                     modules.append(module_data)
                 except Exception as e:
                     print(
@@ -56,12 +63,17 @@ class StudentModuleScraper(BaseScraper):
 
         return modules
 
-    def _scrape_module_details(self, std_module_id: str) -> Dict[str, Any]:
+    def _scrape_module_details(
+        self, std_module_id: str, module_status: Optional[str] = None
+    ) -> Dict[str, Any]:
         url = f"{BASE_URL}/r_stdmoduleedit.php?StdModuleID={std_module_id}"
         response = self.browser.fetch(url)
         soup = BeautifulSoup(response.text, "html.parser")
 
         module_data = {"id": std_module_id}
+
+        if module_status:
+            module_data["status"] = module_status
 
         rows = soup.find_all("tr")
         for row in rows:
@@ -114,13 +126,14 @@ class StudentModuleScraper(BaseScraper):
             elif header == "Type":
                 module_data["type"] = value_cell.get_text(strip=True)
             elif header == "ModuleStatus":
-                select = value_cell.find("select")
-                if select:
-                    selected_option = select.find("option", selected=True)
-                    if selected_option:
-                        module_data["status"] = selected_option.get_text(strip=True)
-                else:
-                    module_data["status"] = value_cell.get_text(strip=True)
+                if "status" not in module_data:
+                    select = value_cell.find("select")
+                    if select:
+                        selected_option = select.find("option", selected=True)
+                        if selected_option:
+                            module_data["status"] = selected_option.get_text(strip=True)
+                    else:
+                        module_data["status"] = value_cell.get_text(strip=True)
             elif header == "Fee":
                 select = value_cell.find("select")
                 if select:
