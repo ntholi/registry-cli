@@ -1,6 +1,7 @@
 import logging
 import os
 import pickle
+import time
 from urllib.parse import quote_plus
 
 import requests
@@ -45,7 +46,7 @@ def check_logged_in(html: str) -> bool:
 class Browser:
     _instance = None
     logged_in = False
-    max_retries = 3
+    max_retries = 60
     session: requests.Session | None = None
 
     def __new__(cls):
@@ -101,6 +102,7 @@ class Browser:
             raise ValueError("Session is not initialized")
 
         retry_count = 0
+        wait_time = 3
 
         while retry_count < self.max_retries:
             try:
@@ -123,7 +125,11 @@ class Browser:
                     logger.error(f"Unexpected status code: {response.status_code}")
                     retry_count += 1
                     if retry_count < self.max_retries:
-                        logger.info(f"Retrying... ({retry_count}/{self.max_retries})")
+                        logger.info(
+                            f"Waiting {wait_time} seconds before retry ({retry_count}/{self.max_retries})"
+                        )
+                        time.sleep(wait_time)
+                        wait_time *= 2
                         continue
 
                 return response
@@ -132,8 +138,10 @@ class Browser:
                 retry_count += 1
                 if retry_count < self.max_retries:
                     logger.error(
-                        f"Request failed: {str(e)}. Retrying... ({retry_count}/{self.max_retries})"
+                        f"Request failed: {str(e)}. Waiting {wait_time} seconds before retry ({retry_count}/{self.max_retries})"
                     )
+                    time.sleep(wait_time)
+                    wait_time *= 2
                 else:
                     logger.error(
                         f"Request failed after {self.max_retries} attempts: {str(e)}"
