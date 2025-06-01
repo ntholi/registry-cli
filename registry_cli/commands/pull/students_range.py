@@ -140,8 +140,9 @@ def students_range_pull(
                 )
 
             click.echo(
-                f"[{processed:,}/{total_range:,}] ({progress_percent:.1f}%){time_estimate_str} Processing student {std_no}..."
+                f"[{processed:,}/{total_range:,}] ({progress_percent:.1f}%){time_estimate_str}"
             )
+            click.echo(f"Processing student {std_no}...")
 
             try:
                 success = student_pull(db, std_no, info_only)

@@ -6,11 +6,13 @@ import requests
 import urllib3
 from bs4 import BeautifulSoup, Tag
 from requests import Response
+from requests.adapters import HTTPAdapter
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions
 from selenium.webdriver.support.wait import WebDriverWait
 from urllib3.exceptions import InsecureRequestWarning
+from urllib3.util.retry import Retry
 
 from registry_cli.utils.logging_config import get_logger
 
@@ -61,6 +63,23 @@ class Browser:
             self.session = requests.Session()
             self.session.verify = False
             logger.info("Created new session")
+
+        self._configure_session_pool()
+
+    def _configure_session_pool(self):
+        if self.session is None:
+            return
+
+        adapter = HTTPAdapter(
+            pool_connections=20,
+            pool_maxsize=80,
+            max_retries=Retry(
+                total=3, backoff_factor=1, status_forcelist=[500, 502, 503, 504]
+            ),
+        )
+
+        self.session.mount("http://", adapter)
+        self.session.mount("https://", adapter)
 
     def save_session(self):
         with open(SESSION_FILE, "wb") as f:
