@@ -19,6 +19,11 @@ from registry_cli.commands.pull.students_range import (
     show_progress,
     students_range_pull,
 )
+from registry_cli.commands.pull.students_range_parallel import (
+    cleanup_chunk_files,
+    show_parallel_progress,
+    students_range_parallel_pull,
+)
 from registry_cli.commands.push.students import student_push
 from registry_cli.commands.send.notifications import send_notifications
 from registry_cli.commands.send.proof import send_proof_registration
@@ -166,6 +171,66 @@ def students_retry(info: bool) -> None:
     """Retry pulling students that previously failed."""
     db = get_db()
     retry_failed(db, info)
+
+
+@pull.command(name="students-range-parallel")
+@click.option(
+    "--start",
+    type=int,
+    default=901019990,
+    help="Starting student number (default: 901019990)",
+)
+@click.option(
+    "--end",
+    type=int,
+    default=901000001,
+    help="Ending student number (default: 901000001)",
+)
+@click.option(
+    "--chunk-size",
+    type=int,
+    default=500,
+    help="Number of students per chunk (default: 500)",
+)
+@click.option(
+    "--max-workers",
+    type=int,
+    default=10,
+    help="Maximum number of parallel workers (default: 10)",
+)
+@click.option(
+    "--info",
+    is_flag=True,
+    help="Only update student information without programs and modules",
+)
+@click.option(
+    "--reset",
+    is_flag=True,
+    help="Reset progress and start from beginning",
+)
+def students_range_parallel(
+    start: int, end: int, chunk_size: int, max_workers: int, info: bool, reset: bool
+) -> None:
+    """Pull student records using multiple parallel processes for faster processing."""
+    use_local = input("Choose environment (local/prod)? ").lower().strip() != "prod"
+    students_range_parallel_pull(
+        start, end, chunk_size, max_workers, info, use_local, reset
+    )
+
+
+@pull.command(name="students-parallel-progress")
+def students_parallel_progress() -> None:
+    """Show progress of the parallel students-range command."""
+    show_parallel_progress()
+
+
+@pull.command(name="students-parallel-cleanup")
+def students_parallel_cleanup() -> None:
+    """Clean up chunk progress files from parallel students-range command."""
+    if click.confirm(
+        "This will delete all chunk progress files. Are you sure?", default=False
+    ):
+        cleanup_chunk_files()
 
 
 @pull.command()
