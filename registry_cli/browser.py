@@ -1,4 +1,3 @@
-import logging
 import os
 import pickle
 import time
@@ -14,10 +13,9 @@ from selenium.webdriver.support import expected_conditions
 from selenium.webdriver.support.wait import WebDriverWait
 from urllib3.exceptions import InsecureRequestWarning
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger(__name__)
+from registry_cli.utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 BASE_URL = "https://cmslesotho.limkokwing.net/campus/registry"
 SESSION_FILE = "session.pkl"

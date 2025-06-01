@@ -1,4 +1,3 @@
-import logging
 import os
 from datetime import datetime
 from pathlib import Path
@@ -24,16 +23,15 @@ from registry_cli.models import (
     Program,
     RegistrationRequest,
     RequestedModule,
+    SemesterModule,
     Structure,
     Student,
     StudentProgram,
     Term,
 )
+from registry_cli.utils.logging_config import create_specialized_logger
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger(__name__)
+logger = create_specialized_logger("pdf_generator", "pdf.log", level="INFO")
 
 OUTPUT_DIR = Path("registration_pdfs")
 OUTPUT_DIR.mkdir(exist_ok=True)
@@ -87,8 +85,12 @@ class RegistrationPDFGenerator:
             student_program, structure, program = program_info
 
             module_details = (
-                db.query(Module)
-                .join(RequestedModule)
+                db.query(SemesterModule)
+                .join(
+                    RequestedModule,
+                    RequestedModule.semester_module_id == SemesterModule.id,
+                )
+                .join(Module, SemesterModule.module_id == Module.id)
                 .filter(
                     RequestedModule.registration_request_id == request.id,
                     Module.code.in_(registered_modules),
@@ -123,9 +125,9 @@ class RegistrationPDFGenerator:
             elements.extend(RegistrationPDFGenerator._build_header(styles))
 
             # Add registration header with enhanced styling
-            elements.extend(RegistrationPDFGenerator._build_registration_header(styles))
-
-            # Add student information
+            elements.extend(
+                RegistrationPDFGenerator._build_registration_header(styles)
+            )  # Add student information
             elements.append(
                 RegistrationPDFGenerator._build_student_info(
                     student, program, term, request.semester_number, styles
@@ -330,7 +332,7 @@ class RegistrationPDFGenerator:
     def _build_student_info(
         student: Student,
         program: Program,
-        term: Term,
+        term: Optional[Term],
         semester_number: int,
         styles: Dict[str, ParagraphStyle],
     ) -> Table:
@@ -405,7 +407,7 @@ class RegistrationPDFGenerator:
 
     @staticmethod
     def _build_modules_table(
-        modules: List[Module], styles: Dict[str, ParagraphStyle]
+        modules: List[SemesterModule], styles: Dict[str, ParagraphStyle]
     ) -> List[Any]:
         """Build the registered modules table with enhanced styling
 
@@ -423,21 +425,19 @@ class RegistrationPDFGenerator:
         elements.append(Spacer(1, 0.1 * inch))
 
         # Create module data table with styled headers
-        module_data = [["#", "Module Code & Description", "Type", "Credits"]]
-
-        # Add modules with improved formatting
-        for idx, module in enumerate(modules, 1):
+        module_data = [
+            ["#", "Module Code & Description", "Type", "Credits"]
+        ]  # Add modules with improved formatting
+        for idx, semester_module in enumerate(modules, 1):
             module_data.append(
                 [
-                    idx,
-                    f"<b>{module.code}</b><br/>{module.name}",
-                    module.type,
-                    str(module.credits),
+                    str(idx),
+                    f"<b>{semester_module.module.code}</b><br/>{semester_module.module.name}",
+                    semester_module.type,
+                    str(semester_module.credits),
                 ]
-            )
-
-        # Calculate total credits
-        total_credits = sum(module.credits for module in modules)
+            )  # Calculate total credits
+        total_credits = sum(semester_module.credits for semester_module in modules)
 
         # Convert module data to paragraphs for better styling
         formatted_module_data = []

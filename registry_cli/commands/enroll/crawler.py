@@ -1,4 +1,3 @@
-import logging
 from typing import Optional, Union
 
 import requests
@@ -8,11 +7,9 @@ from sqlalchemy.orm import Session
 from registry_cli.browser import BASE_URL, Browser, get_form_payload
 from registry_cli.commands.enroll.payloads import add_semester_payload
 from registry_cli.models import Module, RequestedModule, Term
+from registry_cli.utils.logging_config import get_logger
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class Crawler:

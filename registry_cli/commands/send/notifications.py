@@ -1,4 +1,3 @@
-import logging
 import time
 
 import click
@@ -7,11 +6,9 @@ from sqlalchemy.orm import Session
 
 from registry_cli.models import RegistrationClearance, Student, User
 from registry_cli.utils.email_sender import EmailSender
+from registry_cli.utils.logging_config import get_logger
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def send_notifications(db: Session) -> None:

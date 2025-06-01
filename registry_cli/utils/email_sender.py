@@ -1,4 +1,3 @@
-import logging
 import os
 import smtplib
 from email.mime.application import MIMEApplication
@@ -8,10 +7,9 @@ from typing import List, Optional
 
 from dotenv import load_dotenv
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger(__name__)
+from registry_cli.utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 load_dotenv()
 
