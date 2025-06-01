@@ -7,6 +7,9 @@ import click
 from sqlalchemy.orm import Session
 
 from registry_cli.commands.pull.student import student_pull
+from registry_cli.utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 PROGRESS_FILE = "students_range_progress.json"
 
@@ -24,8 +27,17 @@ def format_time_estimate(seconds: float) -> str:
         return f"{hours:.1f} hours"
 
     days = int(hours // 24)
-    remaining_hours = hours % 24
-    return f"{days} days {remaining_hours:.1f} hours"
+    remaining_hours = int((seconds % 86400) // 3600)
+    remaining_minutes = int((seconds % 3600) // 60)
+
+    if remaining_hours > 0 and remaining_minutes > 0:
+        return f"{days} days {remaining_hours} hours {remaining_minutes} minutes"
+    elif remaining_hours > 0:
+        return f"{days} days {remaining_hours} hours"
+    elif remaining_minutes > 0:
+        return f"{days} days {remaining_minutes} minutes"
+    else:
+        return f"{days} days"
 
 
 def load_progress() -> Dict:
@@ -33,7 +45,8 @@ def load_progress() -> Dict:
         try:
             with open(PROGRESS_FILE, "r") as f:
                 return json.load(f)
-        except (json.JSONDecodeError, IOError):
+        except (json.JSONDecodeError, IOError) as e:
+            logger.error(f"Failed to read progress file {PROGRESS_FILE}: {e}")
             click.secho(
                 f"Warning: Could not read progress file {PROGRESS_FILE}, starting fresh",
                 fg="yellow",
@@ -52,6 +65,7 @@ def save_progress(progress: Dict) -> None:
         with open(PROGRESS_FILE, "w") as f:
             json.dump(progress, f, indent=2)
     except IOError as e:
+        logger.error(f"Failed to save progress to {PROGRESS_FILE}: {e}")
         click.secho(f"Warning: Could not save progress: {e}", fg="yellow")
 
 
@@ -63,16 +77,22 @@ def students_range_pull(
     reset: bool = False,
 ) -> None:
     if start < end:
-        click.secho("Error: Start number must be greater than end number", fg="red")
+        error_msg = "Start number must be greater than end number"
+        logger.error(f"Invalid range parameters: start={start}, end={end}. {error_msg}")
+        click.secho(f"Error: {error_msg}", fg="red")
         return
 
     if reset and os.path.exists(PROGRESS_FILE):
+        logger.info(f"Resetting progress file: {PROGRESS_FILE}")
         os.remove(PROGRESS_FILE)
         click.echo("Progress file reset")
 
     progress = load_progress()
 
     if progress["start_number"] != start or progress["end_number"] != end:
+        logger.info(
+            f"Range updated from {progress['start_number']} -> {progress['end_number']} to {start} -> {end}"
+        )
         progress["start_number"] = start
         progress["end_number"] = end
         progress["current_position"] = start
@@ -87,6 +107,13 @@ def students_range_pull(
 
     total_range = start - end + 1
     failed_count = len(failed_pulls)
+
+    logger.info(
+        f"Starting students range pull: {start} -> {end} (Total: {total_range:,} students)"
+    )
+    logger.info(
+        f"Current position: {current_position}, Previously failed: {failed_count:,}"
+    )
 
     click.echo(f"Range: {start} -> {end} (Total: {total_range:,} students)")
     click.echo(f"Failed: {failed_count:,}")
@@ -125,13 +152,20 @@ def students_range_pull(
                     click.secho(f"✓ Successfully pulled student {std_no}", fg="green")
                 else:
                     failed_pulls.add(std_no)
+                    logger.error(
+                        f"Failed to pull student {std_no}: student_pull returned False"
+                    )
                     click.secho(f"✗ Failed to pull student {std_no}", fg="red")
 
             except KeyboardInterrupt:
+                logger.info("Process interrupted by user at student %s", std_no)
                 click.echo("\nInterrupted by user. Saving progress...")
                 break
             except Exception as e:
                 failed_pulls.add(std_no)
+                logger.error(
+                    f"Exception while pulling student {std_no}: {type(e).__name__}: {str(e)}"
+                )
                 click.secho(f"✗ Error pulling student {std_no}: {str(e)}", fg="red")
 
             student_end_time = time.time()
@@ -146,6 +180,15 @@ def students_range_pull(
     finally:
         progress["failed_pulls"] = list(failed_pulls)
         save_progress(progress)
+
+        end_time = time.time()
+        total_time = end_time - start_time
+
+        logger.info(
+            f"Students range pull completed. Total time: {format_time_estimate(total_time)}"
+        )
+        logger.info(f"Failed pulls: {len(failed_pulls):,} students")
+        logger.info(f"Students processed: {students_processed:,}")
 
         click.echo("\nSummary:")
         click.secho(f"Failed pulls: {len(failed_pulls):,} students", fg="red")
@@ -166,12 +209,14 @@ def students_range_pull(
 
 def show_progress() -> None:
     if not os.path.exists(PROGRESS_FILE):
+        logger.warning("No progress file found for show progress operation")
         click.secho(
             "No progress file found. Run the students-range command first.", fg="yellow"
         )
         return
 
     progress = load_progress()
+    logger.info("Displaying progress status")
 
     start = progress["start_number"]
     end = progress["end_number"]
@@ -205,6 +250,7 @@ def show_progress() -> None:
 
 def retry_failed(db: Session, info_only: bool = False) -> None:
     if not os.path.exists(PROGRESS_FILE):
+        logger.warning("No progress file found for retry operation")
         click.secho(
             "No progress file found. Run the students-range command first.", fg="yellow"
         )
@@ -214,9 +260,11 @@ def retry_failed(db: Session, info_only: bool = False) -> None:
     failed_pulls = set(progress["failed_pulls"])
 
     if not failed_pulls:
+        logger.info("No failed pulls found to retry")
         click.secho("No failed pulls to retry!", fg="green")
         return
 
+    logger.info(f"Starting retry process for {len(failed_pulls)} failed student pulls")
     click.echo(f"Retrying {len(failed_pulls)} failed student pulls...")
 
     retry_count = 0
@@ -232,13 +280,23 @@ def retry_failed(db: Session, info_only: bool = False) -> None:
                 retry_count += 1
                 click.secho(f"✓ Successfully pulled student {std_no}", fg="green")
             else:
+                logger.error(
+                    f"Retry failed for student {std_no}: student_pull returned False"
+                )
                 click.secho(f"✗ Still failed to pull student {std_no}", fg="red")
 
         except Exception as e:
+            logger.error(
+                f"Exception during retry for student {std_no}: {type(e).__name__}: {str(e)}"
+            )
             click.secho(f"✗ Error retrying student {std_no}: {str(e)}", fg="red")
 
     progress["failed_pulls"] = list(failed_pulls)
     save_progress(progress)
+
+    logger.info(
+        f"Retry process completed: {retry_count} students successful, {len(failed_pulls)} still failed"
+    )
 
     click.echo(f"\nRetry completed: {retry_count} students now successful")
     click.echo(f"Still failed: {len(failed_pulls)} students")
