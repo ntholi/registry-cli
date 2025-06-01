@@ -398,6 +398,7 @@ class Structure(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     code: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    desc: Mapped[Optional[str]] = mapped_column(String)
     program_id: Mapped[int] = mapped_column(
         ForeignKey("programs.id", ondelete="cascade"), nullable=False
     )

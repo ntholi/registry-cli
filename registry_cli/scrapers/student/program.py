@@ -105,10 +105,11 @@ class StudentProgramScraper(BaseScraper):
 
 
 def find_structure_id(db: Session, version_code: str) -> int:
-    """Find the structure id for a given version code."""
     structure = db.query(Structure).filter(Structure.code == version_code).first()
     if not structure:
+        structure = db.query(Structure).filter(Structure.desc == version_code).first()
+    if not structure:
         raise ValueError(
-            f"Structure with code '{version_code}' not found, did you scrape it?"
+            f"Structure with code or description '{version_code}' not found, did you scrape it?"
         )
     return structure.id

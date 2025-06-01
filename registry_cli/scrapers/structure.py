@@ -32,13 +32,14 @@ class ProgramStructureScraper(BaseScraper):
                 continue
 
             code = cells[0].get_text(strip=True)
+            desc = cells[1].get_text(strip=True)
 
             view_link = cells[5].find("a")
             if not view_link:
                 continue
 
             structure_id = view_link["href"].split("StructureID=")[-1]
-            structures.append({"id": structure_id, "code": code})
+            structures.append({"id": structure_id, "code": code, "desc": desc})
 
         return structures
 

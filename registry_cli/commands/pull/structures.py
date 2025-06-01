@@ -219,11 +219,13 @@ def structure_pull(db: Session, program_id: int) -> None:
                     structure = Structure(
                         id=int(structure_data["id"]),
                         code=structure_data["code"],
+                        desc=structure_data["desc"],
                         program_id=program_id,
                     )
                     db.add(structure)
                 else:
                     structure.code = structure_data["code"]
+                    structure.desc = structure_data["desc"]
                     structure.program_id = program_id
 
                 db.commit()
