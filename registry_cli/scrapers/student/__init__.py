@@ -1,3 +1,4 @@
+from registry_cli.scrapers.student.concurrent import ConcurrentStudentDataCollector
 from registry_cli.scrapers.student.module import StudentModuleScraper
 from registry_cli.scrapers.student.program import StudentProgramScraper
 from registry_cli.scrapers.student.semester import StudentSemesterScraper
@@ -8,4 +9,5 @@ __all__ = [
     "StudentProgramScraper",
     "StudentSemesterScraper",
     "StudentModuleScraper",
+    "ConcurrentStudentDataCollector",
 ]
