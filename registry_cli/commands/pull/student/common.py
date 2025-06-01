@@ -76,6 +76,7 @@ def save_semesters_and_modules_batch(
 
     db.commit()
 
+    module_count = 0
     for semester_id, semester in saved_semesters.items():
         module_data = modules_by_semester.get(semester_id, [])
         for mod in module_data:
@@ -110,8 +111,9 @@ def save_semesters_and_modules_batch(
                     semester=semester,
                 )
                 db.add(module)
+            module_count += 1
 
     db.commit()
     click.echo(
-        f"Successfully saved {len(semesters_data)} semesters and their modules for program: {program.id}"
+        f"Successfully saved {len(semesters_data)} semesters and {module_count} modules for program: {program.id}"
     )

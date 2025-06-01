@@ -19,16 +19,13 @@ def format_time_estimate(seconds: float) -> str:
     if minutes < 60:
         return f"{minutes:.1f} minutes"
 
-    hours = minutes / 60
+    hours = seconds / 3600
     if hours < 24:
         return f"{hours:.1f} hours"
 
-    days = hours / 24
-    if days < 7:
-        return f"{days:.1f} days"
-
-    weeks = days / 7
-    return f"{weeks:.1f} weeks"
+    days = int(hours // 24)
+    remaining_hours = hours % 24
+    return f"{days} days {remaining_hours:.1f} hours"
 
 
 def load_progress() -> Dict:
