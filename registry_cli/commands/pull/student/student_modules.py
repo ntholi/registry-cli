@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from registry_cli.models import StudentProgram, StudentSemester
 from registry_cli.scrapers.student import StudentSemesterScraper
 
-from .student.common import scrape_and_save_modules
+from .common import scrape_and_save_modules
 
 
 def student_modules_pull(db: Session, std_no: int, term: str) -> None:

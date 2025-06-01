@@ -10,10 +10,10 @@ from registry_cli.commands.enroll.student import enroll_by_student_number
 from registry_cli.commands.pull.modules import modules_pull
 from registry_cli.commands.pull.programs import program_pull
 from registry_cli.commands.pull.schools import school_pull
-from registry_cli.commands.pull.semesters import semesters_pull
 from registry_cli.commands.pull.structures import single_structure_pull, structure_pull
 from registry_cli.commands.pull.student import student_pull
-from registry_cli.commands.pull.student_modules import student_modules_pull
+from registry_cli.commands.pull.student.semesters import semesters_pull
+from registry_cli.commands.pull.student.student_modules import student_modules_pull
 from registry_cli.commands.pull.students_range import (
     retry_failed,
     show_progress,
