@@ -1,7 +1,6 @@
 import os
 import pickle
 import time
-from urllib.parse import quote_plus
 
 import requests
 import urllib3

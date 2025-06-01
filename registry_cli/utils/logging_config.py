@@ -21,6 +21,7 @@ class LoggingConfig:
         max_file_size: int = 10 * 1024 * 1024,  # 10 MB
         backup_count: int = 5,
         log_format: Optional[str] = None,
+        enable_console: bool = True,
     ) -> None:
         """
         Set up centralized logging configuration.
@@ -32,6 +33,7 @@ class LoggingConfig:
             max_file_size: Maximum size of log files before rotation (in bytes)
             backup_count: Number of backup files to keep
             log_format: Custom log format string
+            enable_console: Whether to enable console logging (default: True)
         """
         if self._configured:
             return
@@ -57,17 +59,21 @@ class LoggingConfig:
 
         # Configure root logger
         root_logger = logging.getLogger()
-        root_logger.setLevel(min(console_log_level, file_log_level))
+        if enable_console:
+            root_logger.setLevel(min(console_log_level, file_log_level))
+        else:
+            root_logger.setLevel(file_log_level)
 
         # Clear any existing handlers
         root_logger.handlers.clear()
 
-        # Console handler
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(console_log_level)
-        console_formatter = logging.Formatter(log_format)
-        console_handler.setFormatter(console_formatter)
-        root_logger.addHandler(console_handler)
+        # Console handler (only if enabled)
+        if enable_console:
+            console_handler = logging.StreamHandler()
+            console_handler.setLevel(console_log_level)
+            console_formatter = logging.Formatter(log_format)
+            console_handler.setFormatter(console_formatter)
+            root_logger.addHandler(console_handler)
 
         # File handler with rotation
         main_log_file = self.logs_dir / "registry-cli.log"
@@ -86,8 +92,13 @@ class LoggingConfig:
 
         # Log the configuration
         logger = logging.getLogger(__name__)
+        console_status = (
+            f"Console: {console_level or log_level}"
+            if enable_console
+            else "Console: Disabled"
+        )
         logger.info(
-            f"Logging configured - Console: {console_level or log_level}, File: {file_level or log_level}"
+            f"Logging configured - {console_status}, File: {file_level or log_level}"
         )
         logger.info(f"Log files will be stored in: {self.logs_dir.absolute()}")
 
@@ -184,7 +195,11 @@ def configure_from_env() -> None:
     log_level = os.getenv("LOG_LEVEL", "INFO")
     console_level = os.getenv("CONSOLE_LOG_LEVEL")
     file_level = os.getenv("FILE_LOG_LEVEL")
+    enable_console = os.getenv("ENABLE_CONSOLE_LOGGING", "false").lower() != "false"
 
     setup_logging(
-        log_level=log_level, console_level=console_level, file_level=file_level
+        log_level=log_level,
+        console_level=console_level,
+        file_level=file_level,
+        enable_console=enable_console,
     )

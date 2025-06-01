@@ -30,6 +30,7 @@ from registry_cli.commands.send.proof import send_proof_registration
 from registry_cli.commands.update.marks import update_marks_from_excel
 from registry_cli.commands.update.module_refs import update_semester_module_refs
 from registry_cli.db.config import get_engine
+from registry_cli.utils.logging_config import configure_from_env
 
 
 def get_db():
@@ -45,7 +46,7 @@ def get_db():
 
 @click.group()
 def cli() -> None:
-    pass
+    configure_from_env()
 
 
 @cli.group()
