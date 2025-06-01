@@ -1,9 +1,11 @@
-from typing import Any, Dict, List
+import asyncio
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Any, Dict, List, Optional
 
 from bs4 import Comment, Tag
 from bs4.element import NavigableString
 
-from registry_cli.browser import BASE_URL
+from registry_cli.browser import BASE_URL, Browser
 from registry_cli.models import ModuleType
 from registry_cli.scrapers.base import BaseScraper
 
@@ -231,3 +233,53 @@ class SemesterModuleScraper(BaseScraper):
             )
 
         return modules
+
+
+class ConcurrentStructureDataCollector:
+    """Concurrent data collector for structure information including semesters and modules."""
+
+    def __init__(self, max_workers: int = 5):
+        self.max_workers = max_workers
+        self.browser = Browser()
+
+    def collect_structure_data(self, structure_id: str) -> Dict[str, Any]:
+        """Collect all data for a single structure concurrently."""
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            semester_future = executor.submit(self._fetch_semesters, structure_id)
+
+            semesters_data = semester_future.result()
+
+            if not semesters_data:
+                return {"semesters": [], "modules_by_semester": {}}
+
+            module_futures = {
+                semester["id"]: executor.submit(
+                    self._fetch_semester_modules, semester["id"]
+                )
+                for semester in semesters_data
+            }
+
+            modules_by_semester = {}
+            for semester_id, future in module_futures.items():
+                modules_by_semester[semester_id] = future.result()
+
+            return {
+                "semesters": semesters_data,
+                "modules_by_semester": modules_by_semester,
+            }
+
+    def _fetch_semesters(self, structure_id: str) -> List[Dict[str, Any]]:
+        """Fetch semester data for a structure."""
+        semester_url = (
+            f"{BASE_URL}/f_semesterlist.php?showmaster=1&StructureID={structure_id}"
+        )
+        scraper = SemesterScraper(semester_url)
+        return scraper.scrape()
+
+    def _fetch_semester_modules(self, semester_id: int) -> List[Dict[str, Any]]:
+        """Fetch module data for a semester."""
+        module_url = (
+            f"{BASE_URL}/f_semmodulelist.php?showmaster=1&SemesterID={semester_id}"
+        )
+        scraper = SemesterModuleScraper(module_url)
+        return scraper.scrape()
