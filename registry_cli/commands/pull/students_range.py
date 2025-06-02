@@ -124,7 +124,18 @@ def students_range_pull(
         return
 
     try:
-        for std_no in range(current_position, end - 1, -1):
+        failed_students = [
+            std_no for std_no in range(start, end - 1, -1) if std_no in failed_pulls
+        ]
+        remaining_students = [
+            std_no
+            for std_no in range(current_position, end - 1, -1)
+            if std_no not in failed_pulls
+        ]
+
+        all_students = failed_students + remaining_students
+
+        for std_no in all_students:
             student_start_time = time.time()
 
             remaining = std_no - end + 1
@@ -139,10 +150,11 @@ def students_range_pull(
                     f" ETA: {format_time_estimate(estimated_remaining_time)}"
                 )
 
+            status_indicator = "(RETRY)" if std_no in failed_pulls else ""
             click.echo(
                 f"[{processed:,}/{total_range:,}] ({progress_percent:.1f}%){time_estimate_str}"
             )
-            click.echo(f"Processing student {std_no}...")
+            click.echo(f"Processing student {std_no} {status_indicator}...")
 
             try:
                 success = student_pull(db, std_no, info_only)
