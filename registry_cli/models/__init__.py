@@ -35,9 +35,6 @@ class User(Base):
     )
     name: Mapped[Optional[str]] = mapped_column(String)
     role: Mapped[UserRole] = mapped_column(String, default="user", nullable=False)
-    is_department_admin: Mapped[bool] = mapped_column(
-        Boolean, default=False, nullable=False
-    )
     email: Mapped[Optional[str]] = mapped_column(String, unique=True)
     email_verified: Mapped[Optional[datetime]] = mapped_column(DateTime)
     image: Mapped[Optional[str]] = mapped_column(String)

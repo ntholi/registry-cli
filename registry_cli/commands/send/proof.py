@@ -6,6 +6,7 @@ from registry_cli.models import (
     Module,
     RegistrationRequest,
     RequestedModule,
+    SemesterModule,
     Student,
     Term,
 )
@@ -47,7 +48,10 @@ def send_proof_registration(db: Session, std_no: int) -> None:
         registered_modules = [
             module.code
             for module in db.query(Module.code)
-            .join(RequestedModule)
+            .join(SemesterModule, Module.id == SemesterModule.module_id)
+            .join(
+                RequestedModule, SemesterModule.id == RequestedModule.semester_module_id
+            )
             .filter(
                 and_(
                     RequestedModule.registration_request_id == request.id,
