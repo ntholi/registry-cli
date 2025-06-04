@@ -28,6 +28,7 @@ from registry_cli.commands.push.students import student_push
 from registry_cli.commands.send.notifications import send_notifications
 from registry_cli.commands.send.proof import send_proof_registration
 from registry_cli.commands.update.marks import update_marks_from_excel
+from registry_cli.commands.update.module_grades import create_module_grades
 from registry_cli.commands.update.module_refs import update_semester_module_refs
 from registry_cli.db.config import get_engine
 from registry_cli.utils.logging_config import configure_from_env
@@ -357,6 +358,29 @@ def update_module_references(dry_run: bool) -> None:
     """
     db = get_db()
     update_semester_module_refs(db, dry_run)
+
+
+@update.command(name="module-grades")
+@click.option(
+    "--verbose",
+    is_flag=True,
+    help="Show detailed calculation information for each grade created",
+)
+def update_module_grades(verbose: bool) -> None:
+    """
+    Calculate and create module grades from assessment marks.
+
+    This command reads all assessment marks and creates module grades by:
+    1. Calculating weighted totals based on assessment marks, total marks, and weights
+    2. Determining the appropriate grade based on the weighted total
+    3. Creating module_grade entries only where they don't already exist
+
+    The weighted total is calculated as the sum of:
+    (student_marks / assessment_total_marks) * 100 * (assessment_weight / 100)
+    for each assessment in the module.
+    """
+    db = get_db()
+    create_module_grades(db, verbose)
 
 
 @cli.group()

@@ -11,7 +11,6 @@ from sqlalchemy import (
     Integer,
     String,
     UniqueConstraint,
-    unique,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
