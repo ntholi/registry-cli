@@ -1,3 +1,4 @@
+import math
 import time
 from typing import Dict, List, Tuple
 
@@ -56,6 +57,7 @@ def calculate_weighted_total(
 
 
 def calculate_grade(weighted_total: float) -> GradeType:
+    weighted_total = math.ceil(weighted_total)
     if weighted_total >= 90:
         return "A+"
     elif weighted_total >= 85:
@@ -146,7 +148,7 @@ def create_module_grades(db: Session, verbose: bool = False) -> None:
                 module_id=module_id,
                 std_no=std_no,
                 grade=grade,
-                weighted_total=weighted_total,
+                weighted_total=math.ceil(weighted_total),
                 created_at=current_time,
                 updated_at=current_time,
             )
@@ -157,7 +159,7 @@ def create_module_grades(db: Session, verbose: bool = False) -> None:
             if verbose:
                 click.echo(f"\nCreated grade for student {std_no}, module {module_id}:")
                 click.echo(f"  Grade: {grade}")
-                click.echo(f"  Weighted Total: {weighted_total:.2f}")
+                click.echo(f"  Weighted Total: {math.ceil(weighted_total)}")
                 for detail in calculation_details:
                     click.echo(f"  {detail}")
 
