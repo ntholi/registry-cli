@@ -11,6 +11,7 @@ from sqlalchemy import (
     Integer,
     String,
     UniqueConstraint,
+    unique,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -177,18 +178,16 @@ class Student(Base):
     name: Mapped[str] = mapped_column(String, nullable=False)
     national_id: Mapped[str] = mapped_column(String, nullable=False)
     sem: Mapped[int] = mapped_column(Integer, nullable=False)
-    date_of_birth: Mapped[datetime] = mapped_column(DateTime)
+    date_of_birth: Mapped[Optional[int]] = mapped_column(Integer)
     phone1: Mapped[Optional[str]] = mapped_column(String)
     phone2: Mapped[Optional[str]] = mapped_column(String)
-    gender: Mapped[Gender] = mapped_column(String)
-    marital_status: Mapped[MaritalStatus] = mapped_column(String)
+    gender: Mapped[Optional[Gender]] = mapped_column(String)
+    marital_status: Mapped[Optional[MaritalStatus]] = mapped_column(String)
     religion: Mapped[Optional[str]] = mapped_column(String)
     user_id: Mapped[Optional[str]] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL")
     )
-    created_at: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=lambda: int(datetime.now().timestamp())
-    )
+    created_at: Mapped[int] = mapped_column(Integer, nullable=False)
 
     user: Mapped[Optional["User"]] = relationship(back_populates="student")
     programs: Mapped[list["StudentProgram"]] = relationship(
@@ -219,9 +218,7 @@ class StudentProgram(Base):
     graduation_date: Mapped[Optional[str]] = mapped_column(String)
     status: Mapped[ProgramStatus] = mapped_column(String, nullable=False)
     assist_provider: Mapped[Optional[str]] = mapped_column(String)
-    created_at: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=lambda: int(datetime.now().timestamp())
-    )
+    created_at: Mapped[int] = mapped_column(Integer, nullable=False)
 
     semesters: Mapped[list["StudentSemester"]] = relationship(
         back_populates="program", cascade="all, delete"
@@ -252,15 +249,13 @@ class StudentSemester(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     term: Mapped[str] = mapped_column(String, nullable=False)
+    semester_number: Mapped[Optional[int]] = mapped_column(Integer)
     status: Mapped[SemesterStatus] = mapped_column(String, nullable=False)
-    semester_number: Mapped[int] = mapped_column(Integer)
     student_program_id: Mapped[int] = mapped_column(
         ForeignKey("student_programs.id", ondelete="cascade"), nullable=False
     )
     caf_date: Mapped[Optional[str]] = mapped_column(String)
-    created_at: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=lambda: int(datetime.now().timestamp())
-    )
+    created_at: Mapped[int] = mapped_column(Integer, nullable=False)
 
     program: Mapped["StudentProgram"] = relationship(back_populates="semesters")
     modules: Mapped[list["StudentModule"]] = relationship(
@@ -329,7 +324,7 @@ class StudentModule(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     semester_module_id: Mapped[int] = mapped_column(
-        ForeignKey("modules.id", ondelete="cascade"), nullable=False
+        ForeignKey("semester_modules.id", ondelete="cascade"), nullable=False
     )
     status: Mapped[ModuleStatus] = mapped_column(String, nullable=False)
     marks: Mapped[str] = mapped_column(String, nullable=False)
@@ -337,9 +332,7 @@ class StudentModule(Base):
     student_semester_id: Mapped[int] = mapped_column(
         ForeignKey("student_semesters.id", ondelete="cascade"), nullable=False
     )
-    created_at: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=lambda: int(datetime.now().timestamp())
-    )
+    created_at: Mapped[int] = mapped_column(Integer, nullable=False)
 
     semester: Mapped["StudentSemester"] = relationship(back_populates="modules")
 
@@ -356,11 +349,10 @@ class School(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     code: Mapped[str] = mapped_column(String, nullable=False, unique=True)
     name: Mapped[str] = mapped_column(String, nullable=False)
-    created_at: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=lambda: int(datetime.now().timestamp())
-    )
+    created_at: Mapped[int] = mapped_column(Integer, nullable=False)
 
     programs: Mapped[list["Program"]] = relationship(back_populates="school")
+    user_schools: Mapped[list["UserSchool"]] = relationship(back_populates="school")
 
     def __repr__(self) -> str:
         return f"<School id={self.id!r} code={self.code!r} name={self.name!r}>"
@@ -379,9 +371,7 @@ class Program(Base):
     school_id: Mapped[int] = mapped_column(
         ForeignKey("schools.id", ondelete="cascade"), nullable=False
     )
-    created_at: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=lambda: int(datetime.now().timestamp())
-    )
+    created_at: Mapped[int] = mapped_column(Integer, nullable=False)
 
     school: Mapped["School"] = relationship(back_populates="programs")
     structures: Mapped[list["Structure"]] = relationship(back_populates="program")
@@ -424,12 +414,14 @@ class Module(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     code: Mapped[str] = mapped_column(String, nullable=False)
     name: Mapped[str] = mapped_column(String, nullable=False)
-    status: Mapped[Optional[str]] = mapped_column(String, default="Active")
-    timestamp: Mapped[int] = mapped_column(Integer)
+    status: Mapped[str] = mapped_column(String, nullable=False, default="Active")
+    timestamp: Mapped[Optional[str]] = mapped_column(String)
 
     semester_modules: Mapped[list["SemesterModule"]] = relationship(
         back_populates="module"
     )
+    assessments: Mapped[list["Assessment"]] = relationship(back_populates="module")
+    module_grades: Mapped[list["ModuleGrade"]] = relationship(back_populates="module")
 
     def __repr__(self) -> str:
         return (
@@ -442,23 +434,19 @@ class SemesterModule(Base):
     __tablename__ = "semester_modules"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    module_id: Mapped[int] = mapped_column(ForeignKey("modules.id"))
-    code: Mapped[Optional[str]] = mapped_column(
-        String, nullable=True
-    )  # TODO: THIS IS TEMPORARY, DELETE IT ASAP DELETE IT IN THE .DB FILE
+    module_id: Mapped[Optional[int]] = mapped_column(ForeignKey("modules.id"))
     type: Mapped[ModuleType] = mapped_column(String, nullable=False)
     credits: Mapped[float] = mapped_column(Float, nullable=False)
     semester_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("structure_semesters.id", ondelete="SET NULL")
     )
     hidden: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    created_at: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=lambda: int(datetime.now().timestamp())
-    )
+    created_at: Mapped[int] = mapped_column(Integer, nullable=False)
+
     semester: Mapped[Optional["StructureSemester"]] = relationship(
         back_populates="semester_modules", foreign_keys=[semester_id]
     )
-    module: Mapped["Module"] = relationship(back_populates="semester_modules")
+    module: Mapped[Optional["Module"]] = relationship(back_populates="semester_modules")
     prerequisites: Mapped[list["ModulePrerequisite"]] = relationship(
         back_populates="module",
         foreign_keys="[ModulePrerequisite.semester_module_id]",
@@ -468,6 +456,9 @@ class SemesterModule(Base):
         back_populates="prerequisite",
         foreign_keys="[ModulePrerequisite.prerequisite_id]",
         cascade="all, delete",
+    )
+    assigned_modules: Mapped[list["AssignedModule"]] = relationship(
+        back_populates="semester_module"
     )
 
     def __repr__(self) -> str:
@@ -484,9 +475,7 @@ class ModulePrerequisite(Base):
     prerequisite_id: Mapped[int] = mapped_column(
         ForeignKey("semester_modules.id", ondelete="cascade"), nullable=False
     )
-    created_at: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=lambda: int(datetime.now().timestamp())
-    )
+    created_at: Mapped[int] = mapped_column(Integer, nullable=False)
 
     module: Mapped["SemesterModule"] = relationship(
         "SemesterModule",
@@ -521,9 +510,7 @@ class StructureSemester(Base):
     semester_number: Mapped[int] = mapped_column(Integer, nullable=False)
     name: Mapped[str] = mapped_column(String, nullable=False)
     total_credits: Mapped[float] = mapped_column(Float, nullable=False)
-    created_at: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=lambda: int(datetime.now().timestamp())
-    )
+    created_at: Mapped[int] = mapped_column(Integer, nullable=False)
 
     structure: Mapped["Structure"] = relationship(back_populates="semesters")
     semester_modules: Mapped[list["SemesterModule"]] = relationship(
@@ -544,10 +531,10 @@ class Term(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String, nullable=False, unique=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    semester: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
-    created_at: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=lambda: int(datetime.now().timestamp())
-    )
+    semester: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    assessments: Mapped[list["Assessment"]] = relationship(back_populates="term")
 
     def __repr__(self) -> str:
         return f"<Term id={self.id!r} name={self.name!r} is_active={self.is_active!r} semester={self.semester!r}>"
@@ -558,9 +545,7 @@ class Sponsor(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String, nullable=False, unique=True)
-    created_at: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=lambda: int(datetime.now().timestamp())
-    )
+    created_at: Mapped[int] = mapped_column(Integer, nullable=False)
     updated_at: Mapped[Optional[int]] = mapped_column(Integer)
 
     def __repr__(self) -> str:
@@ -581,9 +566,7 @@ class SponsoredStudent(Base):
     term_id: Mapped[int] = mapped_column(
         ForeignKey("terms.id", ondelete="cascade"), nullable=False
     )
-    created_at: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=lambda: int(datetime.now().timestamp())
-    )
+    created_at: Mapped[int] = mapped_column(Integer, nullable=False)
     updated_at: Mapped[Optional[int]] = mapped_column(Integer)
 
     __table_args__ = (
@@ -621,9 +604,7 @@ class RegistrationRequest(Base):
     semester_number: Mapped[int] = mapped_column(Integer, nullable=False)
     message: Mapped[Optional[str]] = mapped_column(String)
     mail_sent: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    created_at: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=lambda: int(datetime.now().timestamp())
-    )
+    created_at: Mapped[int] = mapped_column(Integer, nullable=False)
     updated_at: Mapped[Optional[int]] = mapped_column(Integer)
     date_approved: Mapped[Optional[int]] = mapped_column(Integer)
 
@@ -665,9 +646,7 @@ class RequestedModule(Base):
     status: Mapped[RequestedModuleStatus] = mapped_column(
         String, nullable=False, default="pending"
     )
-    created_at: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=lambda: int(datetime.now().timestamp())
-    )
+    created_at: Mapped[int] = mapped_column(Integer, nullable=False)
 
     registration_request: Mapped["RegistrationRequest"] = relationship(
         back_populates="requested_modules"
@@ -753,3 +732,144 @@ class RegistrationClearanceAudit(Base):
             f"registration_clearance_id={self.registration_clearance_id!r} "
             f"previous_status={self.previous_status!r} new_status={self.new_status!r}>"
         )
+
+
+class AssignedModule(Base):
+    __tablename__ = "assigned_modules"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="cascade"), nullable=False
+    )
+    semester_module_id: Mapped[int] = mapped_column(
+        ForeignKey("semester_modules.id", ondelete="cascade"), nullable=False
+    )
+    created_at: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    user: Mapped["User"] = relationship()
+    semester_module: Mapped["SemesterModule"] = relationship(
+        back_populates="assigned_modules"
+    )
+
+    def __repr__(self) -> str:
+        return f"<AssignedModule id={self.id!r} user_id={self.user_id!r} semester_module_id={self.semester_module_id!r}>"
+
+
+class UserSchool(Base):
+    __tablename__ = "user_schools"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="cascade"), nullable=False
+    )
+    school_id: Mapped[int] = mapped_column(
+        ForeignKey("schools.id", ondelete="cascade"), nullable=False
+    )
+    created_at: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    user: Mapped["User"] = relationship()
+    school: Mapped["School"] = relationship(back_populates="user_schools")
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "school_id", name="unique_user_school"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<UserSchool id={self.id!r} user_id={self.user_id!r} school_id={self.school_id!r}>"
+
+
+AssessmentNumber = Literal[
+    "CW1",
+    "CW2",
+    "CW3",
+    "CW4",
+    "CW5",
+    "CW6",
+    "CW7",
+    "CW8",
+    "CW9",
+    "CW10",
+    "CW11",
+    "CW12",
+    "CW13",
+    "CW14",
+    "CW15",
+]
+
+
+class Assessment(Base):
+    __tablename__ = "assessments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    module_id: Mapped[int] = mapped_column(
+        ForeignKey("modules.id", ondelete="cascade"), nullable=False
+    )
+    term_id: Mapped[int] = mapped_column(
+        ForeignKey("terms.id", ondelete="cascade"), nullable=False
+    )
+    assessment_number: Mapped[AssessmentNumber] = mapped_column(String, nullable=False)
+    assessment_type: Mapped[str] = mapped_column(String, nullable=False)
+    total_marks: Mapped[float] = mapped_column(Float, nullable=False)
+    weight: Mapped[float] = mapped_column(Float, nullable=False)
+    created_at: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    module: Mapped["Module"] = relationship(back_populates="assessments")
+    term: Mapped["Term"] = relationship(back_populates="assessments")
+    assessment_marks: Mapped[list["AssessmentMark"]] = relationship(
+        back_populates="assessment"
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "module_id", "assessment_number", "term_id", name="unique_assessment_module"
+        ),
+    )
+
+    def __repr__(self) -> str:
+        return f"<Assessment id={self.id!r} module_id={self.module_id!r} assessment_number={self.assessment_number!r}>"
+
+
+class AssessmentMark(Base):
+    __tablename__ = "assessment_marks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    assessment_id: Mapped[int] = mapped_column(
+        ForeignKey("assessments.id", ondelete="cascade"), nullable=False
+    )
+    std_no: Mapped[int] = mapped_column(
+        ForeignKey("students.std_no", ondelete="cascade"), nullable=False
+    )
+    marks: Mapped[float] = mapped_column(Float, nullable=False)
+    created_at: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    assessment: Mapped["Assessment"] = relationship(back_populates="assessment_marks")
+    student: Mapped["Student"] = relationship()
+
+    def __repr__(self) -> str:
+        return f"<AssessmentMark id={self.id!r} assessment_id={self.assessment_id!r} std_no={self.std_no!r} marks={self.marks!r}>"
+
+
+class ModuleGrade(Base):
+    __tablename__ = "module_grades"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    module_id: Mapped[int] = mapped_column(
+        ForeignKey("modules.id", ondelete="cascade"), nullable=False
+    )
+    std_no: Mapped[int] = mapped_column(
+        ForeignKey("students.std_no", ondelete="cascade"), nullable=False
+    )
+    grade: Mapped[GradeType] = mapped_column(String, nullable=False)
+    weighted_total: Mapped[float] = mapped_column(Float, nullable=False)
+    created_at: Mapped[int] = mapped_column(Integer, nullable=False)
+    updated_at: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    module: Mapped["Module"] = relationship(back_populates="module_grades")
+    student: Mapped["Student"] = relationship()
+
+    __table_args__ = (
+        UniqueConstraint("module_id", "std_no", name="unique_module_student"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<ModuleGrade id={self.id!r} module_id={self.module_id!r} std_no={self.std_no!r} grade={self.grade!r}>"
