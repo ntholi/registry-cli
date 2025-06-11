@@ -3,8 +3,12 @@ from typing import Any, Dict, List
 import click
 from sqlalchemy.orm import Session
 
-from registry_cli.models import Module, SemesterModule, StudentModule, StudentSemester
+from registry_cli.models import (Module, SemesterModule, StudentModule,
+                                 StudentSemester)
 from registry_cli.scrapers.student import StudentModuleScraper
+from registry_cli.utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 def scrape_and_save_modules(db: Session, semester: StudentSemester):
@@ -89,6 +93,9 @@ def save_semesters_and_modules_batch(
                 click.secho(
                     f"SemesterModule with id: {mod['semester_module_id']} not found",
                     fg="yellow",
+                )
+                logger.error(
+                    f"SemesterModule with id: {mod['semester_module_id']} not found"
                 )
                 continue
 
