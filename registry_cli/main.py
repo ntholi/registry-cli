@@ -7,6 +7,8 @@ from registry_cli.commands.approve.signups import approve_signups
 from registry_cli.commands.check.prerequisites import check_prerequisites
 from registry_cli.commands.enroll.approved import enroll_approved
 from registry_cli.commands.enroll.student import enroll_by_student_number
+from registry_cli.commands.export.registrations import export_program_registrations
+from registry_cli.commands.export.students import export_students_by_school
 from registry_cli.commands.pull.modules import modules_pull
 from registry_cli.commands.pull.programs import program_pull
 from registry_cli.commands.pull.schools import school_pull
@@ -393,6 +395,26 @@ def check() -> None:
 def prerequisites() -> None:
     db = get_db()
     check_prerequisites(db)
+
+
+@cli.group()
+def export() -> None:
+    """Commands for exporting data to various formats."""
+    pass
+
+
+@export.command()
+def registrations() -> None:
+    """Export registration statistics by program and semester to CSV."""
+    db = get_db()
+    export_program_registrations(db)
+
+
+@export.command(name="students-by-school")
+def students_by_school() -> None:
+    """Export registered students by school to Excel with separate sheets."""
+    db = get_db()
+    export_students_by_school(db)
 
 
 if __name__ == "__main__":
