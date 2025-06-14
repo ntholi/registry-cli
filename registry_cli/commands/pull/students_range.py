@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 import time
 from typing import Dict, Set
 
@@ -10,6 +11,13 @@ from registry_cli.commands.pull.student import student_pull
 from registry_cli.utils.logging_config import get_logger
 
 logger = get_logger(__name__)
+
+
+def _exit_if_session_rollback(exc: Exception) -> None:
+    if "transaction has been rolled back" in str(exc).lower():
+        click.secho("Fatal SQLAlchemy session rollback error detected. Exiting...", fg="red")
+        sys.exit(1)
+
 
 PROGRESS_FILE = "students_range_progress.json"
 
@@ -175,6 +183,7 @@ def students_range_pull(
                 click.echo("\nInterrupted by user. Saving progress...")
                 break
             except Exception as e:
+                _exit_if_session_rollback(e)
                 failed_pulls.add(std_no)
                 logger.error(
                     f"Exception while pulling student {std_no}: {type(e).__name__}: {str(e)}"
@@ -299,6 +308,7 @@ def retry_failed(db: Session, info_only: bool = False) -> None:
                 click.secho(f"✗ Still failed to pull student {std_no}", fg="red")
 
         except Exception as e:
+            _exit_if_session_rollback(e)
             logger.error(
                 f"Exception during retry for student {std_no}: {type(e).__name__}: {str(e)}"
             )

@@ -13,6 +13,17 @@ from registry_cli.commands.pull.student import student_pull
 from registry_cli.db.config import get_engine
 
 
+def _exit_if_session_rollback(exc: Exception) -> None:
+    """Terminate the process immediately if a SQLAlchemy session rollback is detected."""
+    if "transaction has been rolled back" in str(exc).lower():
+        click.secho(
+            "Fatal SQLAlchemy session rollback error detected. Exiting...",
+            fg="red",
+        )
+        sys.exit(1)
+
+
+
 def get_db_session(use_local: bool = True):
     engine = get_engine(use_local)
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -116,7 +127,8 @@ def worker_process(
                 else:
                     failed_pulls.add(std_no)
 
-            except Exception:
+            except Exception as e:
+                _exit_if_session_rollback(e)
                 failed_pulls.add(std_no)
 
             student_end_time = time.time()
@@ -132,7 +144,8 @@ def worker_process(
 
             save_chunk_progress(chunk_id, progress)
 
-    except Exception:
+    except Exception as e:
+        _exit_if_session_rollback(e)
         pass
     finally:
         try:
