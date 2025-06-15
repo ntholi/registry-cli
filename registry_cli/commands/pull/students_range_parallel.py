@@ -111,9 +111,14 @@ def worker_process(
             save_chunk_progress(chunk_id, progress)
             return
 
+        start_time = time.time()
         total_processing_time = 0
         students_processed = 0
         total_range = start - end + 1
+        
+        click.echo(f"[Chunk {chunk_id}] Range: {start} -> {end} (Total: {total_range:,} students)")
+        click.echo(f"[Chunk {chunk_id}] Failed: {len(failed_pulls):,}")
+        click.echo(f"[Chunk {chunk_id}] Current position: {current_position}")
 
         for std_no in range(current_position, end - 1, -1):
             student_start_time = time.time()
@@ -136,6 +141,24 @@ def worker_process(
             total_processing_time += student_processing_time
             students_processed += 1
 
+            if students_processed % 10 == 0 or std_no in failed_pulls:
+                elapsed_time = time.time() - start_time
+                remaining = current_position - end
+                avg_time_per_student = total_processing_time / students_processed if students_processed > 0 else 0
+                estimated_remaining_time = remaining * avg_time_per_student
+                progress_percent = (students_processed / total_range) * 100 if total_range > 0 else 0
+                
+                chunk_total = start - end + 1
+                chunk_processed = start - std_no
+                
+                click.echo(
+                    f"[Chunk {chunk_id}] {std_no:,} | "
+                    f"{chunk_processed:,}/{chunk_total:,} ({progress_percent:.1f}%) | "
+                    f"Avg: {avg_time_per_student:.2f}s | "
+                    f"Est: {format_time_estimate(estimated_remaining_time)} | "
+                    f"Failed: {len(failed_pulls):,}"
+                )
+
             progress["current_position"] = std_no
             progress["failed_pulls"] = list(failed_pulls)
 
@@ -143,6 +166,17 @@ def worker_process(
                 progress["completed"] = True
 
             save_chunk_progress(chunk_id, progress)
+        
+        if students_processed > 0:
+            elapsed_time = time.time() - start_time
+            avg_time_per_student = total_processing_time / students_processed
+            click.echo(f"\n[Chunk {chunk_id}] Completed {students_processed:,} students in {format_time_estimate(elapsed_time)}")
+            click.echo(f"[Chunk {chunk_id}] Average time per student: {avg_time_per_student:.2f}s")
+            
+            if failed_pulls:
+                click.echo(
+                    f"[Chunk {chunk_id}] Failed student numbers: {sorted(failed_pulls, reverse=True)[:10]}{'...' if len(failed_pulls) > 10 else ''}"
+                )
 
     except Exception as e:
         _exit_if_session_rollback(e)
