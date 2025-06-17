@@ -1,11 +1,14 @@
+import logging
 from datetime import datetime
-from typing import Any, Dict, List, cast
+from typing import Any, Dict, List, Optional, cast
 
 from bs4 import ResultSet, Tag
 
 from registry_cli.browser import BASE_URL
 from registry_cli.models import SemesterStatus
 from registry_cli.scrapers.base import BaseScraper
+
+logger = logging.getLogger(__name__)
 
 
 class StudentSemesterScraper(BaseScraper):
@@ -45,7 +48,8 @@ class StudentSemesterScraper(BaseScraper):
             if semester_id:
                 try:
                     semester_details = self._get_semester_details(semester_id)
-                    semesters.append(semester_details)
+                    if semester_details is not None:
+                        semesters.append(semester_details)
                 except Exception as e:
                     print(
                         f"Error fetching semester details for ID {semester_id}: {str(e)}"
@@ -53,14 +57,14 @@ class StudentSemesterScraper(BaseScraper):
 
         return semesters
 
-    def _get_semester_details(self, semester_id: str) -> Dict[str, Any]:
+    def _get_semester_details(self, semester_id: str) -> Optional[Dict[str, Any]]:
         """Get all semester details directly from the semester view page.
 
         Args:
             semester_id: The ID of the semester
 
         Returns:
-            Dictionary containing all semester details
+            Dictionary containing all semester details, or None if it's a foundation semester
         """
         view_url = f"{BASE_URL}/r_stdsemesterview.php?StdSemesterID={semester_id}"
         self.url = view_url
@@ -77,8 +81,11 @@ class StudentSemesterScraper(BaseScraper):
 
                 # Map specific fields to our data model
                 if header == "Semester":
+                    value = value.strip()
+                    if "foundation" in value.lower() or value.lower().startswith("f"):
+                        logger.warning(f"Skipping foundation semester: '{value}'")
+                        return None
                     try:
-                        value = value.strip()
                         if " " in value:
                             semester_number = int(value.split(" ")[0])
                         else:

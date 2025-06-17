@@ -2,6 +2,7 @@ import os
 import sqlite3
 import sys
 
+import click
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine
@@ -25,7 +26,7 @@ def _register_hrana_exit(engine: Engine) -> None:
         if isinstance(err, sqlite3.DatabaseError) and "HRANA_WEBSOCKET_ERROR" in str(
             err
         ):
-            print("Fatal HRANA WebSocket error detected. Exiting...")
+            click.secho("Fatal HRANA WebSocket error detected. Exiting...", fg="red")
             sys.exit(1)
 
 
