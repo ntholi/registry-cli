@@ -17,6 +17,9 @@ from registry_cli.commands.pull.student import student_pull
 from registry_cli.commands.pull.student.semesters import semesters_pull
 from registry_cli.commands.pull.student.student_modules import student_modules_pull
 from registry_cli.commands.pull.students_range import students_range_pull
+from registry_cli.commands.pull.students_range_parallel import (
+    students_range_parallel_pull,
+)
 from registry_cli.commands.push.students import student_push
 from registry_cli.commands.send.notifications import send_notifications
 from registry_cli.commands.send.proof import send_proof_registration
@@ -148,6 +151,43 @@ def students_range(start: int, end: int, info: bool, reset: bool) -> None:
     """Pull student records from start number down to end number with progress persistence."""
     db = get_db()
     students_range_pull(db, start, end, info, reset)
+
+
+@pull.command(name="students-range-parallel")
+@click.option(
+    "--start",
+    type=int,
+    default=901013069,
+    help="Starting student number (default: 901013069)",
+)
+@click.option(
+    "--end",
+    type=int,
+    default=901000001,
+    help="Ending student number (default: 901000001)",
+)
+@click.option(
+    "--info",
+    is_flag=True,
+    help="Only update student information without programs and modules",
+)
+@click.option(
+    "--reset",
+    is_flag=True,
+    help="Reset progress and start from beginning",
+)
+@click.option(
+    "--max-workers",
+    type=int,
+    default=10,
+    help="Maximum number of parallel workers (default: 10)",
+)
+def students_range_parallel(
+    start: int, end: int, info: bool, reset: bool, max_workers: int
+) -> None:
+    """Pull student records in parallel from start number down to end number with progress persistence."""
+    use_local = input("Choose environment (local/prod)? ").lower().strip() != "prod"
+    students_range_parallel_pull(start, end, info, reset, max_workers, use_local)
 
 
 @pull.command()
