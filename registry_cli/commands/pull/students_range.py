@@ -15,7 +15,9 @@ logger = get_logger(__name__)
 
 def _exit_if_session_rollback(exc: Exception) -> None:
     if "transaction has been rolled back" in str(exc).lower():
-        click.secho("Fatal SQLAlchemy session rollback error detected. Exiting...", fg="red")
+        click.secho(
+            "Fatal SQLAlchemy session rollback error detected. Exiting...", fg="red"
+        )
         sys.exit(1)
 
 
@@ -227,99 +229,3 @@ def students_range_pull(
             click.echo(
                 f"Next run will continue from student {progress['current_position']}"
             )
-
-
-def show_progress() -> None:
-    if not os.path.exists(PROGRESS_FILE):
-        logger.warning("No progress file found for show progress operation")
-        click.secho(
-            "No progress file found. Run the students-range command first.", fg="yellow"
-        )
-        return
-
-    progress = load_progress()
-    logger.info("Displaying progress status")
-
-    start = progress["start_number"]
-    end = progress["end_number"]
-    failed_pulls = set(progress["failed_pulls"])
-    current_position = progress["current_position"]
-
-    total_range = start - end + 1
-    failed_count = len(failed_pulls)
-    remaining = current_position - end + 1
-    processed = total_range - remaining
-    progress_percent = (processed / total_range) * 100
-
-    click.echo("=" * 50)
-    click.echo("PROGRESS STATUS")
-    click.echo("=" * 50)
-    click.echo(f"Range: {start:,} -> {end:,} (Total: {total_range:,} students)")
-    click.echo(f"Current position: {current_position:,}")
-    click.echo(f"Progress: {processed:,}/{total_range:,} ({progress_percent:.1f}%)")
-    click.secho(f"Failed pulls: {failed_count:,} students", fg="red")
-
-    if current_position < end:
-        click.secho("✓ All students completed!", fg="green")
-    else:
-        click.echo(f"Remaining: {remaining:,} students")
-
-    if failed_pulls:
-        click.echo(
-            f"\nSample failed student numbers: {sorted(failed_pulls, reverse=True)[:10]}"
-        )
-
-
-def retry_failed(db: Session, info_only: bool = False) -> None:
-    if not os.path.exists(PROGRESS_FILE):
-        logger.warning("No progress file found for retry operation")
-        click.secho(
-            "No progress file found. Run the students-range command first.", fg="yellow"
-        )
-        return
-
-    progress = load_progress()
-    failed_pulls = set(progress["failed_pulls"])
-
-    if not failed_pulls:
-        logger.info("No failed pulls found to retry")
-        click.secho("No failed pulls to retry!", fg="green")
-        return
-
-    logger.info(f"Starting retry process for {len(failed_pulls)} failed student pulls")
-    click.echo(f"Retrying {len(failed_pulls)} failed student pulls...")
-
-    retry_count = 0
-
-    for std_no in sorted(failed_pulls, reverse=True):
-        click.echo(f"Retrying student {std_no}...")
-
-        try:
-            success = student_pull(db, std_no, info_only)
-
-            if success:
-                failed_pulls.remove(std_no)
-                retry_count += 1
-                click.secho(f"✓ Successfully pulled student {std_no}", fg="green")
-            else:
-                logger.error(
-                    f"Retry failed for student {std_no}: student_pull returned False"
-                )
-                click.secho(f"✗ Still failed to pull student {std_no}", fg="red")
-
-        except Exception as e:
-            _exit_if_session_rollback(e)
-            logger.error(
-                f"Exception during retry for student {std_no}: {type(e).__name__}: {str(e)}"
-            )
-            click.secho(f"✗ Error retrying student {std_no}: {str(e)}", fg="red")
-
-    progress["failed_pulls"] = list(failed_pulls)
-    save_progress(progress)
-
-    logger.info(
-        f"Retry process completed: {retry_count} students successful, {len(failed_pulls)} still failed"
-    )
-
-    click.echo(f"\nRetry completed: {retry_count} students now successful")
-    click.echo(f"Still failed: {len(failed_pulls)} students")

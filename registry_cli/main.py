@@ -16,11 +16,7 @@ from registry_cli.commands.pull.structures import single_structure_pull, structu
 from registry_cli.commands.pull.student import student_pull
 from registry_cli.commands.pull.student.semesters import semesters_pull
 from registry_cli.commands.pull.student.student_modules import student_modules_pull
-from registry_cli.commands.pull.students_range import (
-    retry_failed,
-    show_progress,
-    students_range_pull,
-)
+from registry_cli.commands.pull.students_range import students_range_pull
 from registry_cli.commands.push.students import student_push
 from registry_cli.commands.send.notifications import send_notifications
 from registry_cli.commands.send.proof import send_proof_registration
@@ -152,24 +148,6 @@ def students_range(start: int, end: int, info: bool, reset: bool) -> None:
     """Pull student records from start number down to end number with progress persistence."""
     db = get_db()
     students_range_pull(db, start, end, info, reset)
-
-
-@pull.command(name="students-progress")
-def students_progress() -> None:
-    """Show progress of the students-range command."""
-    show_progress()
-
-
-@pull.command(name="students-retry")
-@click.option(
-    "--info",
-    is_flag=True,
-    help="Only update student information without programs and modules",
-)
-def students_retry(info: bool) -> None:
-    """Retry pulling students that previously failed."""
-    db = get_db()
-    retry_failed(db, info)
 
 
 @pull.command()
