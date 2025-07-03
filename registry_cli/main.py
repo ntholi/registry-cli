@@ -27,6 +27,9 @@ from registry_cli.commands.update.marks import update_marks_from_excel
 from registry_cli.commands.update.module_grades import create_module_grades
 from registry_cli.commands.update.module_refs import update_semester_module_refs
 from registry_cli.commands.update.student_modules import update_student_modules
+from registry_cli.commands.update.term_student_modules import (
+    update_term_student_modules,
+)
 from registry_cli.db.config import get_engine
 from registry_cli.utils.logging_config import configure_from_env
 
@@ -357,6 +360,29 @@ def update_student_modules_cmd(std_no: int, term: str) -> None:
     """
     db = get_db()
     update_student_modules(db, std_no, term)
+
+
+@update.command(name="term-student-modules")
+@click.argument("term", type=str)
+@click.option(
+    "--reset",
+    is_flag=True,
+    help="Reset progress and start from beginning",
+)
+def update_term_student_modules_cmd(term: str, reset: bool) -> None:
+    """
+    Update module marks and grades for all students in a specific term.
+
+    This command processes all students who have semesters in the specified term:
+    1. Finds all student semesters for the given term
+    2. For each student, updates all their modules using module_grades data
+    3. Shows progress with estimated completion time
+    4. Saves progress to allow resuming interrupted runs
+
+    TERM: Academic term (e.g. 2025-02)
+    """
+    db = get_db()
+    update_term_student_modules(db, term, reset)
 
 
 @cli.group()
