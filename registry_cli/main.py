@@ -26,6 +26,7 @@ from registry_cli.commands.send.proof import send_proof_registration
 from registry_cli.commands.update.marks import update_marks_from_excel
 from registry_cli.commands.update.module_grades import create_module_grades
 from registry_cli.commands.update.module_refs import update_semester_module_refs
+from registry_cli.commands.update.student_modules import update_student_modules
 from registry_cli.db.config import get_engine
 from registry_cli.utils.logging_config import configure_from_env
 
@@ -336,6 +337,26 @@ def update_module_grades(verbose: bool) -> None:
     """
     db = get_db()
     create_module_grades(db, verbose)
+
+
+@update.command(name="student-modules")
+@click.argument("std_no", type=int)
+@click.argument("term", type=str)
+def update_student_modules_cmd(std_no: int, term: str) -> None:
+    """
+    Update a student's module marks and grades from module_grades data.
+
+    This command updates all modules for a student in a specific term by:
+    1. Finding the student's semester for the given term
+    2. Getting all student modules for that semester
+    3. Looking up the corresponding module grades from module_grades table
+    4. Updating both the website and database with the new marks and grades
+
+    STD_NO: Student number
+    TERM: Academic term (e.g. 2025-02)
+    """
+    db = get_db()
+    update_student_modules(db, std_no, term)
 
 
 @cli.group()
