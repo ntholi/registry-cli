@@ -96,6 +96,7 @@ def update_student_modules(db: Session, std_no: int, term: str) -> None:
                 student_module.id,
                 module_grade.weighted_total,
                 module_grade.grade,
+                student_module.status,
             )
 
             if success:
@@ -132,7 +133,7 @@ def update_student_modules(db: Session, std_no: int, term: str) -> None:
 
 
 def _update_module_on_website(
-    browser: Browser, std_module_id: int, mark: float, grade: str
+    browser: Browser, std_module_id: int, mark: float, grade: str, status: str
 ) -> bool:
     try:
         url = f"{BASE_URL}/r_stdmoduleedit.php?StdModuleID={std_module_id}"
@@ -149,6 +150,8 @@ def _update_module_on_website(
         form_data["a_edit"] = "U"
         form_data["x_StdModMark"] = str(int(mark))
         form_data["x_StdModGrade"] = grade
+        form_data["x_StdModStatCode"] = status
+        form_data["x_StdModFee"] = ""
 
         post_url = f"{BASE_URL}/r_stdmoduleedit.php"
         post_response = browser.post(post_url, form_data)
