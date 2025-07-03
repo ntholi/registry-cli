@@ -167,8 +167,6 @@ def update_term_student_modules(db: Session, term: str, reset: bool = False) -> 
                     failed_students.remove(std_no)
                 completed_students.add(std_no)
 
-                click.secho(f"✓ Successfully updated student {std_no}", fg="green")
-
             except KeyboardInterrupt:
                 logger.info("Process interrupted by user at student %s", std_no)
                 click.echo("\nInterrupted by user. Saving progress...")

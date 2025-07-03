@@ -18,7 +18,12 @@ from registry_cli.models import (
 def update_student_modules(db: Session, std_no: int, term: str) -> None:
     click.echo(f"Updating module marks and grades for student {std_no} in term {term}")
 
-    program = db.query(StudentProgram).filter(StudentProgram.std_no == std_no).first()
+    program = (
+        db.query(StudentProgram)
+        .filter(StudentProgram.std_no == std_no)
+        .where(StudentProgram.status == "Active")
+        .first()
+    )
     if not program:
         click.secho(f"No program found for student {std_no}", fg="red")
         return
@@ -32,7 +37,9 @@ def update_student_modules(db: Session, std_no: int, term: str) -> None:
         .first()
     )
     if not semester:
-        click.secho(f"No semester found for student {std_no} in term {term}", fg="red")
+        click.secho(
+            f"No semester found for student '{std_no}' in term '{term}'", fg="red"
+        )
         return
 
     student_modules = (
@@ -130,6 +137,7 @@ def update_student_modules(db: Session, std_no: int, term: str) -> None:
         click.secho(f"Skipped: {skipped_count} modules", fg="blue")
     if error_count > 0:
         click.secho(f"Errors: {error_count} modules", fg="red")
+    click.echo("------------------------------------------------\n")
 
 
 def _update_module_on_website(
