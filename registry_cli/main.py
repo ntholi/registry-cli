@@ -26,6 +26,7 @@ from registry_cli.commands.send.proof import send_proof_registration
 from registry_cli.commands.update.marks import update_marks_from_excel
 from registry_cli.commands.update.module_grades import create_module_grades
 from registry_cli.commands.update.module_refs import update_semester_module_refs
+from registry_cli.commands.update.student_module_refs import update_student_module_refs
 from registry_cli.commands.update.student_modules import update_student_modules
 from registry_cli.commands.update.term_student_modules import (
     update_term_student_modules,
@@ -383,6 +384,32 @@ def update_term_student_modules_cmd(term: str, reset: bool) -> None:
     """
     db = get_db()
     update_term_student_modules(db, term, reset)
+
+
+@update.command(name="student-module-refs")
+@click.argument("std_nos", type=int, nargs=-1, required=True)
+@click.argument("term", type=str)
+@click.argument("module_name", type=str)
+@click.argument("new_sem_module_id", type=int)
+def update_student_module_refs_cmd(
+    std_nos: tuple[int, ...], term: str, module_name: str, new_sem_module_id: int
+) -> None:
+    """
+    Update x_SemModuleID for specific students' modules in a given semester.
+
+    This command updates the semester module reference for all matching modules
+    for the specified students in a given term by:
+    1. Finding each student's semester for the given term
+    2. Finding all modules matching the module name for that semester
+    3. Updating the x_SemModuleID field on the website and in the database
+
+    STD_NOS: List of student numbers (space-separated)
+    TERM: Academic term (e.g. 2025-02)
+    MODULE_NAME: Module name to search for (e.g. "Probability & Statistics")
+    NEW_SEM_MODULE_ID: New semester module ID to assign
+    """
+    db = get_db()
+    update_student_module_refs(db, list(std_nos), term, module_name, new_sem_module_id)
 
 
 @cli.group()
