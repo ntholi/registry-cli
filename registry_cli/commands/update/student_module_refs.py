@@ -82,7 +82,7 @@ def update_student_module_refs(
         for student_module in student_modules:
             try:
                 success = _update_module_ref_on_website(
-                    browser, student_module.id, new_sem_module_id
+                    browser, student_module.id, new_sem_module_id, student_module.status
                 )
 
                 if success:
@@ -121,7 +121,7 @@ def update_student_module_refs(
 
 
 def _update_module_ref_on_website(
-    browser: Browser, std_module_id: int, new_sem_module_id: int
+    browser: Browser, std_module_id: int, new_sem_module_id: int, status: str
 ) -> bool:
     try:
         url = f"{BASE_URL}/r_stdmoduleedit.php?StdModuleID={std_module_id}"
@@ -137,6 +137,8 @@ def _update_module_ref_on_website(
 
         form_data["a_edit"] = "U"
         form_data["x_SemModuleID"] = str(new_sem_module_id)
+        form_data["x_StdModStatCode"] = status
+        form_data["x_StdModFee"] = ""
 
         post_url = f"{BASE_URL}/r_stdmoduleedit.php"
         post_response = browser.post(post_url, form_data)
