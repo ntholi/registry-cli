@@ -29,6 +29,7 @@ from registry_cli.commands.update.module_refs import update_semester_module_refs
 from registry_cli.commands.update.student_module_refs import update_student_module_refs
 from registry_cli.commands.update.student_modules import update_student_modules
 from registry_cli.commands.update.term_student_modules import (
+    update_specific_students_modules,
     update_term_student_modules,
 )
 from registry_cli.db.config import get_engine
@@ -384,6 +385,33 @@ def update_term_student_modules_cmd(term: str, reset: bool) -> None:
     """
     db = get_db()
     update_term_student_modules(db, term, reset)
+
+
+@update.command(name="specific-students-modules")
+@click.argument("std_nos", type=int, nargs=-1, required=True)
+@click.argument("term", type=str)
+@click.option(
+    "--reset",
+    is_flag=True,
+    help="Reset progress and start from beginning",
+)
+def update_specific_students_modules_cmd(
+    std_nos: tuple[int, ...], term: str, reset: bool
+) -> None:
+    """
+    Update module marks and grades for specific students in a specific term.
+
+    This command processes only the specified students who have semesters in the given term:
+    1. Validates that the specified students have semesters in the given term
+    2. For each student, updates all their modules using module_grades data
+    3. Shows progress with estimated completion time
+    4. Saves progress to allow resuming interrupted runs
+
+    STD_NOS: List of student numbers (space-separated)
+    TERM: Academic term (e.g. 2025-02)
+    """
+    db = get_db()
+    update_specific_students_modules(db, list(std_nos), term, reset)
 
 
 @update.command(name="student-module-refs")
