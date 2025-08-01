@@ -8,7 +8,6 @@ from registry_cli.browser import BASE_URL
 from registry_cli.commands.pull.programs import program_pull
 from registry_cli.models import (
     Module,
-    ModulePrerequisite,
     Program,
     SemesterModule,
     Structure,
@@ -103,7 +102,7 @@ class StructureDataProcessor:
 
                 if modules_data:
                     validated_modules = self.validate_and_process_modules(modules_data)
-                    self._save_modules_and_prerequisites(semester, validated_modules)
+                    self._save_modules(semester, validated_modules)
 
             self.db.commit()
             return True
@@ -141,12 +140,10 @@ class StructureDataProcessor:
         self.db.flush()
         return semester
 
-    def _save_modules_and_prerequisites(
+    def _save_modules(
         self, semester: StructureSemester, modules_data: List[Dict[str, Any]]
     ) -> None:
-        """Save modules and their prerequisites for a semester."""
-        semester_modules_needing_prerequisites = []
-
+        """Save modules for a semester."""
         for module_data in modules_data:
             semester_module = (
                 self.db.query(SemesterModule)
@@ -169,64 +166,7 @@ class StructureDataProcessor:
                 semester_module.credits = module_data["credits"]
                 semester_module.semester_id = semester.id
 
-            if module_data.get("prerequisite_code"):
-                semester_modules_needing_prerequisites.append(
-                    {
-                        "semester_module": semester_module,
-                        "prerequisite_code": module_data["prerequisite_code"],
-                    }
-                )
-
         self.db.flush()
-
-        for item in semester_modules_needing_prerequisites:
-            self._process_prerequisite(
-                item["semester_module"], item["prerequisite_code"]
-            )
-
-    def _process_prerequisite(
-        self, semester_module: SemesterModule, prerequisite_code: str
-    ) -> None:
-        """Process and save prerequisite relationship."""
-        prerequisite = (
-            self.db.query(Module).filter(Module.code == prerequisite_code).first()
-        )
-
-        if not prerequisite:
-            click.secho(
-                f"Warning: Prerequisite module {prerequisite_code} not found in database",
-                fg="yellow",
-            )
-            return
-
-        prerequisite_sem_module = (
-            self.db.query(SemesterModule)
-            .filter(SemesterModule.module_id == prerequisite.id)
-            .first()
-        )
-
-        if not prerequisite_sem_module:
-            click.secho(
-                f"Warning: Prerequisite semester module for {prerequisite_code} not found in database",
-                fg="yellow",
-            )
-            return
-
-        existing_prerequisite = (
-            self.db.query(ModulePrerequisite)
-            .filter(
-                ModulePrerequisite.semester_module_id == semester_module.id,
-                ModulePrerequisite.prerequisite_id == prerequisite_sem_module.id,
-            )
-            .first()
-        )
-
-        if not existing_prerequisite:
-            module_prerequisite = ModulePrerequisite(
-                semester_module_id=semester_module.id,
-                prerequisite_id=prerequisite_sem_module.id,
-            )
-            self.db.add(module_prerequisite)
 
 
 class ConcurrentStructurePuller:
