@@ -199,9 +199,6 @@ class SemesterModuleScraper(BaseScraper):
             except ValueError:
                 module_type = "Core"
 
-            if type_text == "Delete":
-                continue
-
             # Get credits
             credits_text = cells[3].get_text(strip=True).replace(",", "")
             try:
