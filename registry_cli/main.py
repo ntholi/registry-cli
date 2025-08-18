@@ -5,6 +5,10 @@ from sqlalchemy.orm import sessionmaker
 
 from registry_cli.commands.approve.signups import approve_signups
 from registry_cli.commands.check.prerequisites import check_prerequisites
+from registry_cli.commands.create.student_semesters import (
+    create_student_semester_by_student_number,
+    create_student_semesters_approved,
+)
 from registry_cli.commands.enroll.approved import enroll_approved
 from registry_cli.commands.enroll.student import enroll_by_student_number
 from registry_cli.commands.export.registrations import export_program_registrations
@@ -253,6 +257,27 @@ def approved() -> None:
 def enroll_student(std_no: int) -> None:
     db = get_db()
     enroll_by_student_number(db, std_no)
+
+
+@cli.group()
+def create() -> None:
+    """Commands for creating new records."""
+    pass
+
+
+@create.command(name="student-semesters")
+def create_semesters_approved() -> None:
+    """Create student semesters for all approved registration requests."""
+    db = get_db()
+    create_student_semesters_approved(db)
+
+
+@create.command(name="student-semester")
+@click.argument("std_no", type=int)
+def create_semester_by_student(std_no: int) -> None:
+    """Create student semester for a specific approved student."""
+    db = get_db()
+    create_student_semester_by_student_number(db, std_no)
 
 
 @cli.group()

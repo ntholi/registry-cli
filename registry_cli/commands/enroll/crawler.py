@@ -24,12 +24,10 @@ class Crawler:
         structure_id: int,
         std_program_id: int,
         semester_number: int,
+        term: Term,
     ) -> int | None:
         logger.info(f"Adding semester for student '{std_program_id}'")
         url = f"{BASE_URL}/r_stdsemesterlist.php?showmaster=1&StdProgramID={std_program_id}"
-        term = self.db.query(Term).filter(Term.is_active == True).first()
-        if not term:
-            raise ValueError("No active Term found in database")
 
         std_semester_id = self.get_id_for(self.browser.fetch(url), term.name)
         if std_semester_id:

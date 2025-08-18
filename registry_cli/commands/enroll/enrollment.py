@@ -24,9 +24,11 @@ def enroll_student(db: Session, request: RegistrationRequest) -> None:
     if not student:
         raise ValueError(f"Student {request.std_no} not found")
 
-    active_term = db.query(Term).filter(Term.is_active == True).first()
-    if not active_term:
-        click.secho("Error: No active term found in the database", fg="red")
+    term = db.query(Term).filter(Term.id == request.term_id).first()
+    if not term:
+        click.secho(
+            f"Error: Term with ID {request.term_id} not found in the database", fg="red"
+        )
         return
 
     crawler = Crawler(db)
@@ -53,6 +55,7 @@ def enroll_student(db: Session, request: RegistrationRequest) -> None:
         structure_id=structure.id,
         std_program_id=program.id,
         semester_number=request.semester_number,
+        term=term,
     )
 
     if not semester_id:
@@ -115,7 +118,7 @@ def enroll_student(db: Session, request: RegistrationRequest) -> None:
             request=request,
             student=student,
             registered_modules=registered_module_codes,
-            term=active_term.name,
+            term=term.name,
         )
 
         if email_sent:
