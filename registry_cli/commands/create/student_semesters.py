@@ -8,7 +8,9 @@ from sqlalchemy.orm import Session
 from registry_cli.models import (
     RegistrationClearance,
     RegistrationRequest,
+    RequestedModule,
     Student,
+    StudentModule,
     StudentProgram,
     StudentSemester,
     Term,
@@ -73,6 +75,8 @@ def create_student_semester_for_request(
             f"term {term.name}, semester {request.semester_number}",
             fg="yellow",
         )
+        # Still create modules if they don't exist
+        _create_student_modules_for_semester(db, existing_semester, request)
         return existing_semester
 
     # Create new StudentSemester
@@ -87,12 +91,84 @@ def create_student_semester_for_request(
     db.add(student_semester)
     db.commit()
 
+    # Create StudentModule records for the requested modules
+    modules_created = _create_student_modules_for_semester(
+        db, student_semester, request
+    )
+
     click.secho(
         f"Created semester for student {student.std_no}, "
-        f"term {term.name}, semester {request.semester_number}",
+        f"term {term.name}, semester {request.semester_number} "
+        f"with {modules_created} modules",
         fg="green",
     )
     return student_semester
+
+
+def _create_student_modules_for_semester(
+    db: Session, student_semester: StudentSemester, request: RegistrationRequest
+) -> int:
+    """
+    Create StudentModule records for the requested modules in a semester.
+
+    Args:
+        db: Database session
+        student_semester: StudentSemester to create modules for
+        request: RegistrationRequest containing requested modules
+
+    Returns:
+        Number of modules created
+    """
+    requested_modules = (
+        db.query(RequestedModule)
+        .filter(RequestedModule.registration_request_id == request.id)
+        .all()
+    )
+
+    modules_created = 0
+    for requested_module in requested_modules:
+        # Check if student module already exists
+        existing_module = (
+            db.query(StudentModule)
+            .filter(
+                and_(
+                    StudentModule.student_semester_id == student_semester.id,
+                    StudentModule.semester_module_id
+                    == requested_module.semester_module_id,
+                )
+            )
+            .first()
+        )
+
+        if existing_module:
+            click.secho(
+                f"Module {requested_module.semester_module.module.code if requested_module.semester_module.module else 'Unknown'} "
+                f"already exists for student semester {student_semester.id}",
+                fg="yellow",
+            )
+            continue
+
+        # Create new StudentModule
+        student_module = StudentModule(
+            semester_module_id=requested_module.semester_module_id,
+            status=requested_module.module_status,
+            marks="NM",  # Default marks
+            grade="NM",  # Default grade indicating not yet graded
+            student_semester_id=student_semester.id,
+            created_at=int(time.time()),
+        )
+
+        db.add(student_module)
+        modules_created += 1
+
+    if modules_created > 0:
+        db.commit()
+        click.secho(
+            f"Created {modules_created} student modules for semester {student_semester.id}",
+            fg="green",
+        )
+
+    return modules_created
 
 
 def create_student_semesters_approved(db: Session) -> None:
@@ -156,6 +232,7 @@ def create_student_semester_by_student_number(db: Session, std_no: int) -> None:
                 .having(func.count(RegistrationClearance.registration_request_id) == 2)
             )
         )
+        .order_by(RegistrationRequest.id.desc())
         .first()
     )
 
