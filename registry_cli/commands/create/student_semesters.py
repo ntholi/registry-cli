@@ -76,7 +76,16 @@ def create_student_semester_for_request(
             fg="yellow",
         )
         # Still create modules if they don't exist
-        _create_student_modules_for_semester(db, existing_semester, request)
+        modules_created = _create_student_modules_for_semester(
+            db, existing_semester, request, silent=True
+        )
+
+        # Mark the registration request as registered if not already
+        if request.status != "registered":
+            request.status = "registered"
+            request.updated_at = int(time.time())
+            db.commit()
+
         return existing_semester
 
     # Create new StudentSemester
@@ -93,8 +102,13 @@ def create_student_semester_for_request(
 
     # Create StudentModule records for the requested modules
     modules_created = _create_student_modules_for_semester(
-        db, student_semester, request
+        db, student_semester, request, silent=True
     )
+
+    # Mark the registration request as registered
+    request.status = "registered"
+    request.updated_at = int(time.time())
+    db.commit()
 
     click.secho(
         f"Created semester for student {student.std_no}, "
@@ -106,7 +120,10 @@ def create_student_semester_for_request(
 
 
 def _create_student_modules_for_semester(
-    db: Session, student_semester: StudentSemester, request: RegistrationRequest
+    db: Session,
+    student_semester: StudentSemester,
+    request: RegistrationRequest,
+    silent: bool = False,
 ) -> int:
     """
     Create StudentModule records for the requested modules in a semester.
@@ -115,6 +132,7 @@ def _create_student_modules_for_semester(
         db: Database session
         student_semester: StudentSemester to create modules for
         request: RegistrationRequest containing requested modules
+        silent: If True, suppress detailed output messages
 
     Returns:
         Number of modules created
@@ -141,11 +159,12 @@ def _create_student_modules_for_semester(
         )
 
         if existing_module:
-            click.secho(
-                f"Module {requested_module.semester_module.module.code if requested_module.semester_module.module else 'Unknown'} "
-                f"already exists for student semester {student_semester.id}",
-                fg="yellow",
-            )
+            if not silent:
+                click.secho(
+                    f"Module {requested_module.semester_module.module.code if requested_module.semester_module.module else 'Unknown'} "
+                    f"already exists for student semester {student_semester.id}",
+                    fg="yellow",
+                )
             continue
 
         # Create new StudentModule
@@ -163,10 +182,11 @@ def _create_student_modules_for_semester(
 
     if modules_created > 0:
         db.commit()
-        click.secho(
-            f"Created {modules_created} student modules for semester {student_semester.id}",
-            fg="green",
-        )
+        if not silent:
+            click.secho(
+                f"Created {modules_created} student modules for semester {student_semester.id}",
+                fg="green",
+            )
 
     return modules_created
 
@@ -246,10 +266,7 @@ def create_student_semester_by_student_number(db: Session, std_no: int) -> None:
     click.echo(f"Processing semester creation for student {std_no}")
     try:
         student_semester = create_student_semester_for_request(db, registration_request)
-        if student_semester:
-            click.secho(
-                f"Successfully created semester for student {std_no}", fg="green"
-            )
+        # The success message is already shown by create_student_semester_for_request
     except Exception as e:
         click.secho(
             f"Failed to create semester for student {std_no}: {str(e)}", fg="red"
