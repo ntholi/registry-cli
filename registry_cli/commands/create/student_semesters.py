@@ -80,6 +80,9 @@ def create_student_semester_for_request(
             db, existing_semester, request, silent=True
         )
 
+        # Mark all requested modules as registered
+        _mark_requested_modules_as_registered(db, request)
+
         # Mark the registration request as registered if not already
         if request.status != "registered":
             request.status = "registered"
@@ -104,6 +107,9 @@ def create_student_semester_for_request(
     modules_created = _create_student_modules_for_semester(
         db, student_semester, request, silent=True
     )
+
+    # Mark all requested modules as registered
+    _mark_requested_modules_as_registered(db, request)
 
     # Mark the registration request as registered
     request.status = "registered"
@@ -189,6 +195,36 @@ def _create_student_modules_for_semester(
             )
 
     return modules_created
+
+
+def _mark_requested_modules_as_registered(
+    db: Session, request: RegistrationRequest
+) -> None:
+    """
+    Mark all requested modules associated with a registration request as registered.
+
+    Args:
+        db: Database session
+        request: RegistrationRequest containing requested modules to mark as registered
+    """
+    requested_modules = (
+        db.query(RequestedModule)
+        .filter(RequestedModule.registration_request_id == request.id)
+        .all()
+    )
+
+    modules_updated = 0
+    for requested_module in requested_modules:
+        if requested_module.status != "registered":
+            requested_module.status = "registered"
+            modules_updated += 1
+
+    if modules_updated > 0:
+        db.commit()
+        click.secho(
+            f"Marked {modules_updated} requested modules as registered for request {request.id}",
+            fg="green",
+        )
 
 
 def create_student_semesters_approved(db: Session) -> None:
