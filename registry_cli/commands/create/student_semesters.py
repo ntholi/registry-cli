@@ -6,6 +6,7 @@ from sqlalchemy import and_, func
 from sqlalchemy.orm import Session
 
 from registry_cli.models import (
+    Clearance,
     RegistrationClearance,
     RegistrationRequest,
     RequestedModule,
@@ -235,9 +236,10 @@ def create_student_semesters_approved(db: Session) -> None:
         .filter(
             RegistrationRequest.id.in_(
                 db.query(RegistrationClearance.registration_request_id)
+                .join(Clearance, RegistrationClearance.clearance_id == Clearance.id)
                 .filter(
-                    RegistrationClearance.department.in_(["finance", "library"]),
-                    RegistrationClearance.status == "approved",
+                    Clearance.department.in_(["finance", "library"]),
+                    Clearance.status == "approved",
                 )
                 .group_by(RegistrationClearance.registration_request_id)
                 .having(func.count(RegistrationClearance.registration_request_id) == 2)
@@ -280,9 +282,10 @@ def create_student_semester_by_student_number(db: Session, std_no: int) -> None:
         .filter(
             RegistrationRequest.id.in_(
                 db.query(RegistrationClearance.registration_request_id)
+                .join(Clearance, RegistrationClearance.clearance_id == Clearance.id)
                 .filter(
-                    RegistrationClearance.department.in_(["finance", "library"]),
-                    RegistrationClearance.status == "approved",
+                    Clearance.department.in_(["finance", "library"]),
+                    Clearance.status == "approved",
                 )
                 .group_by(RegistrationClearance.registration_request_id)
                 .having(func.count(RegistrationClearance.registration_request_id) == 2)

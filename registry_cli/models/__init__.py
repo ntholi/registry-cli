@@ -607,7 +607,7 @@ class RegistrationRequest(Base):
     requested_modules: Mapped[list["RequestedModule"]] = relationship(
         back_populates="registration_request", cascade="all, delete"
     )
-    clearances: Mapped[list["RegistrationClearance"]] = relationship(
+    registration_clearances: Mapped[list["RegistrationClearance"]] = relationship(
         back_populates="registration_request", cascade="all, delete"
     )
     sponsor: Mapped["Sponsor"] = relationship()
@@ -657,18 +657,15 @@ class RequestedModule(Base):
         )
 
 
-ClearanceRequestStatus = Literal["pending", "approved", "rejected"]
+ClearanceStatus = Literal["pending", "approved", "rejected"]
 
 
-class RegistrationClearance(Base):
-    __tablename__ = "registration_clearances"
+class Clearance(Base):
+    __tablename__ = "clearance"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    registration_request_id: Mapped[int] = mapped_column(
-        ForeignKey("registration_requests.id", ondelete="cascade"), nullable=False
-    )
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     department: Mapped[DashboardUser] = mapped_column(String, nullable=False)
-    status: Mapped[ClearanceRequestStatus] = mapped_column(
+    status: Mapped[ClearanceStatus] = mapped_column(
         String, nullable=False, default="pending"
     )
     message: Mapped[Optional[str]] = mapped_column(String)
@@ -679,37 +676,61 @@ class RegistrationClearance(Base):
     response_date: Mapped[Optional[int]] = mapped_column(Integer)
     created_at: Mapped[int] = mapped_column(Integer, nullable=False)
 
-    registration_request: Mapped["RegistrationRequest"] = relationship(
-        back_populates="clearances"
-    )
     responder: Mapped[Optional["User"]] = relationship()
+    registration_clearances: Mapped[list["RegistrationClearance"]] = relationship(
+        back_populates="clearance", cascade="all, delete"
+    )
+    audits: Mapped[list["ClearanceAudit"]] = relationship(
+        back_populates="clearance", cascade="all, delete"
+    )
+
+    def __repr__(self) -> str:
+        return f"<Clearance id={self.id!r} department={self.department!r} status={self.status!r}>"
+
+
+class RegistrationClearance(Base):
+    __tablename__ = "registration_clearance"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    registration_request_id: Mapped[int] = mapped_column(
+        ForeignKey("registration_requests.id", ondelete="cascade"), nullable=False
+    )
+    clearance_id: Mapped[int] = mapped_column(
+        ForeignKey("clearance.id", ondelete="cascade"), nullable=False
+    )
+    created_at: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    registration_request: Mapped["RegistrationRequest"] = relationship(
+        back_populates="registration_clearances"
+    )
+    clearance: Mapped["Clearance"] = relationship(
+        back_populates="registration_clearances"
+    )
 
     __table_args__ = (
         UniqueConstraint(
             "registration_request_id",
-            "department",
-            name="unique_registration_clearance",
+            "clearance_id",
+            name="registration_clearance_unique",
         ),
     )
 
     def __repr__(self) -> str:
         return (
             f"<RegistrationClearance id={self.id!r} registration_request_id={self.registration_request_id!r} "
-            f"department={self.department!r} status={self.status!r}>"
+            f"clearance_id={self.clearance_id!r}>"
         )
 
 
-class RegistrationClearanceAudit(Base):
-    __tablename__ = "registration_clearance_audit"
+class ClearanceAudit(Base):
+    __tablename__ = "clearance_audit"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    registration_clearance_id: Mapped[int] = mapped_column(
-        ForeignKey("registration_clearances.id", ondelete="cascade"), nullable=False
+    clearance_id: Mapped[int] = mapped_column(
+        ForeignKey("clearance.id", ondelete="cascade"), nullable=False
     )
-    previous_status: Mapped[Optional[RegistrationRequestStatus]] = mapped_column(String)
-    new_status: Mapped[RegistrationRequestStatus] = mapped_column(
-        String, nullable=False
-    )
+    previous_status: Mapped[Optional[ClearanceStatus]] = mapped_column(String)
+    new_status: Mapped[ClearanceStatus] = mapped_column(String, nullable=False)
     created_by: Mapped[str] = mapped_column(
         ForeignKey("users.id", ondelete="set null"), nullable=False
     )
@@ -719,13 +740,13 @@ class RegistrationClearanceAudit(Base):
     message: Mapped[Optional[str]] = mapped_column(String)
     modules: Mapped[list[str]] = mapped_column(JSON, default=lambda: [], nullable=False)
 
-    registration_clearance: Mapped["RegistrationClearance"] = relationship()
+    clearance: Mapped["Clearance"] = relationship(back_populates="audits")
     creator: Mapped["User"] = relationship(foreign_keys=[created_by])
 
     def __repr__(self) -> str:
         return (
-            f"<RegistrationClearanceAudit id={self.id!r} "
-            f"registration_clearance_id={self.registration_clearance_id!r} "
+            f"<ClearanceAudit id={self.id!r} "
+            f"clearance_id={self.clearance_id!r} "
             f"previous_status={self.previous_status!r} new_status={self.new_status!r}>"
         )
 

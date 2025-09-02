@@ -5,7 +5,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from registry_cli.commands.enroll.enrollment import enroll_student
-from registry_cli.models import RegistrationClearance, RegistrationRequest
+from registry_cli.models import Clearance, RegistrationClearance, RegistrationRequest
 
 
 def enroll_approved(db: Session) -> None:
@@ -15,9 +15,10 @@ def enroll_approved(db: Session) -> None:
         .filter(
             RegistrationRequest.id.in_(
                 db.query(RegistrationClearance.registration_request_id)
+                .join(Clearance, RegistrationClearance.clearance_id == Clearance.id)
                 .filter(
-                    RegistrationClearance.department.in_(["finance", "library"]),
-                    RegistrationClearance.status == "approved",
+                    Clearance.department.in_(["finance", "library"]),
+                    Clearance.status == "approved",
                 )
                 .group_by(RegistrationClearance.registration_request_id)
                 .having(func.count(RegistrationClearance.registration_request_id) == 2)

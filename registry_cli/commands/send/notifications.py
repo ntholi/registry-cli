@@ -4,7 +4,7 @@ import click
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
-from registry_cli.models import RegistrationClearance, Student, User
+from registry_cli.models import Clearance, RegistrationClearance, Student, User
 from registry_cli.utils.email_sender import EmailSender
 from registry_cli.utils.logging_config import get_logger
 
@@ -15,7 +15,7 @@ def send_notifications(db: Session) -> None:
     """
     Send email notifications to students whose registration clearance has been rejected.
 
-    This command finds all registration clearances with status 'rejected',
+    This command finds all clearances with status 'rejected',
     a non-empty message, and email_sent=False, then sends notifications
     to those students.
 
@@ -24,13 +24,13 @@ def send_notifications(db: Session) -> None:
     """
     try:
         pending_notifications = (
-            db.query(RegistrationClearance)
+            db.query(Clearance)
             .filter(
                 and_(
-                    RegistrationClearance.status == "rejected",
-                    RegistrationClearance.message.isnot(None),
-                    RegistrationClearance.message != "",
-                    RegistrationClearance.email_sent == False,
+                    Clearance.status == "rejected",
+                    Clearance.message.isnot(None),
+                    Clearance.message != "",
+                    Clearance.email_sent == False,
                 )
             )
             .all()
@@ -70,9 +70,23 @@ def send_notifications(db: Session) -> None:
 
 def process_individual_notification(
     db: Session,
-    clearance: RegistrationClearance,
+    clearance: Clearance,
 ) -> bool:
-    registration_request = clearance.registration_request
+    # Get the registration request through the RegistrationClearance mapping
+    registration_clearance = (
+        db.query(RegistrationClearance)
+        .filter(RegistrationClearance.clearance_id == clearance.id)
+        .first()
+    )
+
+    if not registration_clearance:
+        click.secho(
+            f"Error: Registration clearance mapping not found for clearance ID {clearance.id}",
+            fg="red",
+        )
+        return False
+
+    registration_request = registration_clearance.registration_request
     if not registration_request:
         click.secho(
             f"Error: Registration request not found for clearance ID {clearance.id}",
@@ -137,14 +151,14 @@ def process_individual_notification(
 
 
 def generate_rejection_email(
-    student: Student, clearance: RegistrationClearance, responder_name: str
+    student: Student, clearance: Clearance, responder_name: str
 ) -> tuple[str, str, str]:
     """
     Generate the email content for a rejected registration clearance.
 
     Args:
         student: Student object containing student details
-        clearance: RegistrationClearance object containing clearance details
+        clearance: Clearance object containing clearance details
         responder_name: Name of the staff member who responded to the request
 
     Returns:
