@@ -32,6 +32,10 @@ from registry_cli.commands.update.module_grades import create_module_grades
 from registry_cli.commands.update.module_refs import update_semester_module_refs
 from registry_cli.commands.update.student_module_refs import update_student_module_refs
 from registry_cli.commands.update.student_modules import update_student_modules
+from registry_cli.commands.update.student_semester import (
+    update_multiple_students_semester_numbers,
+    update_student_semester_number,
+)
 from registry_cli.commands.update.term_student_modules import (
     update_specific_students_modules,
     update_term_student_modules,
@@ -463,6 +467,48 @@ def update_student_module_refs_cmd(
     """
     db = get_db()
     update_student_module_refs(db, list(std_nos), term, module_name, new_sem_module_id)
+
+
+@update.command(name="semester-number")
+@click.argument("std_no", type=int)
+def update_semester_number_cmd(std_no: int) -> None:
+    """
+    Update a student's semester number and status based on their registered modules.
+
+    This command analyzes the modules in the student's latest registration request,
+    determines the semester number that most modules belong to, and updates both
+    the registration request and student semester accordingly.
+
+    It also updates the status - if most modules have a "Repeat" status (Repeat1, Repeat2, etc.)
+    then the status becomes "Repeat", otherwise it remains "Active".
+
+    STD_NO: Student number
+    """
+    db = get_db()
+    update_student_semester_number(db, std_no)
+
+
+@update.command(name="semester-numbers")
+@click.argument("std_nos", type=int, nargs=-1, required=True)
+@click.option(
+    "--reset",
+    is_flag=True,
+    help="Reset progress and start from beginning",
+)
+def update_semester_numbers_cmd(std_nos: tuple[int, ...], reset: bool) -> None:
+    """
+    Update semester numbers and statuses for multiple students based on their registered modules.
+
+    This command processes multiple students and for each:
+    1. Analyzes the modules in their latest registration request
+    2. Determines the semester number that most modules belong to
+    3. Updates both the registration request and student semester accordingly
+    4. Updates status based on majority of module statuses (Active vs Repeat)
+
+    STD_NOS: List of student numbers (space-separated)
+    """
+    db = get_db()
+    update_multiple_students_semester_numbers(db, list(std_nos), reset)
 
 
 @cli.group()
