@@ -129,7 +129,11 @@ def search_and_update_module_id(
                 click.echo(f"  Updating module: {current_module_info}")
 
                 success = _update_module_ref_on_website(
-                    browser, student_module.id, x_sem_module_id, student_module.status
+                    browser,
+                    student_module.id,
+                    x_sem_module_id,
+                    student_module.status,
+                    credits=semester_module.credits,
                 )
 
                 if success:
@@ -196,7 +200,11 @@ def _find_matching_student_modules(
 
 
 def _update_module_ref_on_website(
-    browser: Browser, std_module_id: int, new_sem_module_id: int, status: str
+    browser: Browser,
+    std_module_id: int,
+    new_sem_module_id: int,
+    status: str,
+    credits: float,
 ) -> bool:
     """
     Update the x_SemModuleID field on the website using r_stdmoduleedit.php.
@@ -206,6 +214,7 @@ def _update_module_ref_on_website(
         std_module_id: StudentModule ID to update
         new_sem_module_id: New SemesterModule ID to set
         status: Current status of the student module
+        credits: Credits of the new semester module
 
     Returns:
         bool: True if update was successful, False otherwise
@@ -229,6 +238,7 @@ def _update_module_ref_on_website(
         form_data["a_edit"] = "U"  # Update action
         form_data["x_SemModuleID"] = str(new_sem_module_id)
         form_data["x_StdModStatCode"] = status
+        form_data["x_StdModCredits"] = credits
         form_data["x_StdModFee"] = ""  # Clear fee field
 
         # Submit the form
