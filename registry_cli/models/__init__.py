@@ -2,12 +2,14 @@ from datetime import datetime
 from typing import Literal, Optional
 from uuid import uuid4
 
+from nanoid import generate
 from sqlalchemy import (
     JSON,
     Boolean,
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     UniqueConstraint,
@@ -25,16 +27,25 @@ DashboardUser = Literal[
 UserRole = Literal[
     "user", "student", "finance", "registry", "library", "resource", "academic", "admin"
 ]
+UserPosition = Literal[
+    "manager",
+    "program_leader",
+    "principal_lecturer",
+    "year_leader",
+    "lecturer",
+    "admin",
+]
 
 
 class User(Base):
     __tablename__ = "users"
 
     id: Mapped[str] = mapped_column(
-        String, primary_key=True, default=lambda: str(uuid4())
+        String, primary_key=True, default=lambda: generate()
     )
     name: Mapped[Optional[str]] = mapped_column(String)
     role: Mapped[UserRole] = mapped_column(String, default="user", nullable=False)
+    position: Mapped[Optional[UserPosition]] = mapped_column(String)
     email: Mapped[Optional[str]] = mapped_column(String, unique=True)
     email_verified: Mapped[Optional[datetime]] = mapped_column(DateTime)
     image: Mapped[Optional[str]] = mapped_column(String)
@@ -233,6 +244,7 @@ SemesterStatus = Literal[
     "Deleted",
     "DNR",
     "DroppedOut",
+    "Withdrawn",
     "Enrolled",
     "Exempted",
     "Inactive",
@@ -312,6 +324,8 @@ GradeType = Literal[
     "DNA",
     "PP",
     "DNS",
+    "EXP",
+    "NM",
 ]
 
 
@@ -345,6 +359,7 @@ class School(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     code: Mapped[str] = mapped_column(String, nullable=False, unique=True)
     name: Mapped[str] = mapped_column(String, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[int] = mapped_column(Integer, nullable=False)
 
     programs: Mapped[list["Program"]] = relationship(back_populates="school")
@@ -559,6 +574,27 @@ class SponsoredStudent(Base):
         ForeignKey("students.std_no", ondelete="cascade"), nullable=False
     )
     borrower_no: Mapped[Optional[str]] = mapped_column(String)
+    bank_name: Mapped[Optional[str]] = mapped_column(String)
+    account_number: Mapped[Optional[str]] = mapped_column(String)
+    confirmed: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
+    created_at: Mapped[int] = mapped_column(Integer, nullable=False)
+    updated_at: Mapped[Optional[int]] = mapped_column(Integer)
+
+    __table_args__ = (
+        UniqueConstraint("sponsor_id", "std_no", name="unique_sponsored_student"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<SponsoredStudent id={self.id!r} sponsor_id={self.sponsor_id!r} std_no={self.std_no!r}>"
+
+
+class SponsoredTerm(Base):
+    __tablename__ = "sponsored_terms"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    sponsored_student_id: Mapped[int] = mapped_column(
+        ForeignKey("sponsored_students.id", ondelete="cascade"), nullable=False
+    )
     term_id: Mapped[int] = mapped_column(
         ForeignKey("terms.id", ondelete="cascade"), nullable=False
     )
@@ -566,11 +602,13 @@ class SponsoredStudent(Base):
     updated_at: Mapped[Optional[int]] = mapped_column(Integer)
 
     __table_args__ = (
-        UniqueConstraint("std_no", "term_id", name="unique_sponsored_term"),
+        UniqueConstraint(
+            "sponsored_student_id", "term_id", name="unique_sponsored_term"
+        ),
     )
 
     def __repr__(self) -> str:
-        return f"<SponsoredStudent id={self.id!r} sponsor_id={self.sponsor_id!r} std_no={self.std_no!r}>"
+        return f"<SponsoredTerm id={self.id!r} sponsored_student_id={self.sponsored_student_id!r} term_id={self.term_id!r}>"
 
 
 RegistrationRequestStatus = Literal[
@@ -600,6 +638,7 @@ class RegistrationRequest(Base):
     semester_number: Mapped[int] = mapped_column(Integer, nullable=False)
     message: Mapped[Optional[str]] = mapped_column(String)
     mail_sent: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    count: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     created_at: Mapped[int] = mapped_column(Integer, nullable=False)
     updated_at: Mapped[Optional[int]] = mapped_column(Integer)
     date_approved: Mapped[Optional[int]] = mapped_column(Integer)
@@ -755,6 +794,10 @@ class AssignedModule(Base):
     __tablename__ = "assigned_modules"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    term_id: Mapped[int] = mapped_column(
+        ForeignKey("terms.id", ondelete="cascade"), nullable=False
+    )
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     user_id: Mapped[str] = mapped_column(
         ForeignKey("users.id", ondelete="cascade"), nullable=False
     )
@@ -890,3 +933,181 @@ class ModuleGrade(Base):
 
     def __repr__(self) -> str:
         return f"<ModuleGrade id={self.id!r} module_id={self.module_id!r} std_no={self.std_no!r} grade={self.grade!r}>"
+
+
+class GraduationRequest(Base):
+    __tablename__ = "graduation_requests"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    std_no: Mapped[int] = mapped_column(
+        ForeignKey("students.std_no", ondelete="cascade"), nullable=False, unique=True
+    )
+    information_confirmed: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
+    message: Mapped[Optional[str]] = mapped_column(String)
+    created_at: Mapped[int] = mapped_column(Integer, nullable=False)
+    updated_at: Mapped[Optional[int]] = mapped_column(Integer)
+
+    def __repr__(self) -> str:
+        return f"<GraduationRequest id={self.id!r} std_no={self.std_no!r}>"
+
+
+class GraduationClearance(Base):
+    __tablename__ = "graduation_clearance"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    graduation_request_id: Mapped[int] = mapped_column(
+        ForeignKey("graduation_requests.id", ondelete="cascade"), nullable=False
+    )
+    clearance_id: Mapped[int] = mapped_column(
+        ForeignKey("clearance.id", ondelete="cascade"), nullable=False
+    )
+    created_at: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("clearance_id", name="unique_graduation_clearance"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<GraduationClearance id={self.id!r} graduation_request_id={self.graduation_request_id!r}>"
+
+
+PaymentType = Literal["graduation_gown", "graduation_fee"]
+
+
+class PaymentReceipt(Base):
+    __tablename__ = "payment_receipts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    graduation_request_id: Mapped[int] = mapped_column(
+        ForeignKey("graduation_requests.id", ondelete="cascade"), nullable=False
+    )
+    payment_type: Mapped[PaymentType] = mapped_column(String, nullable=False)
+    receipt_no: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    created_at: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    def __repr__(self) -> str:
+        return f"<PaymentReceipt id={self.id!r} graduation_request_id={self.graduation_request_id!r} payment_type={self.payment_type!r}>"
+
+
+class StatementOfResultsPrint(Base):
+    __tablename__ = "statement_of_results_prints"
+
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: generate()
+    )
+    std_no: Mapped[int] = mapped_column(
+        ForeignKey("students.std_no", ondelete="cascade"), nullable=False
+    )
+    printed_by: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="set null"), nullable=False
+    )
+    student_name: Mapped[str] = mapped_column(String, nullable=False)
+    program_name: Mapped[str] = mapped_column(String, nullable=False)
+    total_credits: Mapped[int] = mapped_column(Integer, nullable=False)
+    total_modules: Mapped[int] = mapped_column(Integer, nullable=False)
+    cgpa: Mapped[Optional[float]] = mapped_column(Float)
+    classification: Mapped[Optional[str]] = mapped_column(String)
+    academic_status: Mapped[Optional[str]] = mapped_column(String)
+    graduation_date: Mapped[Optional[str]] = mapped_column(String)
+    printed_at: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    def __repr__(self) -> str:
+        return f"<StatementOfResultsPrint id={self.id!r} std_no={self.std_no!r}>"
+
+
+BlockedStatus = Literal["blocked", "unblocked"]
+
+
+class BlockedStudent(Base):
+    __tablename__ = "blocked_students"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    status: Mapped[BlockedStatus] = mapped_column(
+        String, nullable=False, default="blocked"
+    )
+    reason: Mapped[str] = mapped_column(String, nullable=False)
+    by_department: Mapped[DashboardUser] = mapped_column(String, nullable=False)
+    std_no: Mapped[int] = mapped_column(
+        ForeignKey("students.std_no", ondelete="cascade"), nullable=False
+    )
+    created_at: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    __table_args__ = (Index("blocked_students_std_no_idx", "std_no"),)
+
+    def __repr__(self) -> str:
+        return f"<BlockedStudent id={self.id!r} std_no={self.std_no!r} status={self.status!r}>"
+
+
+class StudentCardPrint(Base):
+    __tablename__ = "student_card_prints"
+
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: generate()
+    )
+    reference: Mapped[str] = mapped_column(
+        String, nullable=False, unique=True, default="Initial Print"
+    )
+    std_no: Mapped[int] = mapped_column(
+        ForeignKey("students.std_no", ondelete="cascade"), nullable=False
+    )
+    printed_by: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="set null"), nullable=False
+    )
+    created_at: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    def __repr__(self) -> str:
+        return f"<StudentCardPrint id={self.id!r} std_no={self.std_no!r}>"
+
+
+AssessmentMarksAuditAction = Literal["create", "update", "delete"]
+
+
+class AssessmentMarksAudit(Base):
+    __tablename__ = "assessment_marks_audit"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    assessment_mark_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("assessment_marks.id", ondelete="set null")
+    )
+    action: Mapped[AssessmentMarksAuditAction] = mapped_column(String, nullable=False)
+    previous_marks: Mapped[Optional[float]] = mapped_column(Float)
+    new_marks: Mapped[Optional[float]] = mapped_column(Float)
+    created_by: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="set null"), nullable=False
+    )
+    date: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    def __repr__(self) -> str:
+        return f"<AssessmentMarksAudit id={self.id!r} action={self.action!r}>"
+
+
+AssessmentsAuditAction = Literal["create", "update", "delete"]
+
+
+class AssessmentsAudit(Base):
+    __tablename__ = "assessments_audit"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    assessment_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("assessments.id", ondelete="set null")
+    )
+    action: Mapped[AssessmentsAuditAction] = mapped_column(String, nullable=False)
+    previous_assessment_number: Mapped[Optional[AssessmentNumber]] = mapped_column(
+        String
+    )
+    new_assessment_number: Mapped[Optional[AssessmentNumber]] = mapped_column(String)
+    previous_assessment_type: Mapped[Optional[str]] = mapped_column(String)
+    new_assessment_type: Mapped[Optional[str]] = mapped_column(String)
+    previous_total_marks: Mapped[Optional[float]] = mapped_column(Float)
+    new_total_marks: Mapped[Optional[float]] = mapped_column(Float)
+    previous_weight: Mapped[Optional[float]] = mapped_column(Float)
+    new_weight: Mapped[Optional[float]] = mapped_column(Float)
+    created_by: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="set null"), nullable=False
+    )
+    date: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    def __repr__(self) -> str:
+        return f"<AssessmentsAudit id={self.id!r} action={self.action!r}>"
