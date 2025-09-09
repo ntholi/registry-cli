@@ -475,33 +475,38 @@ def update_student_module_refs_cmd(
 
 
 @update.command(name="module-ids")
-@click.argument("term", type=str)
+@click.argument("semester_number", type=int)
 @click.argument("module_name", type=str)
 @click.argument("x_sem_module_id", type=int)
 @click.argument("std_nos", type=int, nargs=-1, required=True)
 def search_update_modules_cmd(
-    term: str, module_name: str, x_sem_module_id: int, std_nos: tuple[int, ...]
+    semester_number: int,
+    module_name: str,
+    x_sem_module_id: int,
+    std_nos: tuple[int, ...],
 ) -> None:
     """
     Search for a module by name and update x_SemModuleID for specified students.
 
     This command searches for modules matching the given name in the student's
     semester modules and updates the x_SemModuleID field in r_stdmoduleedit.php
-    for all specified students in the given term.
+    for all specified students in the given semester number.
 
     The command:
-    1. Finds each student's semester for the given term
+    1. Finds each student's semester for the given semester number
     2. Searches for modules matching the module name (case-insensitive partial match)
     3. Updates the x_SemModuleID field on the website and in the database
     4. Provides detailed progress and summary information
 
-    TERM: Academic term (e.g. 2025-02)
+    SEMESTER_NUMBER: Semester number (e.g. 1, 2, 3, 4)
     MODULE_NAME: Module name to search for (e.g. "Probability & Statistics")
     X_SEM_MODULE_ID: New semester module ID to assign
     STD_NOS: List of student numbers (space-separated)
     """
     db = get_db()
-    search_and_update_module_id(db, term, module_name, x_sem_module_id, list(std_nos))
+    search_and_update_module_id(
+        db, semester_number, module_name, x_sem_module_id, list(std_nos)
+    )
 
 
 @update.command(name="semester-number")

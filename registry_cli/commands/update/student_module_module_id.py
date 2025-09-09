@@ -16,7 +16,11 @@ from registry_cli.models import (
 
 
 def search_and_update_module_id(
-    db: Session, term: str, module_name: str, x_sem_module_id: int, std_nos: List[int]
+    db: Session,
+    semester_number: int,
+    module_name: str,
+    x_sem_module_id: int,
+    std_nos: List[int],
 ) -> None:
     """
     Search for a module by name and update x_SemModuleID for specified students.
@@ -24,11 +28,11 @@ def search_and_update_module_id(
     This command:
     1. Searches for a module matching the given name in r_stdmodulelist.php context
     2. Updates the x_SemModuleID in r_stdmoduleedit.php for each student
-    3. Processes all students in the provided list for the given term
+    3. Processes all students in the provided list for the given semester number
 
     Args:
         db: Database session
-        term: Academic term (e.g. 2025-02)
+        semester_number: Semester number (e.g. 1, 2, 3, 4)
         module_name: Module name to search for
         x_sem_module_id: New x_SemModuleID value to set
         std_nos: List of student numbers to update
@@ -36,7 +40,7 @@ def search_and_update_module_id(
     click.echo(
         f"Searching for module '{module_name}' and updating x_SemModuleID to {x_sem_module_id}"
     )
-    click.echo(f"Processing {len(std_nos)} students in term {term}")
+    click.echo(f"Processing {len(std_nos)} students in semester {semester_number}")
 
     # First verify the x_sem_module_id exists in the database
     semester_module = (
@@ -80,18 +84,19 @@ def search_and_update_module_id(
             skipped_count += 1
             continue
 
-        # Find student's semester for the given term
+        # Find student's semester for the given semester number
         semester = (
             db.query(StudentSemester)
             .filter(
                 StudentSemester.student_program_id == program.id,
-                StudentSemester.term == term,
+                StudentSemester.semester_number == semester_number,
             )
             .first()
         )
         if not semester:
             click.secho(
-                f"No semester found for student {std_no} in term {term}", fg="yellow"
+                f"No semester found for student {std_no} in semester {semester_number}",
+                fg="yellow",
             )
             skipped_count += 1
             continue
@@ -101,7 +106,7 @@ def search_and_update_module_id(
 
         if not student_modules:
             click.secho(
-                f"No modules matching '{module_name}' found for student {std_no} in term {term}",
+                f"No modules matching '{module_name}' found for student {std_no} in semester {semester_number}",
                 fg="yellow",
             )
             skipped_count += 1
