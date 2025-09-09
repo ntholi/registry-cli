@@ -30,6 +30,9 @@ from registry_cli.commands.send.proof import send_proof_registration
 from registry_cli.commands.update.marks import update_marks_from_excel
 from registry_cli.commands.update.module_grades import create_module_grades
 from registry_cli.commands.update.module_refs import update_semester_module_refs
+from registry_cli.commands.update.module_search_update import (
+    search_and_update_module_refs,
+)
 from registry_cli.commands.update.student_module_refs import update_student_module_refs
 from registry_cli.commands.update.student_modules import update_student_modules
 from registry_cli.commands.update.student_semester import (
@@ -45,8 +48,8 @@ from registry_cli.utils.logging_config import configure_from_env
 
 
 def get_db():
-    use_local = input("Choose environment (local/prod)? ").lower().strip() != "prod"
-    engine = get_engine(use_local)
+    # use_local = input("Choose environment (local/prod)? ").lower().strip() != "prod"
+    engine = get_engine()
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     db = SessionLocal()
     try:
@@ -467,6 +470,36 @@ def update_student_module_refs_cmd(
     """
     db = get_db()
     update_student_module_refs(db, list(std_nos), term, module_name, new_sem_module_id)
+
+
+@update.command(name="search-update-modules")
+@click.argument("term", type=str)
+@click.argument("module_name", type=str)
+@click.argument("x_sem_module_id", type=int)
+@click.argument("std_nos", type=int, nargs=-1, required=True)
+def search_update_modules_cmd(
+    term: str, module_name: str, x_sem_module_id: int, std_nos: tuple[int, ...]
+) -> None:
+    """
+    Search for a module by name and update x_SemModuleID for specified students.
+
+    This command searches for modules matching the given name in the student's
+    semester modules and updates the x_SemModuleID field in r_stdmoduleedit.php
+    for all specified students in the given term.
+
+    The command:
+    1. Finds each student's semester for the given term
+    2. Searches for modules matching the module name (case-insensitive partial match)
+    3. Updates the x_SemModuleID field on the website and in the database
+    4. Provides detailed progress and summary information
+
+    TERM: Academic term (e.g. 2025-02)
+    MODULE_NAME: Module name to search for (e.g. "Probability & Statistics")
+    X_SEM_MODULE_ID: New semester module ID to assign
+    STD_NOS: List of student numbers (space-separated)
+    """
+    db = get_db()
+    search_and_update_module_refs(db, term, module_name, x_sem_module_id, list(std_nos))
 
 
 @update.command(name="semester-number")
