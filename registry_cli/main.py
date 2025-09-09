@@ -30,8 +30,8 @@ from registry_cli.commands.send.proof import send_proof_registration
 from registry_cli.commands.update.marks import update_marks_from_excel
 from registry_cli.commands.update.module_grades import create_module_grades
 from registry_cli.commands.update.module_refs import update_semester_module_refs
-from registry_cli.commands.update.module_search_update import (
-    search_and_update_module_refs,
+from registry_cli.commands.update.student_module_module_id import (
+    search_and_update_module_id,
 )
 from registry_cli.commands.update.student_module_refs import update_student_module_refs
 from registry_cli.commands.update.student_modules import update_student_modules
@@ -474,7 +474,7 @@ def update_student_module_refs_cmd(
     update_student_module_refs(db, list(std_nos), term, module_name, new_sem_module_id)
 
 
-@update.command(name="search-update-modules")
+@update.command(name="module-ids")
 @click.argument("term", type=str)
 @click.argument("module_name", type=str)
 @click.argument("x_sem_module_id", type=int)
@@ -501,7 +501,7 @@ def search_update_modules_cmd(
     STD_NOS: List of student numbers (space-separated)
     """
     db = get_db()
-    search_and_update_module_refs(db, term, module_name, x_sem_module_id, list(std_nos))
+    search_and_update_module_id(db, term, module_name, x_sem_module_id, list(std_nos))
 
 
 @update.command(name="semester-number")

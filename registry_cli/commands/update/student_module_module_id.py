@@ -15,21 +15,17 @@ from registry_cli.models import (
 )
 
 
-def search_and_update_module_refs(
-    db: Session, 
-    term: str, 
-    module_name: str, 
-    x_sem_module_id: int, 
-    std_nos: List[int]
+def search_and_update_module_id(
+    db: Session, term: str, module_name: str, x_sem_module_id: int, std_nos: List[int]
 ) -> None:
     """
     Search for a module by name and update x_SemModuleID for specified students.
-    
+
     This command:
     1. Searches for a module matching the given name in r_stdmodulelist.php context
     2. Updates the x_SemModuleID in r_stdmoduleedit.php for each student
     3. Processes all students in the provided list for the given term
-    
+
     Args:
         db: Database session
         term: Academic term (e.g. 2025-02)
@@ -41,22 +37,27 @@ def search_and_update_module_refs(
         f"Searching for module '{module_name}' and updating x_SemModuleID to {x_sem_module_id}"
     )
     click.echo(f"Processing {len(std_nos)} students in term {term}")
-    
+
     # First verify the x_sem_module_id exists in the database
     semester_module = (
-        db.query(SemesterModule)
-        .filter(SemesterModule.id == x_sem_module_id)
-        .first()
+        db.query(SemesterModule).filter(SemesterModule.id == x_sem_module_id).first()
     )
-    
+
     if not semester_module:
-        click.secho(f"Error: SemesterModule with ID {x_sem_module_id} not found in database", fg="red")
+        click.secho(
+            f"Error: SemesterModule with ID {x_sem_module_id} not found in database",
+            fg="red",
+        )
         return
-    
+
     if semester_module.module:
-        click.echo(f"Target SemesterModule: {semester_module.module.code} - {semester_module.module.name}")
+        click.echo(
+            f"Target SemesterModule: {semester_module.module.code} - {semester_module.module.name}"
+        )
     else:
-        click.echo(f"Target SemesterModule ID: {x_sem_module_id} (no associated module)")
+        click.echo(
+            f"Target SemesterModule ID: {x_sem_module_id} (no associated module)"
+        )
 
     browser = Browser()
     updated_count = 0
@@ -107,7 +108,9 @@ def search_and_update_module_refs(
             continue
 
         total_modules += len(student_modules)
-        click.echo(f"Found {len(student_modules)} matching modules for student {std_no}")
+        click.echo(
+            f"Found {len(student_modules)} matching modules for student {std_no}"
+        )
 
         # Update each matching module
         for student_module in student_modules:
@@ -118,7 +121,7 @@ def search_and_update_module_refs(
                     .filter(SemesterModule.id == student_module.semester_module_id)
                     .first()
                 )
-                
+
                 current_module_info = "Unknown"
                 if current_sem_module and current_sem_module.module:
                     current_module_info = f"{current_sem_module.module.code} - {current_sem_module.module.name}"
@@ -158,7 +161,7 @@ def search_and_update_module_refs(
     db.commit()
 
     # Print summary
-    click.echo(f"\n" + "="*50)
+    click.echo(f"\n" + "=" * 50)
     click.echo(f"Update Summary:")
     click.echo(f"Total modules found: {total_modules}")
     click.secho(f"Successfully updated: {updated_count} modules", fg="green")
@@ -166,7 +169,7 @@ def search_and_update_module_refs(
         click.secho(f"Skipped students: {skipped_count}", fg="blue")
     if error_count > 0:
         click.secho(f"Errors: {error_count} modules", fg="red")
-    click.echo("="*50)
+    click.echo("=" * 50)
 
 
 def _find_matching_student_modules(
@@ -174,7 +177,7 @@ def _find_matching_student_modules(
 ) -> List[StudentModule]:
     """
     Find student modules that match the given module name.
-    
+
     Searches in the StudentModule -> SemesterModule -> Module chain.
     """
     # Search by module name using ILIKE for case-insensitive partial matching
@@ -188,7 +191,7 @@ def _find_matching_student_modules(
         )
         .all()
     )
-    
+
     return student_modules
 
 
@@ -197,13 +200,13 @@ def _update_module_ref_on_website(
 ) -> bool:
     """
     Update the x_SemModuleID field on the website using r_stdmoduleedit.php.
-    
+
     Args:
         browser: Browser instance for making requests
         std_module_id: StudentModule ID to update
         new_sem_module_id: New SemesterModule ID to set
         status: Current status of the student module
-        
+
     Returns:
         bool: True if update was successful, False otherwise
     """
@@ -257,5 +260,7 @@ def _update_module_ref_on_website(
             return False
 
     except Exception as e:
-        click.secho(f"Exception updating StudentModule {std_module_id}: {str(e)}", fg="red")
+        click.secho(
+            f"Exception updating StudentModule {std_module_id}: {str(e)}", fg="red"
+        )
         return False
