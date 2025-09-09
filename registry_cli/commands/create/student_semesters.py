@@ -2,7 +2,7 @@ import time
 from typing import Optional
 
 import click
-from sqlalchemy import and_, func
+from sqlalchemy import and_, func, text
 from sqlalchemy.orm import Session
 
 from registry_cli.models import (
@@ -19,7 +19,10 @@ from registry_cli.models import (
 
 
 def create_student_semester_for_request(
-    db: Session, request: RegistrationRequest
+    db: Session,
+    request: RegistrationRequest,
+    custom_id: Optional[int] = None,
+    custom_module_id_start: Optional[int] = None,
 ) -> Optional[StudentSemester]:
     """
     Create a StudentSemester record based on a RegistrationRequest.
@@ -27,6 +30,8 @@ def create_student_semester_for_request(
     Args:
         db: Database session
         request: RegistrationRequest to create semester for
+        custom_id: Optional custom ID to use for new StudentSemester records
+        custom_module_id_start: Optional starting ID for new StudentModule records
 
     Returns:
         Created StudentSemester or None if student/program not found
@@ -77,7 +82,7 @@ def create_student_semester_for_request(
             fg="yellow",
         )
         # Still create modules if they don't exist
-        modules_created = _create_student_modules_for_semester(
+        modules_created, _ = _create_student_modules_for_semester(
             db, existing_semester, request, silent=True
         )
 
@@ -101,12 +106,20 @@ def create_student_semester_for_request(
         created_at=int(time.time()),
     )
 
+    # Set custom ID if provided
+    if custom_id is not None:
+        student_semester.id = custom_id
+
     db.add(student_semester)
     db.commit()
 
     # Create StudentModule records for the requested modules
-    modules_created = _create_student_modules_for_semester(
-        db, student_semester, request, silent=True
+    modules_created, _ = _create_student_modules_for_semester(
+        db,
+        student_semester,
+        request,
+        silent=True,
+        custom_module_id_start=custom_module_id_start,
     )
 
     # Mark all requested modules as registered
@@ -131,7 +144,8 @@ def _create_student_modules_for_semester(
     student_semester: StudentSemester,
     request: RegistrationRequest,
     silent: bool = False,
-) -> int:
+    custom_module_id_start: Optional[int] = None,
+) -> tuple[int, int]:
     """
     Create StudentModule records for the requested modules in a semester.
 
@@ -140,9 +154,10 @@ def _create_student_modules_for_semester(
         student_semester: StudentSemester to create modules for
         request: RegistrationRequest containing requested modules
         silent: If True, suppress detailed output messages
+        custom_module_id_start: Optional starting ID for new StudentModule records
 
     Returns:
-        Number of modules created
+        Tuple of (number of modules created, next available custom ID)
     """
     requested_modules = (
         db.query(RequestedModule)
@@ -151,6 +166,8 @@ def _create_student_modules_for_semester(
     )
 
     modules_created = 0
+    current_custom_id = custom_module_id_start
+
     for requested_module in requested_modules:
         # Check if student module already exists
         existing_module = (
@@ -184,6 +201,11 @@ def _create_student_modules_for_semester(
             created_at=int(time.time()),
         )
 
+        # Set custom ID if provided
+        if current_custom_id is not None:
+            student_module.id = current_custom_id
+            current_custom_id += 1
+
         db.add(student_module)
         modules_created += 1
 
@@ -195,7 +217,7 @@ def _create_student_modules_for_semester(
                 fg="green",
             )
 
-    return modules_created
+    return modules_created, current_custom_id or 0
 
 
 def _mark_requested_modules_as_registered(
@@ -252,6 +274,23 @@ def create_student_semesters_approved(db: Session) -> None:
         click.secho("No approved requests found.", fg="red")
         return
 
+    # Get the current maximum ID and set up the custom ID counter
+    max_id_result = db.execute(text("SELECT MAX(id) FROM student_semesters"))
+    current_max_id = max_id_result.scalar() or 0
+    custom_id_counter = current_max_id + 5_000
+
+    # Get the current maximum ID for student_modules
+    max_module_id_result = db.execute(text("SELECT MAX(id) FROM student_modules"))
+    current_max_module_id = max_module_id_result.scalar() or 0
+    custom_module_id_counter = current_max_module_id + 20_000
+
+    click.echo(
+        f"Current max semester ID: {current_max_id}, starting new semester IDs from: {custom_id_counter}"
+    )
+    click.echo(
+        f"Current max module ID: {current_max_module_id}, starting new module IDs from: {custom_module_id_counter}"
+    )
+
     success_count = 0
     for i, request in enumerate(approved_requests):
         click.echo(
@@ -259,9 +298,20 @@ def create_student_semesters_approved(db: Session) -> None:
         )
 
         try:
-            student_semester = create_student_semester_for_request(db, request)
+            student_semester = create_student_semester_for_request(
+                db, request, custom_id_counter, custom_module_id_counter
+            )
             if student_semester:
                 success_count += 1
+                custom_id_counter += 1  # Increment for next semester record
+                # Update custom_module_id_counter based on modules created
+                # We need to calculate how many modules were created for this semester
+                requested_modules_count = (
+                    db.query(RequestedModule)
+                    .filter(RequestedModule.registration_request_id == request.id)
+                    .count()
+                )
+                custom_module_id_counter += requested_modules_count
         except Exception as e:
             click.secho(
                 f"Failed to create semester for student {request.std_no}: {str(e)}",
