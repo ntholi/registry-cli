@@ -260,10 +260,12 @@ def approved() -> None:
 
 
 @enroll.command(name="student")
-@click.argument("std_no", type=int)
-def enroll_student(std_no: int) -> None:
+@click.argument("std_nos", nargs=-1, type=int)
+def enroll_student(std_nos: tuple[int, ...]) -> None:
+    """Enroll one or more students by student number."""
     db = get_db()
-    enroll_by_student_number(db, std_no)
+    for std_no in std_nos:
+        enroll_by_student_number(db, std_no)
 
 
 @cli.group()

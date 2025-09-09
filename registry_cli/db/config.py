@@ -31,6 +31,7 @@ def _register_hrana_exit(engine: Engine) -> None:
 
 
 def get_engine(use_local: bool = False) -> Engine:
+    print("Using local database" if use_local else "Using production database")
     if use_local:
         engine = create_engine(
             "sqlite:///local.db",
@@ -42,7 +43,7 @@ def get_engine(use_local: bool = False) -> Engine:
         _register_hrana_exit(engine)
         return engine
     else:
-        # input("⚠️ Using Production database. Press Enter to continue...")
+        input("⚠️ Using Production database. Press Enter to continue...")
         if TURSO_DATABASE_URL and TURSO_AUTH_TOKEN:
             url = f"{TURSO_DATABASE_URL}?authToken={TURSO_AUTH_TOKEN}"
             engine = create_engine(

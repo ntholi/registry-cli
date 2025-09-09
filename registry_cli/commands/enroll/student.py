@@ -37,3 +37,9 @@ def enroll_by_student_number(db: Session, std_no: int) -> None:
         print(f"Successfully enrolled student {std_no}")
     except Exception as e:
         click.secho(f"Failed to enroll student {std_no}: {str(e)}", fg="red")
+
+
+def enroll_by_student_numbers(db: Session, std_nos: list[int]) -> None:
+    """Enroll multiple students by their student numbers."""
+    for std_no in std_nos:
+        enroll_by_student_number(db, std_no)

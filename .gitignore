@@ -176,7 +176,7 @@ cython_debug/
 registration_pdfs/
 local.zip
 /students_range_progress.json
-/db_backup_*
+*local*zip*
 /sample_pages
 term_update_progress_2025-02.json
 /term_update_progress_2025-02 copy.json
