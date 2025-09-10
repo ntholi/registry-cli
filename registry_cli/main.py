@@ -12,6 +12,10 @@ from registry_cli.commands.create.student_semesters import (
     create_student_semester_by_student_number,
     create_student_semesters_approved,
 )
+from registry_cli.commands.enroll.add_module import (
+    add_semester_module_by_code_to_student,
+    add_semester_module_to_student,
+)
 from registry_cli.commands.enroll.approved import enroll_approved
 from registry_cli.commands.enroll.student import enroll_by_student_number
 from registry_cli.commands.export.registrations import export_program_registrations
@@ -282,6 +286,32 @@ def enroll_student(std_nos: tuple[int, ...]) -> None:
     db = get_db()
     for std_no in std_nos:
         enroll_by_student_number(db, std_no)
+
+
+@enroll.command(name="add-module")
+@click.argument("std_no", type=int)
+@click.argument("term", type=str)
+@click.argument("semester_module_id", type=int)
+@click.option("--status", default="Add", help="Module status (default: Add)")
+def enroll_add_module(
+    std_no: int, term: str, semester_module_id: int, status: str
+) -> None:
+    """Add a semester module to a student's term."""
+    db = get_db()
+    add_semester_module_to_student(db, std_no, term, semester_module_id, status)
+
+
+@enroll.command(name="add-module-by-code")
+@click.argument("std_no", type=int)
+@click.argument("term", type=str)
+@click.argument("module_code", type=str)
+@click.option("--status", default="Add", help="Module status (default: Add)")
+def enroll_add_module_by_code(
+    std_no: int, term: str, module_code: str, status: str
+) -> None:
+    """Add a semester module to a student's term using module code."""
+    db = get_db()
+    add_semester_module_by_code_to_student(db, std_no, term, module_code, status)
 
 
 @cli.group()
