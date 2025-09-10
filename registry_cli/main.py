@@ -291,7 +291,9 @@ def enroll_student(std_nos: tuple[int, ...]) -> None:
 @click.argument("std_nos", nargs=-1, type=int, required=True)
 @click.argument("term", type=str)
 @click.argument("module_code", type=str)
-@click.option("--status", default="Add", help="Module status (default: Add)")
+@click.option(
+    "--status", default="Compulsory", help="Module status (default: Compulsory)"
+)
 def enroll_add_module_by_code(
     std_nos: tuple[int, ...], term: str, module_code: str, status: str
 ) -> None:

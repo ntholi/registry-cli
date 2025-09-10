@@ -1,3 +1,5 @@
+import time
+
 import click
 from bs4 import BeautifulSoup
 from sqlalchemy import and_
@@ -12,6 +14,7 @@ from registry_cli.models import (
     Structure,
     StructureSemester,
     Student,
+    StudentModule,
     StudentProgram,
     StudentSemester,
     Term,
@@ -181,14 +184,33 @@ def add_semester_module_to_single_student(
 
     click.echo(f"Adding module '{module_name}' to student {std_no} for term {term}")
 
+    # Check if module is already registered in the database
+    existing_student_module = (
+        db.query(StudentModule)
+        .filter(
+            and_(
+                StudentModule.student_semester_id == student_semester.id,
+                StudentModule.semester_module_id == semester_module_id,
+            )
+        )
+        .first()
+    )
+
+    if existing_student_module:
+        click.secho(
+            f"Module '{module_name}' is already registered for student {std_no}",
+            fg="yellow",
+        )
+        return
+
     # Use the crawler to add the module
     crawler = Crawler(db)
 
-    # Check if module is already registered
+    # Check if module is already registered on the web interface
     existing_modules = crawler.get_existing_modules(student_semester.id)
     if semester_module.module and semester_module.module.code in existing_modules:
         click.secho(
-            f"Module {semester_module.module.code} is already registered for this student",
+            f"Module {semester_module.module.code} is already registered for this student on the website",
             fg="yellow",
         )
         return
@@ -204,8 +226,21 @@ def add_semester_module_to_single_student(
         )
 
         if success:
+            # Add the module to the database as well
+            student_module = StudentModule(
+                semester_module_id=semester_module_id,
+                status=module_status,
+                marks="NM",  # Not Marked - default value
+                grade="NM",  # Not Marked - default value
+                student_semester_id=student_semester.id,
+                created_at=int(time.time()),
+            )
+
+            db.add(student_module)
+            db.commit()
+
             click.secho(
-                f"Successfully added module '{module_name}' to student {std_no}",
+                f"Successfully added module '{module_name}' to student {std_no} (both website and database)",
                 fg="green",
             )
         else:
