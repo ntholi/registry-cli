@@ -250,7 +250,7 @@ def _mark_requested_modules_as_registered(
         )
 
 
-def create_student_semesters_approved(db: Session) -> None:
+def create_student_semesters_approved(db: Session, use_custom_id: bool = False) -> None:
     """Create student semesters for all approved registration requests."""
     approved_requests = (
         db.query(RegistrationRequest)
@@ -274,22 +274,26 @@ def create_student_semesters_approved(db: Session) -> None:
         click.secho("No approved requests found.", fg="red")
         return
 
-    # Get the current maximum ID and set up the custom ID counter
-    max_id_result = db.execute(text("SELECT MAX(id) FROM student_semesters"))
-    current_max_id = max_id_result.scalar() or 0
-    custom_id_counter = current_max_id + 5_000
+    custom_id_counter = None
+    custom_module_id_counter = None
 
-    # Get the current maximum ID for student_modules
-    max_module_id_result = db.execute(text("SELECT MAX(id) FROM student_modules"))
-    current_max_module_id = max_module_id_result.scalar() or 0
-    custom_module_id_counter = current_max_module_id + 20_000
+    if use_custom_id:
+        # Get the current maximum ID and set up the custom ID counter
+        max_id_result = db.execute(text("SELECT MAX(id) FROM student_semesters"))
+        current_max_id = max_id_result.scalar() or 0
+        custom_id_counter = current_max_id + 5_000
 
-    click.echo(
-        f"Current max semester ID: {current_max_id}, starting new semester IDs from: {custom_id_counter}"
-    )
-    click.echo(
-        f"Current max module ID: {current_max_module_id}, starting new module IDs from: {custom_module_id_counter}"
-    )
+        # Get the current maximum ID for student_modules
+        max_module_id_result = db.execute(text("SELECT MAX(id) FROM student_modules"))
+        current_max_module_id = max_module_id_result.scalar() or 0
+        custom_module_id_counter = current_max_module_id + 20_000
+
+        click.echo(
+            f"Current max semester ID: {current_max_id}, starting new semester IDs from: {custom_id_counter}"
+        )
+        click.echo(
+            f"Current max module ID: {current_max_module_id}, starting new module IDs from: {custom_module_id_counter}"
+        )
 
     success_count = 0
     for i, request in enumerate(approved_requests):
@@ -303,15 +307,17 @@ def create_student_semesters_approved(db: Session) -> None:
             )
             if student_semester:
                 success_count += 1
-                custom_id_counter += 1  # Increment for next semester record
+                if use_custom_id and custom_id_counter is not None:
+                    custom_id_counter += 1  # Increment for next semester record
                 # Update custom_module_id_counter based on modules created
                 # We need to calculate how many modules were created for this semester
-                requested_modules_count = (
-                    db.query(RequestedModule)
-                    .filter(RequestedModule.registration_request_id == request.id)
-                    .count()
-                )
-                custom_module_id_counter += requested_modules_count
+                if use_custom_id and custom_module_id_counter is not None:
+                    requested_modules_count = (
+                        db.query(RequestedModule)
+                        .filter(RequestedModule.registration_request_id == request.id)
+                        .count()
+                    )
+                    custom_module_id_counter += requested_modules_count
         except Exception as e:
             click.secho(
                 f"Failed to create semester for student {request.std_no}: {str(e)}",
