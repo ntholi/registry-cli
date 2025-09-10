@@ -3,6 +3,9 @@ import time
 import click
 from sqlalchemy.orm import sessionmaker
 
+from registry_cli.commands.approve.academic_graduation import (
+    approve_academic_graduation,
+)
 from registry_cli.commands.approve.signups import approve_signups
 from registry_cli.commands.check.prerequisites import check_prerequisites
 from registry_cli.commands.create.student_semesters import (
@@ -231,6 +234,19 @@ def signups() -> None:
     except KeyboardInterrupt:
         print("\nStopping signup approval loop...")
         db.close()
+
+
+@approve.command(name="academic-graduation")
+def academic_graduation() -> None:
+    """
+    Approve pending academic clearance requests for graduation.
+
+    This command goes through all academic pending graduation requests and reviews
+    and approves them if they meet the academic requirements (no failed modules
+    that haven't been repeated and no required modules that were never attempted).
+    """
+    db = get_db()
+    approve_academic_graduation(db)
 
 
 @cli.command()
