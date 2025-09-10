@@ -21,6 +21,77 @@ from registry_cli.utils.logging_config import get_logger
 logger = get_logger(__name__)
 
 
+def add_semester_module_by_code_to_students(
+    db: Session,
+    std_nos: list[int],
+    term: str,
+    module_code: str,
+    module_status: str = "Add",
+) -> None:
+    """
+    Add a semester module to multiple students' terms using module code.
+
+    Args:
+        db: Database session
+        std_nos: List of student numbers
+        term: Term name (e.g., "2024-07")
+        module_code: Module code (e.g., "CS 101")
+        module_status: Status of the module (default: "Add")
+    """
+    # Find the module by code first
+    module = db.query(Module).filter(Module.code == module_code).first()
+    if not module:
+        click.secho(f"Module with code '{module_code}' not found", fg="red")
+        return
+
+    # Find all available semester modules for this module code
+    semester_modules = (
+        db.query(SemesterModule, StructureSemester, Structure, Program)
+        .join(Module, SemesterModule.module_id == Module.id)
+        .join(StructureSemester, SemesterModule.semester_id == StructureSemester.id)
+        .join(Structure, StructureSemester.structure_id == Structure.id)
+        .join(Program, Structure.program_id == Program.id)
+        .filter(
+            and_(Module.code == module_code, SemesterModule.semester_id.isnot(None))
+        )
+        .all()
+    )
+
+    if not semester_modules:
+        click.secho(f"No semester modules found for module '{module_code}'", fg="red")
+        return
+
+    # Select semester module once for all students
+    if len(semester_modules) == 1:
+        semester_module_id = semester_modules[0][0].id
+        click.echo(f"Using semester module ID {semester_module_id} for all students")
+    else:
+        click.echo(
+            f"Found {len(semester_modules)} semester modules for '{module_code}':"
+        )
+        for i, (sm, struct_sem, structure, program) in enumerate(semester_modules):
+            semester_name = struct_sem.name if struct_sem else "Unknown semester"
+            program_name = program.name if program else "Unknown program"
+            click.echo(
+                f"  {i+1}. ID: {sm.id}, Semester: {semester_name}, Credits: {sm.credits}, Program: {program_name}"
+            )
+
+        choice = click.prompt(
+            "Select semester module to use for all students (enter number)",
+            type=click.IntRange(1, len(semester_modules)),
+        )
+        semester_module_id = semester_modules[choice - 1][0].id
+
+    # Process each student with the selected semester module
+    for i, std_no in enumerate(std_nos):
+        click.echo(f"Processing student {i+1}/{len(std_nos)}: {std_no}")
+        add_semester_module_to_single_student(
+            db, std_no, term, semester_module_id, module_status
+        )
+        if i < len(std_nos) - 1:  # Don't add empty line after last student
+            click.echo()
+
+
 def add_semester_module_by_code_to_student(
     db: Session, std_no: int, term: str, module_code: str, module_status: str = "Add"
 ) -> None:
@@ -32,6 +103,29 @@ def add_semester_module_by_code_to_student(
         std_no: Student number
         term: Term name (e.g., "2024-07")
         module_code: Module code (e.g., "CS 101")
+        module_status: Status of the module (default: "Add")
+    """
+    # Use the multi-student function with a single student
+    add_semester_module_by_code_to_students(
+        db, [std_no], term, module_code, module_status
+    )
+
+
+def add_semester_module_to_single_student(
+    db: Session,
+    std_no: int,
+    term: str,
+    semester_module_id: int,
+    module_status: str = "Add",
+) -> None:
+    """
+    Add a specific semester module to a single student's term.
+
+    Args:
+        db: Database session
+        std_no: Student number
+        term: Term name (e.g., "2024-07")
+        semester_module_id: ID of the semester module to add
         module_status: Status of the module (default: "Add")
     """
     # Find the student and their program
@@ -55,55 +149,15 @@ def add_semester_module_by_code_to_student(
         click.secho(f"No active program found for student {std_no}", fg="red")
         return
 
-    # Find the module by code
-    module = db.query(Module).filter(Module.code == module_code).first()
-    if not module:
-        click.secho(f"Module with code '{module_code}' not found", fg="red")
-        return
-
-    # Find semester modules for this module in the student's structure
-    semester_modules = (
-        db.query(SemesterModule, StructureSemester, Structure, Program)
-        .join(Module, SemesterModule.module_id == Module.id)
-        .join(StructureSemester, SemesterModule.semester_id == StructureSemester.id)
-        .join(Structure, StructureSemester.structure_id == Structure.id)
-        .join(Program, Structure.program_id == Program.id)
-        .filter(
-            and_(Module.code == module_code, SemesterModule.semester_id.isnot(None))
-        )
-        .all()
+    # Find the semester module
+    semester_module = (
+        db.query(SemesterModule).filter(SemesterModule.id == semester_module_id).first()
     )
 
-    if not semester_modules:
-        click.secho(f"No semester modules found for module '{module_code}'", fg="red")
+    if not semester_module:
+        click.secho(f"Semester module {semester_module_id} not found", fg="red")
         return
 
-    if len(semester_modules) == 1:
-        # Only one option, use it
-        semester_module_id = semester_modules[0][
-            0
-        ].id  # First element is SemesterModule
-    else:
-        # Multiple options, let user choose
-        click.echo(
-            f"Found {len(semester_modules)} semester modules for '{module_code}':"
-        )
-        for i, (sm, struct_sem, structure, program) in enumerate(semester_modules):
-            semester_name = struct_sem.name if struct_sem else "Unknown semester"
-            program_name = program.name if program else "Unknown program"
-            click.echo(
-                f"  {i+1}. ID: {sm.id}, Semester: {semester_name}, Credits: {sm.credits}, Program: {program_name}"
-            )
-
-        choice = click.prompt(
-            "Select semester module (enter number)",
-            type=click.IntRange(1, len(semester_modules)),
-        )
-        semester_module_id = semester_modules[choice - 1][
-            0
-        ].id  # First element is SemesterModule
-
-    # Now add the module using the semester module ID
     # Find the student's semester for this term
     student_semester = (
         db.query(StudentSemester)
@@ -118,15 +172,6 @@ def add_semester_module_by_code_to_student(
 
     if not student_semester:
         click.secho(f"No semester found for student {std_no} in term {term}", fg="red")
-        return
-
-    # Find the semester module for final validation
-    semester_module = (
-        db.query(SemesterModule).filter(SemesterModule.id == semester_module_id).first()
-    )
-
-    if not semester_module:
-        click.secho(f"Semester module {semester_module_id} not found", fg="red")
         return
 
     # Get module details for logging
