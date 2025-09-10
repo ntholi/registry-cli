@@ -14,7 +14,6 @@ from registry_cli.commands.create.student_semesters import (
 )
 from registry_cli.commands.enroll.add_module import (
     add_semester_module_by_code_to_student,
-    add_semester_module_to_student,
 )
 from registry_cli.commands.enroll.approved import enroll_approved
 from registry_cli.commands.enroll.student import enroll_by_student_number
@@ -289,19 +288,6 @@ def enroll_student(std_nos: tuple[int, ...]) -> None:
 
 
 @enroll.command(name="add-module")
-@click.argument("std_no", type=int)
-@click.argument("term", type=str)
-@click.argument("semester_module_id", type=int)
-@click.option("--status", default="Add", help="Module status (default: Add)")
-def enroll_add_module(
-    std_no: int, term: str, semester_module_id: int, status: str
-) -> None:
-    """Add a semester module to a student's term."""
-    db = get_db()
-    add_semester_module_to_student(db, std_no, term, semester_module_id, status)
-
-
-@enroll.command(name="add-module-by-code")
 @click.argument("std_no", type=int)
 @click.argument("term", type=str)
 @click.argument("module_code", type=str)

@@ -21,122 +21,6 @@ from registry_cli.utils.logging_config import get_logger
 logger = get_logger(__name__)
 
 
-def add_semester_module_to_student(
-    db: Session,
-    std_no: int,
-    term: str,
-    semester_module_id: int,
-    module_status: str = "Add",
-) -> None:
-    """
-    Add a semester module to a student's term using the web interface.
-
-    Args:
-        db: Database session
-        std_no: Student number
-        term: Term name (e.g., "2024-07")
-        semester_module_id: ID of the semester module to add
-        module_status: Status of the module (default: "Add")
-    """
-    # Find the student
-    student = db.query(Student).filter(Student.std_no == std_no).first()
-    if not student:
-        click.secho(f"Student {std_no} not found", fg="red")
-        return
-
-    # Find the term
-    term_obj = db.query(Term).filter(Term.name == term).first()
-    if not term_obj:
-        click.secho(f"Term '{term}' not found", fg="red")
-        return
-
-    # Find the student's active program
-    student_program = (
-        db.query(StudentProgram)
-        .filter(
-            and_(
-                StudentProgram.std_no == std_no,
-                StudentProgram.status == "Active",
-            )
-        )
-        .first()
-    )
-
-    if not student_program:
-        click.secho(f"No active program found for student {std_no}", fg="red")
-        return
-
-    # Find the student's semester for this term
-    student_semester = (
-        db.query(StudentSemester)
-        .filter(
-            and_(
-                StudentSemester.student_program_id == student_program.id,
-                StudentSemester.term == term,
-            )
-        )
-        .first()
-    )
-
-    if not student_semester:
-        click.secho(f"No semester found for student {std_no} in term {term}", fg="red")
-        return
-
-    # Find the semester module
-    semester_module = (
-        db.query(SemesterModule).filter(SemesterModule.id == semester_module_id).first()
-    )
-
-    if not semester_module:
-        click.secho(f"Semester module {semester_module_id} not found", fg="red")
-        return
-
-    # Get module details for logging
-    module_name = "Unknown"
-    if semester_module.module:
-        module_name = f"{semester_module.module.code} - {semester_module.module.name}"
-
-    click.echo(f"Adding module '{module_name}' to student {std_no} for term {term}")
-
-    # Use the crawler to add the module
-    crawler = Crawler(db)
-
-    # Check if module is already registered
-    existing_modules = crawler.get_existing_modules(student_semester.id)
-    if semester_module.module and semester_module.module.code in existing_modules:
-        click.secho(
-            f"Module {semester_module.module.code} is already registered for this student",
-            fg="yellow",
-        )
-        return
-
-    try:
-        # Add the single module using the web interface
-        success = _add_single_module(
-            crawler,
-            student_semester.id,
-            semester_module_id,
-            module_status,
-            semester_module.credits,
-        )
-
-        if success:
-            click.secho(
-                f"Successfully added module '{module_name}' to student {std_no}",
-                fg="green",
-            )
-        else:
-            click.secho(
-                f"Failed to add module '{module_name}' to student {std_no}", fg="red"
-            )
-
-    except Exception as e:
-        click.secho(f"Error adding module: {str(e)}", fg="red")
-        logger.error(
-            f"Error adding module {semester_module_id} to student {std_no}: {str(e)}"
-        )
-
-
 def add_semester_module_by_code_to_student(
     db: Session, std_no: int, term: str, module_code: str, module_status: str = "Add"
 ) -> None:
@@ -220,7 +104,75 @@ def add_semester_module_by_code_to_student(
         ].id  # First element is SemesterModule
 
     # Now add the module using the semester module ID
-    add_semester_module_to_student(db, std_no, term, semester_module_id, module_status)
+    # Find the student's semester for this term
+    student_semester = (
+        db.query(StudentSemester)
+        .filter(
+            and_(
+                StudentSemester.student_program_id == student_program.id,
+                StudentSemester.term == term,
+            )
+        )
+        .first()
+    )
+
+    if not student_semester:
+        click.secho(f"No semester found for student {std_no} in term {term}", fg="red")
+        return
+
+    # Find the semester module for final validation
+    semester_module = (
+        db.query(SemesterModule).filter(SemesterModule.id == semester_module_id).first()
+    )
+
+    if not semester_module:
+        click.secho(f"Semester module {semester_module_id} not found", fg="red")
+        return
+
+    # Get module details for logging
+    module_name = "Unknown"
+    if semester_module.module:
+        module_name = f"{semester_module.module.code} - {semester_module.module.name}"
+
+    click.echo(f"Adding module '{module_name}' to student {std_no} for term {term}")
+
+    # Use the crawler to add the module
+    crawler = Crawler(db)
+
+    # Check if module is already registered
+    existing_modules = crawler.get_existing_modules(student_semester.id)
+    if semester_module.module and semester_module.module.code in existing_modules:
+        click.secho(
+            f"Module {semester_module.module.code} is already registered for this student",
+            fg="yellow",
+        )
+        return
+
+    try:
+        # Add the single module using the web interface
+        success = _add_single_module(
+            crawler,
+            student_semester.id,
+            semester_module_id,
+            module_status,
+            semester_module.credits,
+        )
+
+        if success:
+            click.secho(
+                f"Successfully added module '{module_name}' to student {std_no}",
+                fg="green",
+            )
+        else:
+            click.secho(
+                f"Failed to add module '{module_name}' to student {std_no}", fg="red"
+            )
+
+    except Exception as e:
+        click.secho(f"Error adding module: {str(e)}", fg="red")
+        logger.error(
+            f"Error adding module {semester_module_id} to student {std_no}: {str(e)}"
+        )
 
 
 def _add_single_module(
