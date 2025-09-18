@@ -479,7 +479,20 @@ def approve_academic_graduation(db: Session) -> None:
                 )
                 click.secho(f"    Reasons: {'; '.join(reasons)}", fg="yellow")
 
+            # Commit changes after processing each request
+            try:
+                db.commit()
+            except Exception as commit_error:
+                db.rollback()
+                click.secho(
+                    f"  ✗ Error saving changes for student {graduation_request.std_no}: {str(commit_error)}",
+                    fg="red",
+                )
+                failed_count += 1
+                continue
+
         except Exception as e:
+            db.rollback()
             click.secho(
                 f"  ✗ Error processing student {graduation_request.std_no}: {str(e)}",
                 fg="red",
@@ -487,17 +500,12 @@ def approve_academic_graduation(db: Session) -> None:
             failed_count += 1
             continue
 
-    # Commit all changes
-    try:
-        db.commit()
-        click.echo("\n" + "=" * 50)
-        click.secho(f"Processing complete!", fg="green")
-        click.secho(f"Approved: {approved_count}", fg="green")
-        click.secho(
-            f"Still pending: {len(pending_academic_requests) - approved_count - failed_count}",
-            fg="yellow",
-        )
-        click.secho(f"Failed: {failed_count}", fg="red")
-    except Exception as e:
-        db.rollback()
-        click.secho(f"Error committing changes: {str(e)}", fg="red")
+    # Final summary
+    click.echo("\n" + "=" * 50)
+    click.secho(f"Processing complete!", fg="green")
+    click.secho(f"Approved: {approved_count}", fg="green")
+    click.secho(
+        f"Still pending: {len(pending_academic_requests) - approved_count - failed_count}",
+        fg="yellow",
+    )
+    click.secho(f"Failed: {failed_count}", fg="red")

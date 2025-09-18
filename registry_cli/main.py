@@ -314,7 +314,15 @@ def create() -> None:
 def create_semesters_approved() -> None:
     """Create student semesters for all approved registration requests."""
     db = get_db()
-    create_student_semesters_approved(db)
+    try:
+        while True:
+            print("Running student semester creation for approved requests...")
+            create_student_semesters_approved(db)
+            print("Waiting 60 seconds before next iteration...")
+            time.sleep(60)
+    except KeyboardInterrupt:
+        print("\nStopping student semester creation loop...")
+        db.close()
 
 
 @create.command(name="student-semester")
