@@ -24,6 +24,7 @@ from registry_cli.models import (
     GraduationClearance,
     GraduationRequest,
     Program,
+    School,
     SemesterModule,
     Structure,
     Student,
@@ -157,17 +158,24 @@ def get_student_classification(db: Session, std_no: int) -> Optional[str]:
     return classification
 
 
-def export_graduating_students(db: Session) -> None:
+def export_graduating_students(
+    db: Session, additional_std_nos: Optional[List[int]] = None
+) -> None:
     """
     Export graduating students to Excel file.
 
     Graduating students are those who either:
     1. Have approved academic graduation clearances, OR
     2. Have active programs with semesters containing '2024-07' or '2025-02' terms
-       AND have no pending academic issues (using approve_academic_graduation logic)
+       AND have no pending academic issues (using approve_academic_graduation logic), OR
+    3. Are explicitly provided in additional_std_nos (bypassing the pending issues check)
 
-    The exported file includes: student number, name, program name, CGPA, classification, and criteria met.
+    The exported file includes: student number, name, program name, school name, CGPA, classification, and criteria met.
     CGPA and classification are calculated from student's module grades in their active program.
+
+    Args:
+        db: Database session
+        additional_std_nos: Optional list of student numbers to include without pending issues check
     """
     graduating_students = []
 
@@ -233,6 +241,16 @@ def export_graduating_students(db: Session) -> None:
 
     # Combine both sets of graduating students
     all_graduating_std_nos = approved_std_nos | qualifying_semester_std_nos
+
+    # Add additional student numbers if provided (these bypass pending issues check)
+    additional_std_nos_set = set()
+    if additional_std_nos:
+        additional_std_nos_set = set(additional_std_nos)
+        all_graduating_std_nos |= additional_std_nos_set
+        click.echo(
+            f"Additional student numbers provided: {len(additional_std_nos_set)}"
+        )
+
     click.echo(f"Total graduating students: {len(all_graduating_std_nos)}")
 
     if not all_graduating_std_nos:
@@ -252,11 +270,12 @@ def export_graduating_students(db: Session) -> None:
             if not student:
                 continue
 
-            # Get active program
+            # Get active program with school information
             active_program = (
                 db.query(StudentProgram)
                 .join(Structure, StudentProgram.structure_id == Structure.id)
                 .join(Program, Structure.program_id == Program.id)
+                .join(School, Program.school_id == School.id)
                 .filter(
                     and_(
                         StudentProgram.std_no == std_no,
@@ -275,6 +294,12 @@ def export_graduating_students(db: Session) -> None:
                 else "Unknown Program"
             )
 
+            school_name = (
+                active_program.structure.program.school.name
+                if active_program.structure and active_program.structure.program.school
+                else "Unknown School"
+            )
+
             cgpa, classification = calculate_cgpa_and_classification(db, std_no)
 
             # Determine graduation criteria met
@@ -283,11 +308,14 @@ def export_graduating_students(db: Session) -> None:
                 criteria_met.append("Approved Clearance")
             if std_no in qualifying_semester_std_nos:
                 criteria_met.append("2024-07/2025-02 + No Issues")
+            if std_no in additional_std_nos_set:
+                criteria_met.append("Provided List")
 
             graduating_students.append(
                 {
                     "student_number": std_no,
                     "student_name": student.name,
+                    "school_name": school_name,
                     "program_name": program_name,
                     "cgpa": cgpa if cgpa is not None else "N/A",
                     "classification": classification,
@@ -303,8 +331,16 @@ def export_graduating_students(db: Session) -> None:
         click.secho("No valid graduating students found after processing.", fg="yellow")
         return
 
-    # Sort students by student number
-    graduating_students.sort(key=lambda x: x["student_number"])
+    # Sort students by school name, program name, then CGPA (descending)
+    graduating_students.sort(
+        key=lambda x: (
+            x["school_name"],
+            x["program_name"],
+            -(
+                x["cgpa"] if isinstance(x["cgpa"], (int, float)) else 0
+            ),  # Negative for descending CGPA
+        )
+    )
 
     # Export to Excel
     output_dir = "exports"
@@ -316,13 +352,17 @@ def export_graduating_students(db: Session) -> None:
 
     wb = Workbook()
     ws = wb.active
-    if ws is not None:
+    if ws is None:
+        # This should never happen with a new workbook, but let's handle it
+        ws = wb.create_sheet("Graduating Students")
+    else:
         ws.title = "Graduating Students"
 
     # Set up headers
     headers = [
         "Student Number",
         "Student Name",
+        "School Name",
         "Program Name",
         "CGPA",
         "Classification",
@@ -343,10 +383,11 @@ def export_graduating_students(db: Session) -> None:
     for row, student in enumerate(graduating_students, 2):
         ws.cell(row=row, column=1, value=student["student_number"])
         ws.cell(row=row, column=2, value=student["student_name"])
-        ws.cell(row=row, column=3, value=student["program_name"])
-        ws.cell(row=row, column=4, value=student["cgpa"])
-        ws.cell(row=row, column=5, value=student["classification"])
-        ws.cell(row=row, column=6, value=student["criteria_met"])
+        ws.cell(row=row, column=3, value=student["school_name"])
+        ws.cell(row=row, column=4, value=student["program_name"])
+        ws.cell(row=row, column=5, value=student["cgpa"])
+        ws.cell(row=row, column=6, value=student["classification"])
+        ws.cell(row=row, column=7, value=student["criteria_met"])
 
     # Auto-size columns
     for col in range(1, len(headers) + 1):
@@ -375,13 +416,22 @@ def export_graduating_students(db: Session) -> None:
     click.echo(
         f"- Students with 2025 semesters and no issues: {len(qualifying_semester_std_nos)}"
     )
+    if additional_std_nos_set:
+        click.echo(f"- Students from provided list: {len(additional_std_nos_set)}")
     click.echo(
         f"- Students meeting both criteria: {len(approved_std_nos & qualifying_semester_std_nos)}"
     )
 
-    # Show breakdown by program
+    # Show breakdown by school
     from collections import Counter
 
+    school_counts = Counter(student["school_name"] for student in graduating_students)
+
+    click.echo(f"\nSchool breakdown:")
+    for school, count in school_counts.most_common():
+        click.echo(f"- {school}: {count} students")
+
+    # Show breakdown by program
     program_counts = Counter(student["program_name"] for student in graduating_students)
 
     click.echo(f"\nProgram breakdown:")

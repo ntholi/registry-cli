@@ -54,6 +54,66 @@ from registry_cli.db.config import get_engine
 from registry_cli.utils.logging_config import configure_from_env
 
 
+def read_student_numbers_from_file(file_path: str) -> list[int]:
+    """
+    Read student numbers from a file.
+
+    Supports:
+    - One student number per line
+    - Comma-separated numbers on one or multiple lines
+    - Space-separated numbers on one or multiple lines
+    - Mixed formats
+    - Empty lines (ignored)
+    - Comments starting with # (ignored)
+
+    Args:
+        file_path: Path to the file containing student numbers
+
+    Returns:
+        List of student numbers as integers
+
+    Raises:
+        ValueError: If file contains invalid student numbers
+        FileNotFoundError: If file doesn't exist
+    """
+    student_numbers = []
+
+    with open(file_path, "r", encoding="utf-8") as f:
+        for line_num, line in enumerate(f, 1):
+            # Strip whitespace and skip empty lines and comments
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+
+            # Split by comma, space, or tab
+            import re
+
+            numbers = re.split(r"[,\s\t]+", line)
+
+            for num_str in numbers:
+                num_str = num_str.strip()
+                if not num_str:
+                    continue
+
+                try:
+                    std_no = int(num_str)
+                    student_numbers.append(std_no)
+                except ValueError:
+                    raise ValueError(
+                        f"Invalid student number '{num_str}' on line {line_num} in {file_path}"
+                    )
+
+    # Remove duplicates while preserving order
+    seen = set()
+    unique_numbers = []
+    for num in student_numbers:
+        if num not in seen:
+            seen.add(num)
+            unique_numbers.append(num)
+
+    return unique_numbers
+
+
 def get_db():
     # use_local = input("Choose environment (local/prod)? ").lower().strip() != "prod"
     engine = get_engine()
@@ -629,22 +689,51 @@ def students_by_school() -> None:
 
 
 @export.command(name="graduating-students")
-def graduating_students() -> None:
+@click.argument("std_nos", nargs=-1, type=int)
+@click.option(
+    "--file",
+    "-f",
+    type=click.Path(exists=True, readable=True),
+    help="File containing student numbers (one per line or comma/space separated)",
+)
+def graduating_students(std_nos: tuple[int, ...], file: str) -> None:
     """Export graduating students to Excel file.
 
     Graduating students are those who either:
     1. Have approved academic graduation clearances, OR
     2. Have active programs with semesters containing '2024-07' or '2025-02' terms
-       AND have no pending academic issues (using approve_academic_graduation logic)
+       AND have no pending academic issues (using approve_academic_graduation logic), OR
+    3. Are explicitly provided as arguments or in a file (bypassing the pending issues check)
 
-    The exported file includes: student number, name, program name, CGPA, classification, and criteria met.
+    The exported file includes: student number, name, program name, school name, CGPA, classification, and criteria met.
     Classification is calculated based on CGPA using grade definitions:
     - Distinction: CGPA >= 3.5
     - Merit: CGPA >= 3.0
     - Pass: CGPA >= 2.0
+
+    The export is sorted by: school name, program name, then CGPA (descending).
+
+    STD_NOS: Optional list of student numbers to include (space-separated)
+
+    Examples:
+      registry-cli export graduating-students 901001234 901005678
+      registry-cli export graduating-students --file student_numbers.txt
     """
     db = get_db()
-    export_graduating_students(db)
+
+    # Combine student numbers from arguments and file
+    combined_std_nos = list(std_nos) if std_nos else []
+
+    if file:
+        try:
+            file_std_nos = read_student_numbers_from_file(file)
+            combined_std_nos.extend(file_std_nos)
+            click.echo(f"Loaded {len(file_std_nos)} student numbers from {file}")
+        except Exception as e:
+            click.secho(f"Error reading file {file}: {str(e)}", fg="red")
+            return
+
+    export_graduating_students(db, combined_std_nos if combined_std_nos else None)
 
 
 if __name__ == "__main__":
