@@ -5,6 +5,12 @@ import click
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
+from registry_cli.grade_definitions import is_failing_grade as grade_is_failing
+from registry_cli.grade_definitions import is_passing_grade as grade_is_passing
+from registry_cli.grade_definitions import (
+    is_supplementary_grade as grade_is_supplementary,
+)
+from registry_cli.grade_definitions import normalize_grade_symbol as normalize_grade
 from registry_cli.models import (
     Clearance,
     GradeType,
@@ -22,48 +28,68 @@ from registry_cli.models import (
 def normalize_grade_symbol(grade: str) -> str:
     """
     Normalize grade symbol by trimming and converting to uppercase.
+
+    Deprecated: Use normalize_grade from registry_cli.grade_definitions instead.
+    This function is kept for backward compatibility.
     """
-    return grade.strip().upper()
+    return normalize_grade(grade)
 
 
 def is_passing_grade(grade: str) -> bool:
     """
     Check if a grade is considered passing.
-    Based on the comprehensive grade system with points > 0.
-    """
-    normalized_grade = normalize_grade_symbol(grade)
+    Uses the comprehensive grade definitions system.
 
-    # Grades with points > 0 are considered passing
-    passing_grades = [
-        "A+",
-        "A",
-        "A-",
-        "B+",
-        "B",
-        "B-",
-        "C+",
-        "C",
-        "C-",
-        "PC",
-        "PX",
-        "AP",
-    ]
-    return normalized_grade in passing_grades
+    Args:
+        grade: The grade string to check
+
+    Returns:
+        True if the grade is passing, False otherwise
+    """
+    try:
+        normalized_grade = normalize_grade(grade)
+        return grade_is_passing(normalized_grade)
+    except ValueError:
+        # Invalid grade, consider as not passing
+        return False
 
 
 def is_failing_grade(grade: str) -> bool:
     """
     Check if a grade is considered failing.
+    Uses the comprehensive grade definitions system.
+
+    Args:
+        grade: The grade string to check
+
+    Returns:
+        True if the grade is failing, False otherwise
     """
-    failing_grades = ["F", "X", "GNS", "ANN", "FIN", "FX", "DNC", "DNA", "DNS"]
-    return normalize_grade_symbol(grade) in failing_grades
+    try:
+        normalized_grade = normalize_grade(grade)
+        return grade_is_failing(normalized_grade)
+    except ValueError:
+        # Invalid grade, consider as failing for safety
+        return True
 
 
 def is_supplementary_grade(grade: str) -> bool:
     """
     Check if a grade is supplementary (PP).
+    Uses the comprehensive grade definitions system.
+
+    Args:
+        grade: The grade string to check
+
+    Returns:
+        True if the grade is supplementary, False otherwise
     """
-    return normalize_grade_symbol(grade) == "PP"
+    try:
+        normalized_grade = normalize_grade(grade)
+        return grade_is_supplementary(normalized_grade)
+    except ValueError:
+        # Invalid grade, not supplementary
+        return False
 
 
 def is_failing_or_sup_grade(grade: str) -> bool:

@@ -6,6 +6,7 @@ import click
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
+from registry_cli.grade_definitions import get_grade_by_marks
 from registry_cli.models import Assessment, AssessmentMark, GradeType, ModuleGrade
 
 
@@ -57,29 +58,29 @@ def calculate_weighted_total(
 
 
 def calculate_grade(weighted_total: float) -> GradeType:
-    weighted_total = math.ceil(weighted_total)
-    if weighted_total >= 90:
-        return "A+"
-    elif weighted_total >= 85:
-        return "A"
-    elif weighted_total >= 80:
-        return "A-"
-    elif weighted_total >= 75:
-        return "B+"
-    elif weighted_total >= 70:
-        return "B"
-    elif weighted_total >= 65:
-        return "B-"
-    elif weighted_total >= 60:
-        return "C+"
-    elif weighted_total >= 55:
-        return "C"
-    elif weighted_total >= 50:
-        return "C-"
-    elif weighted_total >= 45:
-        return "PP"
-    else:
+    """
+    Calculate grade based on weighted total using the comprehensive grade definitions.
+
+    Args:
+        weighted_total: The calculated weighted total marks
+
+    Returns:
+        GradeType corresponding to the marks
+
+    Raises:
+        ValueError: If no grade can be determined for the given marks
+    """
+    # Round up the weighted total as was done previously
+    marks = math.ceil(weighted_total)
+
+    # Use the grade definitions to get the appropriate grade
+    grade = get_grade_by_marks(marks)
+
+    if grade is None:
+        # Fallback to F if no grade found (should not happen with current definitions)
         return "F"
+
+    return grade
 
 
 def create_module_grades(db: Session, verbose: bool = False) -> None:
