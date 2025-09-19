@@ -17,6 +17,7 @@ from registry_cli.commands.enroll.add_module import (
 )
 from registry_cli.commands.enroll.approved import enroll_approved
 from registry_cli.commands.enroll.student import enroll_by_student_number
+from registry_cli.commands.export.graduating_students import export_graduating_students
 from registry_cli.commands.export.registrations import export_program_registrations
 from registry_cli.commands.export.students import export_students_by_school
 from registry_cli.commands.pull.modules import modules_pull
@@ -625,6 +626,21 @@ def students_by_school() -> None:
     """Export registered students by school to Excel with separate sheets."""
     db = get_db()
     export_students_by_school(db)
+
+
+@export.command(name="graduating-students")
+def graduating_students() -> None:
+    """Export graduating students to Excel file.
+
+    Graduating students are those who either:
+    1. Have approved academic graduation clearances, OR
+    2. Have active programs with semesters containing '2024-07' or '2025-02' terms
+       AND have no pending academic issues (using approve_academic_graduation logic)
+
+    The exported file includes: student number, name, program name, classification, and criteria met.
+    """
+    db = get_db()
+    export_graduating_students(db)
 
 
 if __name__ == "__main__":
