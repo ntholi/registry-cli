@@ -316,6 +316,7 @@ GradeType = Literal[
     "AP",
     "X",
     "Def",
+    "DEF",
     "GNS",
     "ANN",
     "FIN",

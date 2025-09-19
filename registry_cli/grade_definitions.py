@@ -5,6 +5,7 @@ This module defines all grade types, their point values, descriptions, and mark 
 in a centralized location to replace hardcoded values throughout the application.
 """
 
+import re
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
@@ -34,37 +35,37 @@ GRADE_DEFINITIONS: List[GradeDefinition] = [
     GradeDefinition(
         grade="A+",
         points=4.0,
-        description="Pass with Distinction",
+        description="Distinction",
         marks_range=MarkRange(min=90, max=100),
     ),
     GradeDefinition(
         grade="A",
         points=4.0,
-        description="Pass with Distinction",
+        description="Distinction",
         marks_range=MarkRange(min=85, max=89),
     ),
     GradeDefinition(
         grade="A-",
         points=4.0,
-        description="Pass with Distinction",
+        description="Distinction",
         marks_range=MarkRange(min=80, max=84),
     ),
     GradeDefinition(
         grade="B+",
         points=3.67,
-        description="Pass with Merit",
+        description="Merit",
         marks_range=MarkRange(min=75, max=79),
     ),
     GradeDefinition(
         grade="B",
         points=3.33,
-        description="Pass with Merit",
+        description="Merit",
         marks_range=MarkRange(min=70, max=74),
     ),
     GradeDefinition(
         grade="B-",
         points=3.0,
-        description="Pass with Merit",
+        description="Merit",
         marks_range=MarkRange(min=65, max=69),
     ),
     GradeDefinition(
@@ -95,9 +96,7 @@ GRADE_DEFINITIONS: List[GradeDefinition] = [
         grade="F",
         points=0.0,
         description="Fail",
-        marks_range=MarkRange(
-            min=0, max=44
-        ),  # Note: F covers 0-44, not overlapping with PP
+        marks_range=MarkRange(min=0, max=49),  # Updated to match JS code
     ),
     GradeDefinition(
         grade="EXP",
@@ -126,6 +125,11 @@ GRADE_DEFINITIONS: List[GradeDefinition] = [
     ),
     GradeDefinition(
         grade="Def",
+        points=None,
+        description="Deferred",
+    ),
+    GradeDefinition(
+        grade="DEF",
         points=None,
         description="Deferred",
     ),
@@ -264,7 +268,7 @@ def is_passing_grade(grade: GradeType) -> bool:
 def is_failing_grade(grade: GradeType) -> bool:
     """
     Check if a grade is considered failing.
-    A grade is failing if it has points equal to 0.
+    Matches the JavaScript isFailingGrade function.
 
     Args:
         grade: The grade to check
@@ -272,8 +276,8 @@ def is_failing_grade(grade: GradeType) -> bool:
     Returns:
         True if the grade is failing, False otherwise
     """
-    points = get_grade_points(grade)
-    return points is not None and points == 0
+    failing_grades = ["F", "X", "GNS", "ANN", "FIN", "FX", "DNC", "DNA", "DNS"]
+    return normalize_grade_symbol(grade) in failing_grades
 
 
 def is_supplementary_grade(grade: GradeType) -> bool:
@@ -286,7 +290,21 @@ def is_supplementary_grade(grade: GradeType) -> bool:
     Returns:
         True if the grade is PP, False otherwise
     """
-    return grade == "PP"
+    return normalize_grade_symbol(grade) == "PP"
+
+
+def is_failing_or_supplementary_grade(grade: GradeType) -> bool:
+    """
+    Check if a grade is failing or supplementary.
+    Matches the JavaScript isFailingOrSupGrade function.
+
+    Args:
+        grade: The grade to check
+
+    Returns:
+        True if the grade is failing or supplementary, False otherwise
+    """
+    return is_failing_grade(grade) or is_supplementary_grade(grade)
 
 
 def is_no_points_grade(grade: GradeType) -> bool:
@@ -365,3 +383,178 @@ def normalize_grade_symbol(grade: str) -> GradeType:
         return normalized  # type: ignore
     else:
         raise ValueError(f"Invalid grade symbol: {normalized}")
+
+
+def normalize_module_name(name: str) -> str:
+    """
+    Normalize module name for comparison.
+    Matches the JavaScript normalizeModuleName function.
+    Handles roman numerals, ampersands, and standardizes spacing.
+    """
+    # Convert roman numerals to arabic numbers
+    roman_to_arabic = {
+        "i": "1",
+        "ii": "2",
+        "iii": "3",
+        "iv": "4",
+        "v": "5",
+        "vi": "6",
+        "vii": "7",
+        "viii": "8",
+        "ix": "9",
+        "x": "10",
+    }
+
+    # Normalize the name
+    normalized = name.strip().lower().replace("&", "and")
+
+    # Replace roman numerals with arabic numbers
+    for roman, arabic in roman_to_arabic.items():
+        pattern = r"\b" + roman + r"\b"
+        normalized = re.sub(pattern, arabic, normalized)
+
+    # Replace multiple spaces with single space and trim
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+
+    return normalized
+
+
+@dataclass
+class GradePoint:
+    """Represents grade point information for a semester."""
+
+    semester_id: int
+    gpa: float
+    cgpa: float
+    credits_attempted: float
+    credits_completed: float
+
+
+@dataclass
+class SemesterSummary:
+    """Summary of a semester's modules and calculations."""
+
+    points: float
+    credits_attempted: float
+    credits_completed: float
+    gpa: float
+    is_no_marks: bool
+
+
+def calculate_gpa(points: float, credits_for_gpa: float) -> float:
+    """
+    Calculate GPA from points and credits.
+    Matches the JavaScript calculateGPA function.
+    """
+    return points / credits_for_gpa if credits_for_gpa > 0 else 0.0
+
+
+def summarize_modules(modules: List[Dict]) -> SemesterSummary:
+    """
+    Summarize modules for GPA calculation.
+    Matches the JavaScript summarizeModules function.
+
+    Args:
+        modules: List of student module dictionaries with keys:
+                - grade: Grade symbol
+                - status: Module status
+                - credits: Module credits (from semester_module)
+
+    Returns:
+        SemesterSummary with calculated values
+    """
+    # Filter out deleted/dropped modules
+    relevant = [m for m in modules if m.get("status", "") not in ["Delete", "Drop"]]
+
+    points = 0.0
+    credits_attempted = 0.0
+    credits_for_gpa = 0.0
+
+    # Calculate credits completed (modules with passing grades)
+    credits_completed = 0.0
+    for m in relevant:
+        normalized_grade = normalize_grade_symbol(m.get("grade", ""))
+        if normalized_grade not in ["NM", ""] and is_passing_grade(normalized_grade):
+            credits_completed += m.get("credits", 0.0)
+
+    # Calculate points and credits
+    for m in relevant:
+        grade = m.get("grade", "")
+        credits = m.get("credits", 0.0)
+
+        if not grade:
+            continue
+
+        try:
+            normalized_grade = normalize_grade_symbol(grade)
+        except ValueError:
+            continue
+
+        credits_attempted += credits
+
+        # Only include in GPA calculation if grade is not NM (No Mark)
+        if normalized_grade not in ["NM", ""]:
+            credits_for_gpa += credits
+            grade_points = get_grade_points(normalized_grade)
+            if grade_points is not None:
+                points += grade_points * credits
+
+    gpa = calculate_gpa(points, credits_for_gpa)
+
+    return SemesterSummary(
+        points=points,
+        credits_attempted=credits_attempted,
+        credits_completed=credits_completed,
+        gpa=gpa,
+        is_no_marks=any(m.get("grade", "") == "NM" for m in relevant),
+    )
+
+
+def calculate_cgpa_from_semesters(
+    semesters_data: List[Dict],
+) -> Tuple[List[GradePoint], float]:
+    """
+    Calculate CGPA from multiple semesters.
+    Returns list of GradePoint objects and final CGPA.
+
+    Args:
+        semesters_data: List of semester dictionaries with keys:
+                      - id: Semester ID
+                      - modules: List of module dictionaries
+
+    Returns:
+        Tuple of (grade_points_list, final_cgpa)
+    """
+    points = []
+    cumulative_points = 0.0
+    cumulative_credits_for_gpa = 0.0
+
+    for semester in semesters_data:
+        semester_modules = semester.get("modules", [])
+        semester_summary = summarize_modules(semester_modules)
+
+        cumulative_points += semester_summary.points
+
+        # Calculate semester credits for GPA (excluding NM grades)
+        semester_credits_for_gpa = sum(
+            m.get("credits", 0.0)
+            for m in semester_modules
+            if m.get("status", "") not in ["Delete", "Drop"]
+            and m.get("grade", "") not in ["", "NM"]
+        )
+
+        cumulative_credits_for_gpa += semester_credits_for_gpa
+        cgpa = calculate_gpa(cumulative_points, cumulative_credits_for_gpa)
+
+        points.append(
+            GradePoint(
+                semester_id=semester.get("id", 0),
+                gpa=semester_summary.gpa,
+                cgpa=cgpa,
+                credits_attempted=semester_summary.credits_attempted,
+                credits_completed=semester_summary.credits_completed,
+            )
+        )
+
+    final_cgpa = points[-1].cgpa if points else 0.0
+    return points, final_cgpa

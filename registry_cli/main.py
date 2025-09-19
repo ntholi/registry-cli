@@ -637,7 +637,11 @@ def graduating_students() -> None:
     2. Have active programs with semesters containing '2024-07' or '2025-02' terms
        AND have no pending academic issues (using approve_academic_graduation logic)
 
-    The exported file includes: student number, name, program name, classification, and criteria met.
+    The exported file includes: student number, name, program name, CGPA, classification, and criteria met.
+    Classification is calculated based on CGPA using grade definitions:
+    - Distinction: CGPA >= 3.5
+    - Merit: CGPA >= 3.0
+    - Pass: CGPA >= 2.0
     """
     db = get_db()
     export_graduating_students(db)

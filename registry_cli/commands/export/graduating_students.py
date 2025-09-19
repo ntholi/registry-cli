@@ -1,6 +1,6 @@
 import os
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import click
 from openpyxl import Workbook
@@ -13,14 +13,21 @@ from registry_cli.commands.approve.academic_graduation import (
     get_outstanding_from_structure,
     get_student_programs,
 )
+from registry_cli.grade_definitions import (
+    calculate_cgpa_from_semesters,
+    get_grade_points,
+    is_passing_grade,
+    normalize_grade_symbol,
+)
 from registry_cli.models import (
     Clearance,
     GraduationClearance,
     GraduationRequest,
     Program,
-    StatementOfResultsPrint,
+    SemesterModule,
     Structure,
     Student,
+    StudentModule,
     StudentProgram,
     StudentSemester,
 )
@@ -49,20 +56,105 @@ def has_no_pending_issues(db: Session, std_no: int) -> bool:
         return False
 
 
+def calculate_cgpa_and_classification(
+    db: Session, std_no: int
+) -> Tuple[Optional[float], str]:
+    """
+    Calculate CGPA and determine classification for a student based on their active program.
+    Uses the same logic as the JavaScript implementation.
+
+    Returns:
+        Tuple of (CGPA, Classification)
+    """
+    try:
+        # Get active program
+        active_program = (
+            db.query(StudentProgram)
+            .filter(
+                and_(StudentProgram.std_no == std_no, StudentProgram.status == "Active")
+            )
+            .first()
+        )
+
+        if not active_program:
+            return None, "No Active Program"
+
+        # Get all semesters for the active program (excluding deleted/deferred/etc)
+        semesters = (
+            db.query(StudentSemester)
+            .filter(StudentSemester.student_program_id == active_program.id)
+            .filter(
+                StudentSemester.status.notin_(
+                    ["Deleted", "Deferred", "DroppedOut", "Withdrawn"]
+                )
+            )
+            .order_by(StudentSemester.id)
+            .all()
+        )
+
+        if not semesters:
+            return None, "No Semesters Found"
+
+        # Prepare semester data for CGPA calculation
+        semesters_data = []
+        for semester in semesters:
+            # Get all student modules for this semester (excluding Delete/Drop status)
+            modules = (
+                db.query(StudentModule, SemesterModule.credits)
+                .join(
+                    SemesterModule,
+                    StudentModule.semester_module_id == SemesterModule.id,
+                )
+                .filter(StudentModule.student_semester_id == semester.id)
+                .filter(StudentModule.status.notin_(["Delete", "Drop"]))
+                .all()
+            )
+
+            modules_data = []
+            for student_module, credits in modules:
+                grade = student_module.grade or ""
+
+                modules_data.append(
+                    {
+                        "grade": grade,
+                        "status": student_module.status,
+                        "credits": float(credits),
+                    }
+                )
+
+            semesters_data.append({"id": semester.id, "modules": modules_data})
+
+        # Calculate CGPA using the comprehensive calculation
+        grade_points, final_cgpa = calculate_cgpa_from_semesters(semesters_data)
+
+        if final_cgpa == 0:
+            return None, "No Valid Grades"
+
+        # Determine classification based on CGPA using grade descriptions
+        if final_cgpa >= 3.5:  # A+, A, A- range (Pass with Distinction)
+            classification = "Distinction"
+        elif final_cgpa >= 3.0:  # B+, B, B- range (Pass with Merit)
+            classification = "Merit"
+        elif final_cgpa >= 1.7:  # C+, C, C- range (Pass)
+            classification = "Pass"
+        else:
+            classification = "Failed"
+
+        return round(final_cgpa, 2), classification
+
+    except Exception as e:
+        click.echo(f"Error calculating CGPA for student {std_no}: {str(e)}")
+        return None, "Calculation Error"
+
+
 def get_student_classification(db: Session, std_no: int) -> Optional[str]:
     """
-    Get the student's classification from the most recent statement of results print.
-    """
-    statement = (
-        db.query(StatementOfResultsPrint)
-        .filter(StatementOfResultsPrint.std_no == std_no)
-        .order_by(StatementOfResultsPrint.printed_at.desc())
-        .first()
-    )
+    Get the student's classification based on CGPA calculation.
 
-    if statement:
-        return statement.classification
-    return None
+    Deprecated: Use calculate_cgpa_and_classification instead.
+    """
+    _, classification = calculate_cgpa_and_classification(db, std_no)
+    return classification
 
 
 def export_graduating_students(db: Session) -> None:
@@ -73,6 +165,9 @@ def export_graduating_students(db: Session) -> None:
     1. Have approved academic graduation clearances, OR
     2. Have active programs with semesters containing '2024-07' or '2025-02' terms
        AND have no pending academic issues (using approve_academic_graduation logic)
+
+    The exported file includes: student number, name, program name, CGPA, classification, and criteria met.
+    CGPA and classification are calculated from student's module grades in their active program.
     """
     graduating_students = []
 
@@ -179,21 +274,23 @@ def export_graduating_students(db: Session) -> None:
                 if active_program.structure
                 else "Unknown Program"
             )
-            classification = get_student_classification(db, std_no)
+
+            cgpa, classification = calculate_cgpa_and_classification(db, std_no)
 
             # Determine graduation criteria met
             criteria_met = []
             if std_no in approved_std_nos:
                 criteria_met.append("Approved Clearance")
             if std_no in qualifying_semester_std_nos:
-                criteria_met.append("2025 Semester + No Issues")
+                criteria_met.append("2024-07/2025-02 + No Issues")
 
             graduating_students.append(
                 {
                     "student_number": std_no,
                     "student_name": student.name,
                     "program_name": program_name,
-                    "classification": classification or "Not Available",
+                    "cgpa": cgpa if cgpa is not None else "N/A",
+                    "classification": classification,
                     "criteria_met": " & ".join(criteria_met),
                 }
             )
@@ -219,13 +316,15 @@ def export_graduating_students(db: Session) -> None:
 
     wb = Workbook()
     ws = wb.active
-    ws.title = "Graduating Students"
+    if ws is not None:
+        ws.title = "Graduating Students"
 
     # Set up headers
     headers = [
         "Student Number",
         "Student Name",
         "Program Name",
+        "CGPA",
         "Classification",
         "Criteria Met",
     ]
@@ -245,8 +344,9 @@ def export_graduating_students(db: Session) -> None:
         ws.cell(row=row, column=1, value=student["student_number"])
         ws.cell(row=row, column=2, value=student["student_name"])
         ws.cell(row=row, column=3, value=student["program_name"])
-        ws.cell(row=row, column=4, value=student["classification"])
-        ws.cell(row=row, column=5, value=student["criteria_met"])
+        ws.cell(row=row, column=4, value=student["cgpa"])
+        ws.cell(row=row, column=5, value=student["classification"])
+        ws.cell(row=row, column=6, value=student["criteria_met"])
 
     # Auto-size columns
     for col in range(1, len(headers) + 1):
