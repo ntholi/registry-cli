@@ -30,7 +30,7 @@ def _register_hrana_exit(engine: Engine) -> None:
             sys.exit(1)
 
 
-def get_engine(use_local: bool = True) -> Engine:
+def get_engine(use_local: bool = False) -> Engine:
     print("Using local database" if use_local else "Using production database")
     if use_local:
         engine = create_engine(

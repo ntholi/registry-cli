@@ -940,8 +940,10 @@ class GraduationRequest(Base):
     __tablename__ = "graduation_requests"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    std_no: Mapped[int] = mapped_column(
-        ForeignKey("students.std_no", ondelete="cascade"), nullable=False, unique=True
+    student_program_id: Mapped[int] = mapped_column(
+        ForeignKey("student_programs.id", ondelete="cascade"),
+        nullable=False,
+        unique=True,
     )
     information_confirmed: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False
@@ -950,8 +952,10 @@ class GraduationRequest(Base):
     created_at: Mapped[int] = mapped_column(Integer, nullable=False)
     updated_at: Mapped[Optional[int]] = mapped_column(Integer)
 
+    student_program: Mapped["StudentProgram"] = relationship()
+
     def __repr__(self) -> str:
-        return f"<GraduationRequest id={self.id!r} std_no={self.std_no!r}>"
+        return f"<GraduationRequest id={self.id!r} student_program_id={self.student_program_id!r}>"
 
 
 class GraduationClearance(Base):

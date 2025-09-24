@@ -183,7 +183,11 @@ def export_graduating_students(
     click.echo("Finding students with approved academic graduation clearances...")
 
     approved_graduation_students = (
-        db.query(GraduationRequest.std_no)
+        db.query(StudentProgram.std_no)
+        .join(
+            GraduationRequest,
+            StudentProgram.id == GraduationRequest.student_program_id,
+        )
         .join(
             GraduationClearance,
             GraduationRequest.id == GraduationClearance.graduation_request_id,

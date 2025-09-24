@@ -326,11 +326,20 @@ def get_outstanding_from_structure(
 
 
 def process_academic_clearance(
-    db: Session, graduation_request_id: int, std_no: int
+    db: Session, graduation_request_id: int, student_program_id: int
 ) -> None:
     """
     Process academic clearance for a graduation request.
     """
+    # Get the student program to extract std_no
+    student_program = (
+        db.query(StudentProgram).filter(StudentProgram.id == student_program_id).first()
+    )
+
+    if not student_program:
+        raise Exception("Student program not found")
+
+    std_no = student_program.std_no
     programs = get_student_programs(db, std_no)
     if not programs:
         raise Exception("Student not found")
@@ -393,7 +402,11 @@ def approve_academic_graduation(db: Session) -> None:
     """
     # Find all graduation requests that have pending academic clearances
     pending_academic_requests = (
-        db.query(GraduationRequest)
+        db.query(GraduationRequest, StudentProgram.std_no)
+        .join(
+            StudentProgram,
+            GraduationRequest.student_program_id == StudentProgram.id,
+        )
         .join(
             GraduationClearance,
             GraduationRequest.id == GraduationClearance.graduation_request_id,
@@ -415,9 +428,9 @@ def approve_academic_graduation(db: Session) -> None:
     approved_count = 0
     failed_count = 0
 
-    for i, graduation_request in enumerate(pending_academic_requests, 1):
+    for i, (graduation_request, std_no) in enumerate(pending_academic_requests, 1):
         click.echo(
-            f"\nProcessing {i}/{len(pending_academic_requests)}: Student {graduation_request.std_no}"
+            f"\nProcessing {i}/{len(pending_academic_requests)}: Student {std_no}"
         )
 
         try:
@@ -447,10 +460,10 @@ def approve_academic_graduation(db: Session) -> None:
                 continue
 
             # Get student programs and check academic requirements
-            programs = get_student_programs(db, graduation_request.std_no)
+            programs = get_student_programs(db, std_no)
             if not programs:
                 click.secho(
-                    f"  ✗ No programs found for student {graduation_request.std_no}",
+                    f"  ✗ No programs found for student {std_no}",
                     fg="red",
                 )
                 failed_count += 1
@@ -469,7 +482,7 @@ def approve_academic_graduation(db: Session) -> None:
                 academic_clearance.response_date = int(time.time())
 
                 click.secho(
-                    f"  ✓ Approved academic clearance for student {graduation_request.std_no}",
+                    f"  ✓ Approved academic clearance for student {std_no}",
                     fg="green",
                 )
                 approved_count += 1
@@ -500,7 +513,7 @@ def approve_academic_graduation(db: Session) -> None:
                 academic_clearance.message = f"Academic requirements not met. {'; '.join(reasons)}. Please ensure all program modules are completed successfully before applying for graduation."
 
                 click.secho(
-                    f"  ⚠ Academic requirements not met for student {graduation_request.std_no}",
+                    f"  ⚠ Academic requirements not met for student {std_no}",
                     fg="yellow",
                 )
                 click.secho(f"    Reasons: {'; '.join(reasons)}", fg="yellow")
@@ -511,7 +524,7 @@ def approve_academic_graduation(db: Session) -> None:
             except Exception as commit_error:
                 db.rollback()
                 click.secho(
-                    f"  ✗ Error saving changes for student {graduation_request.std_no}: {str(commit_error)}",
+                    f"  ✗ Error saving changes for student {std_no}: {str(commit_error)}",
                     fg="red",
                 )
                 failed_count += 1
@@ -520,7 +533,7 @@ def approve_academic_graduation(db: Session) -> None:
         except Exception as e:
             db.rollback()
             click.secho(
-                f"  ✗ Error processing student {graduation_request.std_no}: {str(e)}",
+                f"  ✗ Error processing student {std_no}: {str(e)}",
                 fg="red",
             )
             failed_count += 1
