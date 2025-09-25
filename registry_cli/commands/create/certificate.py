@@ -30,7 +30,6 @@ def _get_active_or_completed_program(
 
 
 def _has_approved_academic_graduation(db: Session, student_program_id: int) -> bool:
-    # Join graduation_request -> graduation_clearance -> clearance (academic, approved)
     result = (
         db.query(GraduationRequest)
         .join(
@@ -54,14 +53,22 @@ def create_student_certificate(db: Session, std_no: int) -> Optional[str]:
         click.secho(f"Student {std_no} not found", fg="red")
         return None
 
-    student_program = _get_active_or_completed_program(db, std_no)
-    if not student_program:
-        click.secho("No active/completed program found for student", fg="red")
+    graduation_request = (
+        db.query(GraduationRequest)
+        .join(StudentProgram, GraduationRequest.student_program_id == StudentProgram.id)
+        .filter(StudentProgram.std_no == std_no)
+        .order_by(GraduationRequest.id.desc())
+        .first()
+    )
+    if not graduation_request:
+        click.secho("No graduation request found for student", fg="red")
         return None
+
+    student_program: StudentProgram = graduation_request.student_program  # type: ignore
 
     if not _has_approved_academic_graduation(db, student_program.id):
         click.secho(
-            "Student does not have an approved academic graduation clearance.",
+            "Student's graduation request does not have an approved academic clearance.",
             fg="yellow",
         )
         return None
@@ -86,7 +93,7 @@ def create_student_certificate(db: Session, std_no: int) -> Optional[str]:
 @click.command(name="certificate")
 @click.argument("std_no", type=int)
 def certificate_cmd(std_no: int) -> None:
-    from registry_cli.main import get_db  # local import to avoid circular
+    from registry_cli.main import get_db
 
     db = get_db()
     create_student_certificate(db, std_no)
