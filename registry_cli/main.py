@@ -19,6 +19,9 @@ from registry_cli.commands.enroll.add_module import (
 from registry_cli.commands.enroll.approved import enroll_approved
 from registry_cli.commands.enroll.student import enroll_by_student_number
 from registry_cli.commands.export.graduating_students import export_graduating_students
+from registry_cli.commands.export.graduation_clearance import (
+    export_approved_graduation_students,
+)
 from registry_cli.commands.export.registrations import export_program_registrations
 from registry_cli.commands.export.students import export_students_by_school
 from registry_cli.commands.pull.modules import modules_pull
@@ -691,6 +694,23 @@ def students_by_school() -> None:
     """Export registered students by school to Excel with separate sheets."""
     db = get_db()
     export_students_by_school(db)
+
+
+@export.command(name="approved-graduation-clearance")
+def approved_graduation_clearance() -> None:
+    """Export students approved for graduation by all departments to Excel file.
+
+    This command exports students who have:
+    1. A graduation request
+    2. All departments (finance, registry, library, resource, academic) have approved their clearance
+
+    The exported file includes: student number, student names, faculty, program, and receipt numbers.
+
+    Examples:
+      registry-cli export approved-graduation-clearance
+    """
+    db = get_db()
+    export_approved_graduation_students(db)
 
 
 @export.command(name="graduating-students")

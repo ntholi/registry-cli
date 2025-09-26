@@ -23,6 +23,9 @@ NAME_COORDS = (
     CENTER_X,
     695,
 )  # Student name on the underline after "It is hereby certified that"
+NAME_FONT_SIZE = 32
+NAME_MIN_FONT_SIZE = 16
+NAME_HORIZONTAL_PADDING = 60  # leave breathing room on both sides of the page
 PROGRAM_COORDS = (CENTER_X, 460)  # Program name on the underline after "is awarded"
 DATE_COORDS = (430, 290)  # Date positioned in bottom right area
 
@@ -54,9 +57,30 @@ def _build_overlay(
     except Exception:
         font_name = "Helvetica-Bold"
 
-    # Student name - Palatino bold size 32, center justified
-    c.setFont(font_name, 32)
-    c.drawCentredString(NAME_COORDS[0], NAME_COORDS[1], name)
+    # Student name - Palatino bold, dynamically centered and scaled if needed
+    font_size = NAME_FONT_SIZE
+    c.setFont(font_name, font_size)
+
+    def _string_width(text: str, font: str, size: float) -> float:
+        try:
+            return pdfmetrics.stringWidth(text, font, size)
+        except KeyError:
+            # If the selected font isn't registered, fall back to a built-in font for width
+            return pdfmetrics.stringWidth(text, "Helvetica-Bold", size)
+
+    name_width = _string_width(name, font_name, font_size)
+    max_name_width = max(PAGE_WIDTH - (NAME_HORIZONTAL_PADDING * 2), 1)
+
+    if name_width > max_name_width:
+        scale = max_name_width / name_width
+        adjusted_size = max(NAME_MIN_FONT_SIZE, font_size * scale)
+        if adjusted_size != font_size:
+            font_size = adjusted_size
+            c.setFont(font_name, font_size)
+            name_width = _string_width(name, font_name, font_size)
+
+    name_x = (PAGE_WIDTH - name_width) / 2
+    c.drawString(name_x, NAME_COORDS[1], name)
 
     # Program name - elegant italic script style, centered on the underline
     c.setFont("Helvetica-Oblique", 18)
