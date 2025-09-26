@@ -24,148 +24,151 @@ from registry_cli.models import (
 
 def export_approved_graduation_students(db: Session) -> None:
     """
-    Export students who have been approved for graduation requests clearance by all departments.
+    Export students who have been approved for graduation requests clearance by all required departments.
 
     This command exports students who have:
     1. A graduation request
-    2. All existing departments have approved their clearance
+    2. Approved clearances from finance, library, and academic departments
     3. Their information includes: student number, student names, faculty, program, and receipt numbers
 
     The exported file includes: student number, name, faculty (school), program name, and receipt numbers.
     """
     click.echo(
-        "Finding students with approved graduation clearances from all departments..."
+        "Finding students with approved graduation clearances from finance, library, and academic departments..."
     )
 
-    # First, find which actual departments exist with graduation clearances (exclude invalid entries)
-    valid_departments = ["finance", "registry", "library", "resource", "academic"]
-    existing_departments = (
-        db.query(Clearance.department)
-        .join(GraduationClearance, Clearance.id == GraduationClearance.clearance_id)
-        .filter(Clearance.department.in_(valid_departments))
-        .distinct()
-        .all()
-    )
-    required_departments = [dept[0] for dept in existing_departments]
+    # Define the three required departments
+    required_departments = ["finance", "library", "academic"]
+    required_dept_count = len(required_departments)
 
-    click.echo(f"Departments with graduation clearances: {required_departments}")
-    if not required_departments:
-        click.secho("No departments found with graduation clearances.", fg="yellow")
-        return
+    click.echo(f"Required departments: {required_departments}")
 
-    # Find graduation requests that have approved clearances from ALL required departments
-    # We need to count approved clearances per graduation request and ensure it equals the number of required departments
-    graduation_requests_with_full_approval = (
-        db.query(GraduationRequest.id, GraduationRequest.student_program_id)
+    # Single optimized query to get all approved students with their details and payment receipts
+    query = (
+        db.query(
+            GraduationRequest.id.label("graduation_request_id"),
+            StudentProgram.std_no.label("student_number"),
+            Student.name.label("student_name"),
+            School.name.label("faculty"),
+            Program.name.label("program_name"),
+            PaymentReceipt.receipt_no.label("receipt_no"),
+            PaymentReceipt.payment_type.label("payment_type"),
+        )
+        .select_from(GraduationRequest)
+        .join(StudentProgram, GraduationRequest.student_program_id == StudentProgram.id)
+        .join(Student, StudentProgram.std_no == Student.std_no)
+        .join(Structure, StudentProgram.structure_id == Structure.id)
+        .join(Program, Structure.program_id == Program.id)
+        .join(School, Program.school_id == School.id)
         .join(
             GraduationClearance,
             GraduationRequest.id == GraduationClearance.graduation_request_id,
         )
         .join(Clearance, GraduationClearance.clearance_id == Clearance.id)
+        .outerjoin(
+            PaymentReceipt, PaymentReceipt.graduation_request_id == GraduationRequest.id
+        )
         .filter(
             and_(
                 Clearance.status == "approved",
                 Clearance.department.in_(required_departments),
             )
         )
-        .group_by(GraduationRequest.id, GraduationRequest.student_program_id)
-        .having(
-            func.count(func.distinct(Clearance.department)) == len(required_departments)
+        .group_by(
+            GraduationRequest.id,
+            StudentProgram.std_no,
+            Student.name,
+            School.name,
+            Program.name,
+            PaymentReceipt.receipt_no,
+            PaymentReceipt.payment_type,
         )
-        .all()
+        .having(func.count(func.distinct(Clearance.department)) == required_dept_count)
+        .order_by(GraduationRequest.id, PaymentReceipt.receipt_no)
     )
 
-    if not graduation_requests_with_full_approval:
+    results = query.all()
+
+    if not results:
         click.secho(
-            "No students found with approved graduation clearances from all departments.",
+            "No students found with approved graduation clearances from all required departments.",
             fg="yellow",
         )
         return
 
-    click.echo(
-        f"Found {len(graduation_requests_with_full_approval)} students with full departmental approval"
-    )
+    # Group results by graduation request to organize payment receipts
+    student_data = {}
+    for row in results:
+        grad_req_id = row.graduation_request_id
 
-    # Collect detailed information for approved students
+        if grad_req_id not in student_data:
+            student_data[grad_req_id] = {
+                "graduation_request_id": grad_req_id,
+                "student_number": row.student_number,
+                "student_name": row.student_name,
+                "faculty": row.faculty,
+                "program_name": row.program_name,
+                "graduation_fee_receipts": [],
+                "graduation_gown_receipts": [],
+                "all_receipts": [],
+            }
+
+        # Add payment receipt if it exists
+        if row.receipt_no:
+            if row.payment_type == "graduation_fee":
+                student_data[grad_req_id]["graduation_fee_receipts"].append(
+                    row.receipt_no
+                )
+            elif row.payment_type == "graduation_gown":
+                student_data[grad_req_id]["graduation_gown_receipts"].append(
+                    row.receipt_no
+                )
+            student_data[grad_req_id]["all_receipts"].append(row.receipt_no)
+
+    # Convert to list and format receipt numbers
     approved_students = []
+    for student in student_data.values():
+        # Remove duplicates and format receipt strings
+        student["graduation_fee_receipts"] = list(
+            set(student["graduation_fee_receipts"])
+        )
+        student["graduation_gown_receipts"] = list(
+            set(student["graduation_gown_receipts"])
+        )
+        student["all_receipts"] = list(set(student["all_receipts"]))
 
-    for i, (graduation_request_id, student_program_id) in enumerate(
-        graduation_requests_with_full_approval, 1
-    ):
-        if i % 10 == 0:
-            click.echo(
-                f"Processed {i}/{len(graduation_requests_with_full_approval)} students..."
-            )
-
-        try:
-            # Get student program with related information
-            student_program = (
-                db.query(StudentProgram)
-                .join(Student, StudentProgram.std_no == Student.std_no)
-                .join(Structure, StudentProgram.structure_id == Structure.id)
-                .join(Program, Structure.program_id == Program.id)
-                .join(School, Program.school_id == School.id)
-                .filter(StudentProgram.id == student_program_id)
-                .first()
-            )
-
-            if not student_program or not student_program.student:
-                continue
-
-            # Get payment receipts for this graduation request
-            payment_receipts = (
-                db.query(PaymentReceipt)
-                .filter(PaymentReceipt.graduation_request_id == graduation_request_id)
-                .all()
-            )
-
-            # Organize receipt numbers by payment type
-            graduation_fee_receipts = []
-            graduation_gown_receipts = []
-
-            for receipt in payment_receipts:
-                if receipt.payment_type == "graduation_fee":
-                    graduation_fee_receipts.append(receipt.receipt_no)
-                elif receipt.payment_type == "graduation_gown":
-                    graduation_gown_receipts.append(receipt.receipt_no)
-
-            # Format receipt numbers
-            graduation_fee_receipt_nos = (
-                ", ".join(graduation_fee_receipts) if graduation_fee_receipts else "N/A"
-            )
-            graduation_gown_receipt_nos = (
-                ", ".join(graduation_gown_receipts)
-                if graduation_gown_receipts
-                else "N/A"
-            )
-            all_receipt_nos = (
-                ", ".join([r.receipt_no for r in payment_receipts])
-                if payment_receipts
-                else "N/A"
-            )
-
-            approved_students.append(
-                {
-                    "student_number": student_program.std_no,
-                    "student_name": student_program.student.name,
-                    "faculty": student_program.structure.program.school.name,
-                    "program_name": student_program.structure.program.name,
-                    "graduation_fee_receipts": graduation_fee_receipt_nos,
-                    "graduation_gown_receipts": graduation_gown_receipt_nos,
-                    "all_receipts": all_receipt_nos,
-                    "graduation_request_id": graduation_request_id,
-                }
-            )
-
-        except Exception as e:
-            click.echo(
-                f"Error processing graduation request {graduation_request_id}: {str(e)}"
-            )
-            continue
+        approved_students.append(
+            {
+                "graduation_request_id": student["graduation_request_id"],
+                "student_number": student["student_number"],
+                "student_name": student["student_name"],
+                "faculty": student["faculty"],
+                "program_name": student["program_name"],
+                "graduation_fee_receipts": (
+                    ", ".join(student["graduation_fee_receipts"])
+                    if student["graduation_fee_receipts"]
+                    else "N/A"
+                ),
+                "graduation_gown_receipts": (
+                    ", ".join(student["graduation_gown_receipts"])
+                    if student["graduation_gown_receipts"]
+                    else "N/A"
+                ),
+                "all_receipts": (
+                    ", ".join(student["all_receipts"])
+                    if student["all_receipts"]
+                    else "N/A"
+                ),
+            }
+        )
 
     if not approved_students:
         click.secho("No valid students found after processing.", fg="yellow")
         return
+
+    click.echo(
+        f"Found {len(approved_students)} students with full departmental approval"
+    )
 
     # Sort students by graduation request ID
     approved_students.sort(key=lambda x: x["graduation_request_id"])
