@@ -25,7 +25,7 @@ CENTER_X = PAGE_WIDTH / 2  # Should be ~297.638 points from left edge
 # Y-coordinate for student name positioning
 NAME_FONT_SIZE = 32
 NAME_Y = 695  # Student name on the underline after "It is hereby certified that"
-PROGRAM_Y = 620  # Program name on the underline after "is awarded"
+PROGRAM_Y = 606  # Program name on the underline after "is awarded"
 DATE_COORDS = (430, 290)  # Date positioned in bottom right area
 
 PRIMARY_COLOR = HexColor("#000000")
@@ -57,13 +57,14 @@ def _build_overlay(
         font_name = "Helvetica-Bold"
 
     # Register Snell Roundhand font for program name
-    program_font_name = "Helvetica-Oblique"  # Fallback
+    if not SNELL_FONT_PATH.exists():
+        raise FileNotFoundError(f"Required font file not found: {SNELL_FONT_PATH}")
+
     try:
-        if SNELL_FONT_PATH.exists():
-            pdfmetrics.registerFont(TTFont("SnellRoundhand", str(SNELL_FONT_PATH)))
-            program_font_name = "SnellRoundhand"
-    except Exception:
-        pass
+        pdfmetrics.registerFont(TTFont("SnellRoundhand", str(SNELL_FONT_PATH)))
+        program_font_name = "SnellRoundhand"
+    except Exception as e:
+        raise RuntimeError(f"Failed to register Snell Roundhand font: {e}")
 
     c.setFont(font_name, NAME_FONT_SIZE)
 
@@ -73,7 +74,7 @@ def _build_overlay(
     c.drawCentredString(perfect_center_x, NAME_Y, name)
 
     # Program name - elegant script style using Snell Roundhand, centered on the underline
-    c.setFont(program_font_name, 18)
+    c.setFont(program_font_name, 35)
     c.drawCentredString(perfect_center_x, PROGRAM_Y, program_name)
 
     # Date - small regular font, positioned in bottom right
