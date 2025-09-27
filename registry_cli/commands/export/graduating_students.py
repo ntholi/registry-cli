@@ -57,6 +57,88 @@ def has_no_pending_issues(db: Session, std_no: int) -> bool:
         return False
 
 
+def calculate_cgpa_and_classification_for_program(
+    db: Session, std_no: int, program: StudentProgram
+) -> Tuple[Optional[float], str]:
+    """
+    Calculate CGPA and determine classification for a student based on a specific program.
+    Uses the same logic as the JavaScript implementation.
+
+    Returns:
+        Tuple of (CGPA, Classification)
+    """
+    try:
+        if not program:
+            return None, "No Program Provided"
+
+        # Get all semesters for the specified program (excluding deleted/deferred/etc)
+        semesters = (
+            db.query(StudentSemester)
+            .filter(StudentSemester.student_program_id == program.id)
+            .filter(
+                StudentSemester.status.notin_(
+                    ["Deleted", "Deferred", "DroppedOut", "Withdrawn"]
+                )
+            )
+            .order_by(StudentSemester.id)
+            .all()
+        )
+
+        if not semesters:
+            return None, "No Semesters Found"
+
+        # Prepare semester data for CGPA calculation
+        semesters_data = []
+        for semester in semesters:
+            # Get all student modules for this semester (excluding Delete/Drop status)
+            modules = (
+                db.query(StudentModule, SemesterModule.credits)
+                .join(
+                    SemesterModule,
+                    StudentModule.semester_module_id == SemesterModule.id,
+                )
+                .filter(StudentModule.student_semester_id == semester.id)
+                .filter(StudentModule.status.notin_(["Delete", "Drop"]))
+                .all()
+            )
+
+            modules_data = []
+            for student_module, credits in modules:
+                grade = student_module.grade or ""
+
+                modules_data.append(
+                    {
+                        "grade": grade,
+                        "status": student_module.status,
+                        "credits": float(credits),
+                    }
+                )
+
+            semesters_data.append({"id": semester.id, "modules": modules_data})
+
+        # Calculate CGPA using the comprehensive calculation
+        grade_points, final_cgpa = calculate_cgpa_from_semesters(semesters_data)
+
+        if final_cgpa == 0:
+            return None, "No Valid Grades"
+
+        # Determine classification based on CGPA using grade descriptions
+        if final_cgpa >= 3.5:  # A+, A, A- range (Pass with Distinction)
+            classification = "Distinction"
+        elif final_cgpa >= 3.0:  # B+, B, B- range (Pass with Merit)
+            classification = "Merit"
+        elif final_cgpa >= 1.7:  # C+, C, C- range (Pass)
+            classification = "Pass"
+        else:
+            classification = "Failed"
+
+        return round(final_cgpa, 2), classification
+
+    except Exception as e:
+        click.echo(f"Error calculating CGPA for student {std_no}: {str(e)}")
+        return None, "Calculation Error"
+
+
 def calculate_cgpa_and_classification(
     db: Session, std_no: int
 ) -> Tuple[Optional[float], str]:
@@ -274,37 +356,74 @@ def export_graduating_students(
             if not student:
                 continue
 
-            # Get active program with school information
-            active_program = (
-                db.query(StudentProgram)
-                .join(Structure, StudentProgram.structure_id == Structure.id)
-                .join(Program, Structure.program_id == Program.id)
-                .join(School, Program.school_id == School.id)
-                .filter(
-                    and_(
-                        StudentProgram.std_no == std_no,
-                        StudentProgram.status == "Active",
+            # Check if student has an approved graduation request
+            graduation_request_program = None
+            if std_no in approved_std_nos:
+                graduation_request_program = (
+                    db.query(StudentProgram)
+                    .join(Structure, StudentProgram.structure_id == Structure.id)
+                    .join(Program, Structure.program_id == Program.id)
+                    .join(School, Program.school_id == School.id)
+                    .join(
+                        GraduationRequest,
+                        StudentProgram.id == GraduationRequest.student_program_id,
                     )
+                    .join(
+                        GraduationClearance,
+                        GraduationRequest.id
+                        == GraduationClearance.graduation_request_id,
+                    )
+                    .join(Clearance, GraduationClearance.clearance_id == Clearance.id)
+                    .filter(
+                        and_(
+                            StudentProgram.std_no == std_no,
+                            Clearance.department == "academic",
+                            Clearance.status == "approved",
+                        )
+                    )
+                    .order_by(
+                        GraduationRequest.created_at.desc()
+                    )  # Get the most recent approved request
+                    .first()
                 )
-                .first()
-            )
 
-            if not active_program:
+            # Use graduation request program if available, otherwise get active program
+            if graduation_request_program:
+                target_program = graduation_request_program
+            else:
+                target_program = (
+                    db.query(StudentProgram)
+                    .join(Structure, StudentProgram.structure_id == Structure.id)
+                    .join(Program, Structure.program_id == Program.id)
+                    .join(School, Program.school_id == School.id)
+                    .filter(
+                        and_(
+                            StudentProgram.std_no == std_no,
+                            StudentProgram.status == "Active",
+                        )
+                    )
+                    .first()
+                )
+
+            if not target_program:
                 continue
 
             program_name = (
-                active_program.structure.program.name
-                if active_program.structure
+                target_program.structure.program.name
+                if target_program.structure
                 else "Unknown Program"
             )
 
             school_name = (
-                active_program.structure.program.school.name
-                if active_program.structure and active_program.structure.program.school
+                target_program.structure.program.school.name
+                if target_program.structure and target_program.structure.program.school
                 else "Unknown School"
             )
 
-            cgpa, classification = calculate_cgpa_and_classification(db, std_no)
+            # Calculate CGPA using the target program (graduation request program or active program)
+            cgpa, classification = calculate_cgpa_and_classification_for_program(
+                db, std_no, target_program
+            )
 
             # Determine graduation criteria met
             criteria_met = []
