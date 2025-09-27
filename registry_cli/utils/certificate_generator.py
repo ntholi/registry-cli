@@ -13,6 +13,9 @@ from reportlab.pdfgen import canvas
 TEMPLATE_PATH = Path("sample.pdf")  # Provided template file
 PALATINO_FONT_PATH = Path("fonts/palatino.ttf")  # Custom Palatino Bold font file
 SNELL_FONT_PATH = Path("fonts/Roundhand Bold.ttf")  # Custom Snell Roundhand font file
+AGARAMOND_FONT_PATH = Path(
+    "fonts/Adobe Garamond Pro Regular.ttf"
+)  # AGaramond Regular font file
 OUTPUT_DIR = Path("certificates")
 OUTPUT_DIR.mkdir(exist_ok=True)
 
@@ -21,9 +24,21 @@ PAGE_WIDTH, PAGE_HEIGHT = A4  # A4 is 595.276 x 841.89 points
 CENTER_X = PAGE_WIDTH / 2  # Should be ~297.638 points from left edge
 
 
-DATE_Y = 180  # Date positioned in bottom right area
-
 PRIMARY_COLOR = HexColor("#000000")
+
+
+def _register_font(font_path: Path, font_name: str) -> bool:
+    """Register a font if the file exists.
+
+    Returns True if successfully registered, False otherwise.
+    """
+    try:
+        if font_path.exists():
+            pdfmetrics.registerFont(TTFont(font_name, str(font_path)))
+            return True
+    except Exception as e:
+        raise RuntimeError(f"Failed to register {font_name} font: {e}")
+    return False
 
 
 def _build_overlay(
@@ -118,19 +133,14 @@ def _build_overlay(
             draw_line(line, line_y)
 
     # Register custom fonts if available
-    try:
-        if PALATINO_FONT_PATH.exists():
-            pdfmetrics.registerFont(TTFont("PalatinoBold", str(PALATINO_FONT_PATH)))
-            font_name = "PalatinoBold"
-    except Exception as e:
-        raise RuntimeError(f"Failed to register Snell PalatinoBold font: {e}")
+    font_name = "PalatinoBold"
+    _register_font(PALATINO_FONT_PATH, font_name)
 
-    try:
-        if SNELL_FONT_PATH.exists():
-            pdfmetrics.registerFont(TTFont("SnellRoundhand", str(SNELL_FONT_PATH)))
-            program_font_name = "SnellRoundhand"
-    except Exception as e:
-        raise RuntimeError(f"Failed to register Snell Roundhand font: {e}")
+    program_font_name = "SnellRoundhand"
+    _register_font(SNELL_FONT_PATH, program_font_name)
+
+    date_font_name = "AGaramondPro"
+    _register_font(AGARAMOND_FONT_PATH, date_font_name)
 
     draw_text(
         name,
@@ -147,8 +157,14 @@ def _build_overlay(
         42,
         2.5,
     )
-    c.setFont("Helvetica", 11)
-    c.drawCentredString(perfect_center_x, DATE_Y, issue_date)
+
+    draw_text(
+        issue_date,
+        date_font_name,
+        180,
+        11,
+        0.0,
+    )
 
     c.showPage()
     c.save()
