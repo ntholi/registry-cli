@@ -11,7 +11,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
 
 TEMPLATE_PATH = Path("sample.pdf")  # Provided template file
-PALATINO_FONT_PATH = Path("fonts/palatino_bold.ttf")  # Custom Palatino Bold font file
+PALATINO_FONT_PATH = Path("fonts/palatino.ttf")  # Custom Palatino Bold font file
 SNELL_FONT_PATH = Path(
     "fonts/snellroundhand_black.otf"
 )  # Custom Snell Roundhand font file
@@ -23,7 +23,7 @@ PAGE_WIDTH, PAGE_HEIGHT = A4  # A4 is 595.276 x 841.89 points
 CENTER_X = PAGE_WIDTH / 2  # Should be ~297.638 points from left edge
 
 # Y-coordinate for student name positioning
-NAME_FONT_SIZE = 32
+NAME_FONT_SIZE = 30.3
 NAME_Y = 695  # Student name on the underline after "It is hereby certified that"
 PROGRAM_Y = 606  # Program name on the underline after "is awarded"
 DATE_Y = 180  # Date positioned in bottom right area
@@ -50,19 +50,13 @@ def _build_overlay(
         if PALATINO_FONT_PATH.exists():
             pdfmetrics.registerFont(TTFont("PalatinoBold", str(PALATINO_FONT_PATH)))
             font_name = "PalatinoBold"
-        else:
-            # Fallback to built-in font
-            font_name = "Helvetica-Bold"
-    except Exception:
-        font_name = "Helvetica-Bold"
-
-    # Register Snell Roundhand font for program name
-    if not SNELL_FONT_PATH.exists():
-        raise FileNotFoundError(f"Required font file not found: {SNELL_FONT_PATH}")
+    except Exception as e:
+        raise RuntimeError(f"Failed to register Snell PalatinoBold font: {e}")
 
     try:
-        pdfmetrics.registerFont(TTFont("SnellRoundhand", str(SNELL_FONT_PATH)))
-        program_font_name = "SnellRoundhand"
+        if SNELL_FONT_PATH.exists():
+            pdfmetrics.registerFont(TTFont("SnellRoundhand", str(SNELL_FONT_PATH)))
+            program_font_name = "SnellRoundhand"
     except Exception as e:
         raise RuntimeError(f"Failed to register Snell Roundhand font: {e}")
 
