@@ -13,9 +13,6 @@ from reportlab.pdfgen import canvas
 TEMPLATE_PATH = Path("sample.pdf")  # Provided template file
 PALATINO_FONT_PATH = Path("fonts/palatino.ttf")  # Custom Palatino Bold font file
 SNELL_FONT_PATH = Path("fonts/Roundhand Bold.ttf")  # Custom Snell Roundhand font file
-AGARAMOND_FONT_PATH = Path(
-    "fonts/AGaramondPro-Regular.ttf"
-)  # AGaramond Regular font file
 OUTPUT_DIR = Path("certificates")
 OUTPUT_DIR.mkdir(exist_ok=True)
 
@@ -133,18 +130,15 @@ def _build_overlay(
             draw_line(line, line_y)
 
     # Register custom fonts if available
-    font_name = "PalatinoBold"
-    _register_font(PALATINO_FONT_PATH, font_name)
+    palatino = "palatino"
+    _register_font(PALATINO_FONT_PATH, palatino)
 
-    program_font_name = "SnellRoundhand"
-    _register_font(SNELL_FONT_PATH, program_font_name)
-
-    date_font_name = "AGaramondPro"
-    _register_font(AGARAMOND_FONT_PATH, date_font_name)
+    snell_roundhand = "SnellRoundhand"
+    _register_font(SNELL_FONT_PATH, snell_roundhand)
 
     draw_text(
         name,
-        font_name,
+        palatino,
         695,
         32,
         1,
@@ -152,18 +146,17 @@ def _build_overlay(
 
     draw_text(
         program_name,
-        program_font_name,
+        snell_roundhand,
         603,
         42,
         2.5,
     )
 
     draw_text(
-        "03 November 2022",
-        date_font_name,
+        issue_date,
+        palatino,
         180,
-        13,
-        0.0,
+        12.4,
     )
 
     c.showPage()
