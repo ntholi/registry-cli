@@ -11,7 +11,10 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
 
 TEMPLATE_PATH = Path("sample.pdf")  # Provided template file
-PALATINO_FONT_PATH = Path("palatino_bold.ttf")  # Custom Palatino Bold font file
+PALATINO_FONT_PATH = Path("fonts/palatino_bold.ttf")  # Custom Palatino Bold font file
+SNELL_FONT_PATH = Path(
+    "fonts/snellroundhand_black.otf"
+)  # Custom Snell Roundhand font file
 OUTPUT_DIR = Path("certificates")
 OUTPUT_DIR.mkdir(exist_ok=True)
 
@@ -20,11 +23,9 @@ PAGE_WIDTH, PAGE_HEIGHT = A4  # A4 is 595.276 x 841.89 points
 CENTER_X = PAGE_WIDTH / 2  # Should be ~297.638 points from left edge
 
 # Y-coordinate for student name positioning
-NAME_Y = 695  # Student name on the underline after "It is hereby certified that"
 NAME_FONT_SIZE = 32
-NAME_MIN_FONT_SIZE = 16
-NAME_HORIZONTAL_PADDING = 60  # leave breathing room on both sides of the page
-PROGRAM_Y = 460  # Program name on the underline after "is awarded"
+NAME_Y = 695  # Student name on the underline after "It is hereby certified that"
+PROGRAM_Y = 620  # Program name on the underline after "is awarded"
 DATE_COORDS = (430, 290)  # Date positioned in bottom right area
 
 PRIMARY_COLOR = HexColor("#000000")
@@ -44,7 +45,7 @@ def _build_overlay(
     c = canvas.Canvas(str(tmp_path), pagesize=A4)
     c.setFillColor(PRIMARY_COLOR)
 
-    # Register custom Palatino Bold font if available
+    # Register custom fonts if available
     try:
         if PALATINO_FONT_PATH.exists():
             pdfmetrics.registerFont(TTFont("PalatinoBold", str(PALATINO_FONT_PATH)))
@@ -55,18 +56,25 @@ def _build_overlay(
     except Exception:
         font_name = "Helvetica-Bold"
 
-    # Student name - Palatino bold, automatically centered and scaled if needed
-    font_size = NAME_FONT_SIZE
-    c.setFont(font_name, font_size)
+    # Register Snell Roundhand font for program name
+    program_font_name = "Helvetica-Oblique"  # Fallback
+    try:
+        if SNELL_FONT_PATH.exists():
+            pdfmetrics.registerFont(TTFont("SnellRoundhand", str(SNELL_FONT_PATH)))
+            program_font_name = "SnellRoundhand"
+    except Exception:
+        pass
+
+    c.setFont(font_name, NAME_FONT_SIZE)
 
     # Perfect centering: Use calculated center with +30 point offset
     # This offset was determined through visual testing to account for template-specific positioning
     perfect_center_x = (PAGE_WIDTH / 2) + 30
     c.drawCentredString(perfect_center_x, NAME_Y, name)
 
-    # Program name - elegant italic script style, centered on the underline
-    c.setFont("Helvetica-Oblique", 18)
-    c.drawCentredString(CENTER_X, PROGRAM_Y, program_name)
+    # Program name - elegant script style using Snell Roundhand, centered on the underline
+    c.setFont(program_font_name, 18)
+    c.drawCentredString(perfect_center_x, PROGRAM_Y, program_name)
 
     # Date - small regular font, positioned in bottom right
     c.setFont("Helvetica", 11)
