@@ -39,7 +39,7 @@ def _register_font(font_path: Path, font_name: str) -> bool:
 
 
 def _build_overlay(
-    name: str, program_name: str, issue_date: str, tmp_path: Path
+    name: str, program_name: str, reference: str, issue_date: str, tmp_path: Path
 ) -> None:
     c = canvas.Canvas(str(tmp_path), pagesize=A4)
     c.setFillColor(PRIMARY_COLOR)
@@ -136,6 +136,10 @@ def _build_overlay(
     snell_roundhand = "SnellRoundhand"
     _register_font(SNELL_FONT_PATH, snell_roundhand)
 
+    c.setFont(palatino, 8)
+    text_width = c.stringWidth(reference, palatino, 8)
+    c.drawString(PAGE_WIDTH - text_width, 772, reference)
+
     draw_text(
         name,
         palatino,
@@ -184,7 +188,8 @@ def generate_certificate(name: str, program_name: str) -> Optional[str]:
 
     # Create overlay
     overlay_path = OUTPUT_DIR / "_overlay_temp.pdf"
-    _build_overlay(name, program_name, issue_date, overlay_path)
+    reference = "LSOBBIT901011102"
+    _build_overlay(name, program_name, reference, issue_date, overlay_path)
 
     try:
         base_reader = PdfReader(str(TEMPLATE_PATH))
