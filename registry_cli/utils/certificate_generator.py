@@ -29,6 +29,55 @@ DATE_Y = 180  # Date positioned in bottom right area
 PRIMARY_COLOR = HexColor("#000000")
 
 
+def _draw_text_with_letter_spacing(
+    canvas_obj,
+    text: str,
+    x: float,
+    y: float,
+    font_name: str,
+    font_size: int,
+    letter_spacing_reduction: float = 0.0,
+    center: bool = True,
+) -> None:
+    """Draw text with custom letter spacing.
+
+    Args:
+        canvas_obj: ReportLab canvas object
+        text: Text to draw
+        x: X coordinate (center point if center=True, start point if center=False)
+        y: Y coordinate
+        font_name: Font name to use
+        font_size: Font size
+        letter_spacing_reduction: Points to reduce between letters (positive = tighter spacing)
+        center: Whether to center the text at the x coordinate
+    """
+    canvas_obj.setFont(font_name, font_size)
+
+    if letter_spacing_reduction == 0.0:
+        # No custom spacing needed, use standard drawing
+        if center:
+            canvas_obj.drawCentredString(x, y, text)
+        else:
+            canvas_obj.drawString(x, y, text)
+        return
+
+    # Calculate reduced letter spacing
+    total_width = canvas_obj.stringWidth(text, font_name, font_size)
+    reduced_width = total_width - (len(text) - 1) * letter_spacing_reduction
+
+    if center:
+        start_x = x - (reduced_width / 2)
+    else:
+        start_x = x
+
+    # Draw each character with custom spacing
+    current_x = start_x
+    for char in text:
+        canvas_obj.drawString(current_x, y, char)
+        char_width = canvas_obj.stringWidth(char, font_name, font_size)
+        current_x += char_width - letter_spacing_reduction
+
+
 def _build_overlay(
     name: str, program_name: str, issue_date: str, tmp_path: Path
 ) -> None:
@@ -65,11 +114,17 @@ def _build_overlay(
     perfect_center_x = (PAGE_WIDTH / 2) + 30
     c.drawCentredString(perfect_center_x, NAME_Y, name)
 
-    # Program name - elegant script style using Snell Roundhand, centered on the underline
-    c.setFont(program_font_name, 38)
-    c.drawCentredString(perfect_center_x, PROGRAM_Y, program_name)
-
-    # Date - small regular font, positioned in bottom right
+    # Program name - elegant script style using Snell Roundhand, centered on the underline with reduced letter spacing
+    _draw_text_with_letter_spacing(
+        c,
+        program_name,
+        perfect_center_x,
+        PROGRAM_Y,
+        program_font_name,
+        38,
+        letter_spacing_reduction=2.0,
+        center=True,
+    )  # Date - small regular font, positioned in bottom right
     c.setFont("Helvetica", 11)
     c.drawCentredString(perfect_center_x, DATE_Y, issue_date)
 
