@@ -1,11 +1,16 @@
+import io
 import os
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+import qrcode
+from nanoid import generate
+from PIL import Image
 from PyPDF2 import PdfReader, PdfWriter
 from reportlab.lib.colors import HexColor
 from reportlab.lib.pagesizes import A4
+from reportlab.lib.utils import ImageReader
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
@@ -36,6 +41,39 @@ def _register_font(font_path: Path, font_name: str) -> bool:
     except Exception as e:
         raise RuntimeError(f"Failed to register {font_name} font: {e}")
     return False
+
+
+def _generate_qr_code(reference: str) -> ImageReader:
+    """Generate a QR code for the certificate verification URL.
+
+    Args:
+        reference: The certificate reference number
+
+    Returns:
+        ImageReader object that can be used in reportlab
+    """
+    verification_url = f"http://portal.co.ls/verify/certificate/{reference}"
+
+    # Create QR code instance
+    qr = qrcode.QRCode(
+        version=1,  # Controls the size of the QR Code
+        error_correction=qrcode.ERROR_CORRECT_L,  # About 7% or less errors can be corrected
+        box_size=10,  # Controls how many pixels each "box" of the QR code is
+        border=4,  # Controls how many boxes thick the border should be
+    )
+
+    qr.add_data(verification_url)
+    qr.make(fit=True)
+
+    # Create QR code image
+    qr_img = qr.make_image(fill_color="black", back_color="white")
+
+    # Convert PIL image to ImageReader for reportlab
+    img_buffer = io.BytesIO()
+    qr_img.save(img_buffer, "PNG")
+    img_buffer.seek(0)
+
+    return ImageReader(img_buffer)
 
 
 def _build_overlay(
@@ -163,6 +201,14 @@ def _build_overlay(
         12.4,
     )
 
+    # Add QR code
+    qr_image = _generate_qr_code(reference)
+    qr_size = 60  # Size of the QR code in points
+    qr_x = PAGE_WIDTH / 2 - ((qr_size / 2) + 10)
+    qr_y = 210  # Position from bottom
+
+    c.drawImage(qr_image, qr_x, qr_y, width=qr_size, height=qr_size)
+
     c.showPage()
     c.save()
 
@@ -188,7 +234,8 @@ def generate_certificate(name: str, program_name: str) -> Optional[str]:
 
     # Create overlay
     overlay_path = OUTPUT_DIR / "_overlay_temp.pdf"
-    reference = "LSOBBIT901011102"
+    # Generate unique reference for the certificate
+    reference = f"LSO{generate(size=12).upper()}"
     _build_overlay(name, program_name, reference, issue_date, overlay_path)
 
     try:

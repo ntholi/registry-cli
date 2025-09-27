@@ -20,6 +20,7 @@ sqlalchemy-libsql = "^0.1.0"
 openpyxl = "^3.1.5"
 nanoid = "^2.0.0"
 pypdf2 = "^3.0.1"
+qrcode = {extras = ["pil"], version = "^7.4.2"}
 
 [tool.poetry.scripts]
 registry = "registry_cli.main:cli"
