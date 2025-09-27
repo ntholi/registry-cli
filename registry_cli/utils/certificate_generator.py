@@ -13,9 +13,7 @@ from reportlab.pdfgen import canvas
 TEMPLATE_PATH = Path("sample.pdf")  # Provided template file
 PALATINO_FONT_PATH = Path("fonts/palatino.ttf")  # Custom Palatino Bold font file
 SNELL_FONT_PATH = Path("fonts/Roundhand Bold.ttf")  # Custom Snell Roundhand font file
-AGARAMOND_FONT_PATH = Path(
-    "fonts/Adobe Garamond Pro Regular.ttf"
-)  # AGaramond Regular font file
+AGARAMOND_FONT_PATH = Path("fonts/AGaramond-Regular.ttf")  # AGaramond Regular font file
 OUTPUT_DIR = Path("certificates")
 OUTPUT_DIR.mkdir(exist_ok=True)
 
