@@ -204,7 +204,7 @@ def _build_overlay(
     # Add QR code
     qr_image = _generate_qr_code(reference)
     qr_size = 60  # Size of the QR code in points
-    qr_x = PAGE_WIDTH / 2 - ((qr_size / 2) + 10)
+    qr_x = perfect_center_x - (qr_size / 2)  # Align QR code with text centering
     qr_y = 210  # Position from bottom
 
     c.drawImage(qr_image, qr_x, qr_y, width=qr_size, height=qr_size)
