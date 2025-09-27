@@ -13,12 +13,7 @@ from registry_cli.commands.approve.academic_graduation import (
     get_outstanding_from_structure,
     get_student_programs,
 )
-from registry_cli.grade_definitions import (
-    calculate_cgpa_from_semesters,
-    get_grade_points,
-    is_passing_grade,
-    normalize_grade_symbol,
-)
+from registry_cli.grade_definitions import calculate_cgpa_from_semesters
 from registry_cli.models import (
     Clearance,
     GraduationClearance,
@@ -564,21 +559,22 @@ def export_graduating_students(
         cell = breakdown_ws.cell(row=1, column=col)
         cell.value = header
         cell.font = header_font
-        cell.fill = header_fill
+        cell.fill = PatternFill(
+            start_color="000000", end_color="000000", fill_type="solid"
+        )
 
     # Add breakdown data
     row = 2
     for school in sorted(school_program_stats.keys()):
-        # Add school header row
-        school_cell = breakdown_ws.cell(row=row, column=1)
-        school_cell.value = school
-        school_cell.font = Font(bold=True, color="000080")
-        school_cell.fill = PatternFill(
-            start_color="E6E6FA", end_color="E6E6FA", fill_type="solid"
-        )
-
-        breakdown_ws.cell(row=row, column=2, value="")
-        breakdown_ws.cell(row=row, column=3, value="")
+        # Add school header row spanning three columns
+        for col in range(1, 4):  # Columns 1, 2, 3
+            cell = breakdown_ws.cell(row=row, column=col)
+            if col == 1:
+                cell.value = school
+            cell.font = Font(bold=True, color="FFFFFF")
+            cell.fill = PatternFill(
+                start_color="444444", end_color="444444", fill_type="solid"
+            )
         row += 1
 
         # Add programs for this school
@@ -592,12 +588,12 @@ def export_graduating_students(
 
         # Add school total
         total_cell = breakdown_ws.cell(row=row, column=2)
-        total_cell.value = f"TOTAL - {school}"
-        total_cell.font = Font(bold=True, color="800000")
+        total_cell.value = f"Total"
+        total_cell.font = Font(bold=True, color="444444")
 
         total_count_cell = breakdown_ws.cell(row=row, column=3)
         total_count_cell.value = school_totals[school]
-        total_count_cell.font = Font(bold=True, color="800000")
+        total_count_cell.font = Font(bold=True, color="444444")
 
         row += 2  # Add space between schools
 
@@ -610,7 +606,7 @@ def export_graduating_students(
         cell = breakdown_ws.cell(row=grand_total_row, column=col)
         cell.font = Font(bold=True, color="FFFFFF")
         cell.fill = PatternFill(
-            start_color="366092", end_color="366092", fill_type="solid"
+            start_color="000000", end_color="000000", fill_type="solid"
         )
 
     # Auto-size columns for breakdown sheet
