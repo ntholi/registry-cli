@@ -40,24 +40,82 @@ def _build_overlay(
         y_axis: float,
         font_size: float,
         letter_spacing_reduction: float = 0.0,
+        max_width: float = 550.0,
+        line_spacing: float = 1.2,
     ) -> None:
         c.setFont(font_name, font_size)
 
-        if letter_spacing_reduction == 0.0:
-            c.drawCentredString(perfect_center_x, y_axis, text)
+        def get_text_width(text_segment: str) -> float:
+            """Calculate width of text considering letter spacing reduction."""
+            if letter_spacing_reduction == 0.0:
+                return c.stringWidth(text_segment, font_name, font_size)
+            else:
+                base_width = c.stringWidth(text_segment, font_name, font_size)
+                return base_width - (len(text_segment) - 1) * letter_spacing_reduction
+
+        def draw_line(line_text: str, y_pos: float) -> None:
+            """Draw a single line of text."""
+            if letter_spacing_reduction == 0.0:
+                c.drawCentredString(perfect_center_x, y_pos, line_text)
+                return
+
+            # Calculate reduced letter spacing for this line
+            line_width = get_text_width(line_text)
+            start_x = perfect_center_x - (line_width / 2)
+
+            current_x = start_x
+            for char in line_text:
+                c.drawString(current_x, y_pos, char)
+                char_width = c.stringWidth(char, font_name, font_size)
+                current_x += char_width - letter_spacing_reduction
+
+        # Check if text fits in one line
+        if get_text_width(text) <= max_width:
+            draw_line(text, y_axis)
             return
 
-        # Calculate reduced letter spacing
-        total_width = c.stringWidth(text, font_name, font_size)
-        reduced_width = total_width - (len(text) - 1) * letter_spacing_reduction
+        # Split text into multiple lines
+        words = text.split()
+        lines = []
+        current_line = ""
 
-        start_x = perfect_center_x - (reduced_width / 2)
+        for word in words:
+            test_line = current_line + (" " if current_line else "") + word
 
-        current_x = start_x
-        for char in text:
-            c.drawString(current_x, y_axis, char)
-            char_width = c.stringWidth(char, font_name, font_size)
-            current_x += char_width - letter_spacing_reduction
+            if get_text_width(test_line) <= max_width:
+                current_line = test_line
+            else:
+                if current_line:
+                    lines.append(current_line)
+                    current_line = word
+                else:
+                    # Single word is too long, break it by characters
+                    if get_text_width(word) > max_width:
+                        char_line = ""
+                        for char in word:
+                            test_char_line = char_line + char
+                            if get_text_width(test_char_line) <= max_width:
+                                char_line = test_char_line
+                            else:
+                                if char_line:
+                                    lines.append(char_line)
+                                char_line = char
+                        if char_line:
+                            current_line = char_line
+                    else:
+                        current_line = word
+
+        if current_line:
+            lines.append(current_line)
+
+        # Draw lines with proper spacing
+        line_height = font_size * line_spacing
+        total_height = (len(lines) - 1) * line_height
+        start_y = y_axis + (total_height / 2)
+
+        for i, line in enumerate(lines):
+            line_y = start_y - (i * line_height)
+            draw_line(line, line_y)
 
     # Register custom fonts if available
     try:
@@ -85,7 +143,7 @@ def _build_overlay(
     draw_text(
         program_name,
         program_font_name,
-        606,
+        603,
         42,
         2.5,
     )
