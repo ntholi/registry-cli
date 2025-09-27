@@ -15,20 +15,6 @@ from registry_cli.models import (
 from registry_cli.utils.certificate_generator import generate_certificate
 
 
-def _get_active_or_completed_program(
-    db: Session, std_no: int
-) -> Optional[StudentProgram]:
-    return (
-        db.query(StudentProgram)
-        .filter(
-            StudentProgram.std_no == std_no,
-            StudentProgram.status.in_(["Active", "Completed"]),
-        )
-        .order_by(StudentProgram.id.desc())
-        .first()
-    )
-
-
 def _has_approved_academic_graduation(db: Session, student_program_id: int) -> bool:
     result = (
         db.query(GraduationRequest)
