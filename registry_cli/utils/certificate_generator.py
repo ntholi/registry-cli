@@ -26,7 +26,7 @@ CENTER_X = PAGE_WIDTH / 2  # Should be ~297.638 points from left edge
 NAME_FONT_SIZE = 32
 NAME_Y = 695  # Student name on the underline after "It is hereby certified that"
 PROGRAM_Y = 606  # Program name on the underline after "is awarded"
-DATE_COORDS = (430, 290)  # Date positioned in bottom right area
+DATE_Y = 180  # Date positioned in bottom right area
 
 PRIMARY_COLOR = HexColor("#000000")
 
@@ -79,7 +79,7 @@ def _build_overlay(
 
     # Date - small regular font, positioned in bottom right
     c.setFont("Helvetica", 11)
-    c.drawString(DATE_COORDS[0], DATE_COORDS[1], issue_date)
+    c.drawCentredString(perfect_center_x, DATE_Y, issue_date)
 
     c.showPage()
     c.save()
