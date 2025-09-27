@@ -12,9 +12,7 @@ from reportlab.pdfgen import canvas
 
 TEMPLATE_PATH = Path("sample.pdf")  # Provided template file
 PALATINO_FONT_PATH = Path("fonts/palatino.ttf")  # Custom Palatino Bold font file
-SNELL_FONT_PATH = Path(
-    "fonts/snellroundhand_black.otf"
-)  # Custom Snell Roundhand font file
+SNELL_FONT_PATH = Path("fonts/Roundhand Bold.ttf")  # Custom Snell Roundhand font file
 OUTPUT_DIR = Path("certificates")
 OUTPUT_DIR.mkdir(exist_ok=True)
 
@@ -68,7 +66,7 @@ def _build_overlay(
     c.drawCentredString(perfect_center_x, NAME_Y, name)
 
     # Program name - elegant script style using Snell Roundhand, centered on the underline
-    c.setFont(program_font_name, 35)
+    c.setFont(program_font_name, 38)
     c.drawCentredString(perfect_center_x, PROGRAM_Y, program_name)
 
     # Date - small regular font, positioned in bottom right
