@@ -205,62 +205,84 @@ def calculate_graduation_statistics(
     db: Session, graduating_students: List[Dict], non_graduating_students: List[Dict]
 ) -> Dict:
     """
-    Calculate graduation statistics by program level and overall.
+    Calculate graduation statistics by school and program, similar to breakdown sheet format.
     """
     from collections import defaultdict
 
-    stats = defaultdict(
-        lambda: {"expected": 0, "graduating": 0, "non_graduating": 0, "percentage": 0.0}
-    )
-
-    # Count graduating students by program level
-    for student in graduating_students:
-        # Get program level from database for graduating students
-        try:
-            # Get the active student program to determine the program level
-            student_program = (
-                db.query(StudentProgram, Program.level)
-                .join(Structure, StudentProgram.structure_id == Structure.id)
-                .join(Program, Structure.program_id == Program.id)
-                .filter(
-                    and_(
-                        StudentProgram.std_no == student["student_number"],
-                        StudentProgram.status == "Active",
-                    )
-                )
-                .first()
-            )
-
-            if student_program:
-                program_level = student_program[1]  # Program.level
-            else:
-                program_level = "unknown"
-
-        except Exception:
-            program_level = "unknown"
-
-        stats[program_level]["graduating"] += 1
-        stats["overall"]["graduating"] += 1
-
-    # Count non-graduating students by program level
-    for student in non_graduating_students:
-        program_level = student["program_level"]
-        stats[program_level]["non_graduating"] += 1
-        stats["overall"]["non_graduating"] += 1
-
-    # Calculate totals and percentages
-    for level in stats:
-        stats[level]["expected"] = (
-            stats[level]["graduating"] + stats[level]["non_graduating"]
+    # Structure: stats[school_name][program_name] = {graduating, non_graduating, expected, percentage}
+    school_program_stats = defaultdict(
+        lambda: defaultdict(
+            lambda: {
+                "graduating": 0,
+                "non_graduating": 0,
+                "expected": 0,
+                "percentage": 0.0,
+            }
         )
-        if stats[level]["expected"] > 0:
-            stats[level]["percentage"] = (
-                stats[level]["graduating"] / stats[level]["expected"]
-            ) * 100
-        else:
-            stats[level]["percentage"] = 0.0
+    )
+    school_totals = defaultdict(
+        lambda: {"graduating": 0, "non_graduating": 0, "expected": 0, "percentage": 0.0}
+    )
+    overall_stats = {
+        "graduating": 0,
+        "non_graduating": 0,
+        "expected": 0,
+        "percentage": 0.0,
+    }
 
-    return dict(stats)
+    # Count graduating students by school and program
+    for student in graduating_students:
+        school = student["school_name"]
+        program = student["program_name"]
+
+        school_program_stats[school][program]["graduating"] += 1
+        school_totals[school]["graduating"] += 1
+        overall_stats["graduating"] += 1
+
+    # Count non-graduating students by school and program
+    for student in non_graduating_students:
+        school = student["school_name"]
+        program = student["program_name"]
+
+        school_program_stats[school][program]["non_graduating"] += 1
+        school_totals[school]["non_graduating"] += 1
+        overall_stats["non_graduating"] += 1
+
+    # Calculate totals and percentages for each program
+    for school in school_program_stats:
+        for program in school_program_stats[school]:
+            stats = school_program_stats[school][program]
+            stats["expected"] = stats["graduating"] + stats["non_graduating"]
+            if stats["expected"] > 0:
+                stats["percentage"] = (stats["graduating"] / stats["expected"]) * 100
+            else:
+                stats["percentage"] = 0.0
+
+    # Calculate totals and percentages for each school
+    for school in school_totals:
+        stats = school_totals[school]
+        stats["expected"] = stats["graduating"] + stats["non_graduating"]
+        if stats["expected"] > 0:
+            stats["percentage"] = (stats["graduating"] / stats["expected"]) * 100
+        else:
+            stats["percentage"] = 0.0
+
+    # Calculate overall percentage
+    overall_stats["expected"] = (
+        overall_stats["graduating"] + overall_stats["non_graduating"]
+    )
+    if overall_stats["expected"] > 0:
+        overall_stats["percentage"] = (
+            overall_stats["graduating"] / overall_stats["expected"]
+        ) * 100
+    else:
+        overall_stats["percentage"] = 0.0
+
+    return {
+        "school_program_stats": dict(school_program_stats),
+        "school_totals": dict(school_totals),
+        "overall_stats": overall_stats,
+    }
 
 
 def calculate_cgpa_and_classification_for_program(
@@ -920,10 +942,11 @@ def export_graduating_students(
     # Create graduation statistics sheet
     stats_ws = wb.create_sheet("Graduation Statistics")
 
-    # Set up headers for statistics
+    # Set up headers for statistics breakdown
     stats_headers = [
-        "Program Level",
-        "Expected Graduates",
+        "School/Faculty",
+        "Program",
+        "Expected",
         "Graduating",
         "Non-Graduating",
         "Graduation Rate (%)",
@@ -937,37 +960,72 @@ def export_graduating_students(
             start_color="2E8B57", end_color="2E8B57", fill_type="solid"
         )  # Sea green
 
-    # Add statistics data
+    # Add statistics breakdown data
     row = 2
-    for level, stats in graduation_stats.items():
-        if level != "overall":  # Handle overall separately
-            stats_ws.cell(row=row, column=1, value=level.title())
-            stats_ws.cell(row=row, column=2, value=stats["expected"])
-            stats_ws.cell(row=row, column=3, value=stats["graduating"])
-            stats_ws.cell(row=row, column=4, value=stats["non_graduating"])
-            stats_ws.cell(row=row, column=5, value=f"{stats['percentage']:.1f}%")
-            row += 1
+    school_program_stats = graduation_stats["school_program_stats"]
+    school_totals = graduation_stats["school_totals"]
+    overall_stats = graduation_stats["overall_stats"]
 
-    # Add overall statistics with different formatting
-    if "overall" in graduation_stats:
-        overall_stats = graduation_stats["overall"]
-
-        # Add a separator row
-        row += 1
-
-        # Add overall row with bold formatting
-        stats_ws.cell(row=row, column=1, value="OVERALL")
-        stats_ws.cell(row=row, column=2, value=overall_stats["expected"])
-        stats_ws.cell(row=row, column=3, value=overall_stats["graduating"])
-        stats_ws.cell(row=row, column=4, value=overall_stats["non_graduating"])
-        stats_ws.cell(row=row, column=5, value=f"{overall_stats['percentage']:.1f}%")
-
-        for col in range(1, 6):
+    for school in sorted(school_program_stats.keys()):
+        # Add school header row spanning all columns
+        for col in range(1, 7):  # Columns 1-6
             cell = stats_ws.cell(row=row, column=col)
+            if col == 1:
+                cell.value = school
             cell.font = Font(bold=True, color="FFFFFF")
             cell.fill = PatternFill(
-                start_color="000000", end_color="000000", fill_type="solid"
+                start_color="444444", end_color="444444", fill_type="solid"
             )
+        row += 1
+
+        # Add programs for this school
+        programs = sorted(school_program_stats[school].keys())
+        for program in programs:
+            stats = school_program_stats[school][program]
+            stats_ws.cell(row=row, column=1, value="")  # Indent for program
+            stats_ws.cell(row=row, column=2, value=program)
+            stats_ws.cell(row=row, column=3, value=stats["expected"])
+            stats_ws.cell(row=row, column=4, value=stats["graduating"])
+            stats_ws.cell(row=row, column=5, value=stats["non_graduating"])
+            stats_ws.cell(row=row, column=6, value=f"{stats['percentage']:.1f}%")
+            row += 1
+
+        # Add school total
+        school_stats = school_totals[school]
+        total_cell = stats_ws.cell(row=row, column=2)
+        total_cell.value = f"Total"
+        total_cell.font = Font(bold=True, color="444444")
+
+        stats_ws.cell(row=row, column=3, value=school_stats["expected"])
+        stats_ws.cell(row=row, column=4, value=school_stats["graduating"])
+        stats_ws.cell(row=row, column=5, value=school_stats["non_graduating"])
+
+        rate_cell = stats_ws.cell(row=row, column=6)
+        rate_cell.value = f"{school_stats['percentage']:.1f}%"
+        rate_cell.font = Font(bold=True, color="444444")
+
+        for col in [3, 4, 5]:
+            cell = stats_ws.cell(row=row, column=col)
+            cell.font = Font(bold=True, color="444444")
+
+        row += 2  # Add space between schools
+
+    # Add grand total
+    grand_total_row = row
+    stats_ws.cell(row=grand_total_row, column=2, value="GRAND TOTAL")
+    stats_ws.cell(row=grand_total_row, column=3, value=overall_stats["expected"])
+    stats_ws.cell(row=grand_total_row, column=4, value=overall_stats["graduating"])
+    stats_ws.cell(row=grand_total_row, column=5, value=overall_stats["non_graduating"])
+    stats_ws.cell(
+        row=grand_total_row, column=6, value=f"{overall_stats['percentage']:.1f}%"
+    )
+
+    for col in [2, 3, 4, 5, 6]:
+        cell = stats_ws.cell(row=grand_total_row, column=col)
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill(
+            start_color="000000", end_color="000000", fill_type="solid"
+        )
 
     # Auto-size columns for statistics sheet
     for col in range(1, len(stats_headers) + 1):
@@ -979,7 +1037,7 @@ def export_graduating_students(
                     max_length = len(str(row_cells.value))
             except:
                 pass
-        adjusted_width = min(max_length + 2, 40)
+        adjusted_width = min(max_length + 2, 60)  # Slightly wider for school names
         stats_ws.column_dimensions[column_letter].width = adjusted_width
 
     # Save the file
@@ -1011,11 +1069,10 @@ def export_graduating_students(
         f"- Non-graduating students (should have graduated but have pending issues): {len(non_graduating_students)}"
     )
 
-    if "overall" in graduation_stats:
-        overall_stats = graduation_stats["overall"]
-        click.echo(
-            f"- Overall graduation rate: {overall_stats['percentage']:.1f}% ({overall_stats['graduating']}/{overall_stats['expected']})"
-        )
+    overall_stats = graduation_stats["overall_stats"]
+    click.echo(
+        f"- Overall graduation rate: {overall_stats['percentage']:.1f}% ({overall_stats['graduating']}/{overall_stats['expected']})"
+    )
 
     # Show breakdown by school
     from collections import Counter
