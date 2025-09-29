@@ -294,7 +294,7 @@ def generate_certificate(
     # Expand abbreviated program name to full form
     expanded_program_name = expand_program_name(program_name)
 
-    issue_date = datetime.now().strftime("%d %B %Y")
+    issue_date = "02 October 2025"
 
     # Prepare output filename
     safe_name = "_".join(name.split())
