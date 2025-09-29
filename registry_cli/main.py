@@ -9,6 +9,7 @@ from registry_cli.commands.approve.academic_graduation import (
 from registry_cli.commands.approve.signups import approve_signups
 from registry_cli.commands.check.prerequisites import check_prerequisites
 from registry_cli.commands.create.certificate import certificate_cmd
+from registry_cli.commands.create.certificates_bulk import certificates_bulk_cmd
 from registry_cli.commands.create.student_semesters import (
     create_student_semester_by_student_number,
     create_student_semesters_approved,
@@ -400,6 +401,7 @@ def create_semester_by_student(std_no: int) -> None:
 
 # Certificate generation
 create.add_command(certificate_cmd)
+create.add_command(certificates_bulk_cmd)
 
 
 @cli.group()
