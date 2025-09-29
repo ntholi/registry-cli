@@ -1,5 +1,5 @@
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 
 import click
@@ -50,6 +50,217 @@ def has_no_pending_issues(db: Session, std_no: int) -> bool:
     except Exception as e:
         click.echo(f"Error checking pending issues for student {std_no}: {str(e)}")
         return False
+
+
+def get_pending_issues_details(db: Session, std_no: int) -> Dict[str, List[Dict]]:
+    """
+    Get detailed pending issues for a student.
+    Returns the same structure as get_outstanding_from_structure.
+    """
+    try:
+        programs = get_student_programs(db, std_no)
+        if not programs:
+            return {"failedNeverRepeated": [], "neverAttempted": []}
+
+        outstanding = get_outstanding_from_structure(db, programs)
+        return outstanding
+    except Exception as e:
+        click.echo(f"Error getting pending issues for student {std_no}: {str(e)}")
+        return {"failedNeverRepeated": [], "neverAttempted": []}
+
+
+def get_non_graduating_students(db: Session) -> List[Dict]:
+    """
+    Find students who should be graduating now but have pending issues.
+    - Certificate students: intake in Jun-Sep exactly 1 year ago
+    - Diploma students: intake in Jun-Sep exactly 3 years ago
+    - Degree students: intake in Jun-Sep exactly 4 years ago
+    """
+    non_graduating_students = []
+    current_date = datetime.now()
+
+    # Define expected graduation years by program level
+    expected_years = {"certificate": 1, "diploma": 3, "degree": 4}
+
+    click.echo("Finding students who should have graduated but have pending issues...")
+
+    for level, years in expected_years.items():
+        # Calculate target year (intake should be this many years ago)
+        target_year = current_date.year - years
+
+        # Create date patterns for typical intake months (June, July, August, September)
+        intake_months = [6, 7, 8, 9]  # June to September
+
+        # Build list of possible intake dates for this program level
+        possible_intake_dates = []
+        for month in intake_months:
+            # Try different days that are commonly used for intake dates
+            for day in [1, 15, 30, 31]:  # Common start dates
+                try:
+                    if month == 2 and day > 28:  # Skip invalid February dates
+                        continue
+                    if (
+                        month in [4, 6, 9, 11] and day == 31
+                    ):  # Skip invalid 31st for certain months
+                        continue
+                    intake_date = datetime(target_year, month, day)
+                    possible_intake_dates.append(intake_date.strftime("%Y-%m-%d"))
+                except ValueError:
+                    continue  # Skip invalid dates
+
+        # Find students with active programs at this level with intake dates in target months/year
+        students_query = (
+            db.query(
+                StudentProgram.std_no,
+                StudentProgram.intake_date,
+                Program.level,
+                Program.name,
+                School.name.label("school_name"),
+            )
+            .join(Structure, StudentProgram.structure_id == Structure.id)
+            .join(Program, Structure.program_id == Program.id)
+            .join(School, Program.school_id == School.id)
+            .filter(
+                and_(
+                    StudentProgram.status == "Active",
+                    Program.level == level,
+                    StudentProgram.intake_date.isnot(None),
+                )
+            )
+            .all()
+        )
+
+        # Filter for students with intake dates in the target year and intake months (June-September)
+        filtered_students = []
+        for student_data in students_query:
+            intake_date_str = student_data[1]  # intake_date
+            if intake_date_str:
+                try:
+                    intake_date = datetime.strptime(intake_date_str, "%Y-%m-%d")
+                    # Check if intake is in target year and in months 6-9 (June-September)
+                    if (
+                        intake_date.year == target_year
+                        and intake_date.month in intake_months
+                    ):
+                        filtered_students.append(student_data)
+                except ValueError:
+                    continue  # Skip invalid date formats
+
+        click.echo(
+            f"Found {len(filtered_students)} {level} students with intake in {target_year} Jun-Sep ({years} years ago)"
+        )
+
+        # Use filtered students for processing
+        students_query = filtered_students
+
+        # Check each student for pending issues
+        for i, (
+            std_no,
+            intake_date,
+            program_level,
+            program_name,
+            school_name,
+        ) in enumerate(students_query, 1):
+            if i % 50 == 0:
+                click.echo(f"Checked {i}/{len(students_query)} {level} students...")
+
+            # Skip students who are already graduating (have no pending issues)
+            if has_no_pending_issues(db, std_no):
+                continue
+
+            # Get detailed pending issues
+            pending_issues = get_pending_issues_details(db, std_no)
+
+            # Only include if they actually have pending issues
+            if (
+                len(pending_issues["failedNeverRepeated"]) > 0
+                or len(pending_issues["neverAttempted"]) > 0
+            ):
+                # Get student details
+                student = db.query(Student).filter(Student.std_no == std_no).first()
+                if student:
+                    non_graduating_students.append(
+                        {
+                            "student_number": std_no,
+                            "student_name": student.name,
+                            "school_name": school_name,
+                            "program_name": program_name,
+                            "program_level": program_level,
+                            "intake_date": intake_date,
+                            "expected_graduation_years": years,
+                            "failed_never_repeated": pending_issues[
+                                "failedNeverRepeated"
+                            ],
+                            "never_attempted": pending_issues["neverAttempted"],
+                        }
+                    )
+
+    click.echo(
+        f"Found {len(non_graduating_students)} students with pending issues who should have graduated"
+    )
+    return non_graduating_students
+
+
+def calculate_graduation_statistics(
+    db: Session, graduating_students: List[Dict], non_graduating_students: List[Dict]
+) -> Dict:
+    """
+    Calculate graduation statistics by program level and overall.
+    """
+    from collections import defaultdict
+
+    stats = defaultdict(
+        lambda: {"expected": 0, "graduating": 0, "non_graduating": 0, "percentage": 0.0}
+    )
+
+    # Count graduating students by program level
+    for student in graduating_students:
+        # Get program level from database for graduating students
+        try:
+            # Get the active student program to determine the program level
+            student_program = (
+                db.query(StudentProgram, Program.level)
+                .join(Structure, StudentProgram.structure_id == Structure.id)
+                .join(Program, Structure.program_id == Program.id)
+                .filter(
+                    and_(
+                        StudentProgram.std_no == student["student_number"],
+                        StudentProgram.status == "Active",
+                    )
+                )
+                .first()
+            )
+
+            if student_program:
+                program_level = student_program[1]  # Program.level
+            else:
+                program_level = "unknown"
+
+        except Exception:
+            program_level = "unknown"
+
+        stats[program_level]["graduating"] += 1
+        stats["overall"]["graduating"] += 1
+
+    # Count non-graduating students by program level
+    for student in non_graduating_students:
+        program_level = student["program_level"]
+        stats[program_level]["non_graduating"] += 1
+        stats["overall"]["non_graduating"] += 1
+
+    # Calculate totals and percentages
+    for level in stats:
+        stats[level]["expected"] = (
+            stats[level]["graduating"] + stats[level]["non_graduating"]
+        )
+        if stats[level]["expected"] > 0:
+            stats[level]["percentage"] = (
+                stats[level]["graduating"] / stats[level]["expected"]
+            ) * 100
+        else:
+            stats[level]["percentage"] = 0.0
+
+    return dict(stats)
 
 
 def calculate_cgpa_and_classification_for_program(
@@ -466,6 +677,14 @@ def export_graduating_students(
         )
         return
 
+    # Get non-graduating students (those who should have graduated but have pending issues)
+    non_graduating_students = get_non_graduating_students(db)
+
+    # Calculate graduation statistics
+    graduation_stats = calculate_graduation_statistics(
+        db, graduating_students, non_graduating_students
+    )
+
     # Sort students by school name, program name, then CGPA (descending)
     graduating_students.sort(
         key=lambda x: (
@@ -505,7 +724,7 @@ def export_graduating_students(
     ]
     header_font = Font(bold=True, color="FFFFFF")
     header_fill = PatternFill(
-        start_color="366092", end_color="366092", fill_type="solid"
+        start_color="000000", end_color="000000", fill_type="solid"
     )
 
     for col, header in enumerate(headers, 1):
@@ -622,6 +841,147 @@ def export_graduating_students(
         adjusted_width = min(max_length + 2, 60)  # Slightly wider for school names
         breakdown_ws.column_dimensions[column_letter].width = adjusted_width
 
+    # Create non-graduating students sheet
+    if non_graduating_students:
+        non_grad_ws = wb.create_sheet("Non-Graduating Students")
+
+        # Set up headers for non-graduating students
+        non_grad_headers = [
+            "Student Number",
+            "Student Name",
+            "School Name",
+            "Program Name",
+            "Program Level",
+            "Intake Date",
+            "Expected Years",
+            "Failed Never Repeated",
+            "Never Attempted",
+        ]
+
+        for col, header in enumerate(non_grad_headers, 1):
+            cell = non_grad_ws.cell(row=1, column=col)
+            cell.value = header
+            cell.font = header_font
+            cell.fill = PatternFill(
+                start_color="8B0000", end_color="8B0000", fill_type="solid"
+            )  # Dark red
+
+        # Add non-graduating student data
+        for row, student in enumerate(non_graduating_students, 2):
+            non_grad_ws.cell(row=row, column=1, value=student["student_number"])
+            non_grad_ws.cell(row=row, column=2, value=student["student_name"])
+            non_grad_ws.cell(row=row, column=3, value=student["school_name"])
+            non_grad_ws.cell(row=row, column=4, value=student["program_name"])
+            non_grad_ws.cell(row=row, column=5, value=student["program_level"].title())
+            non_grad_ws.cell(row=row, column=6, value=student["intake_date"])
+            non_grad_ws.cell(
+                row=row, column=7, value=student["expected_graduation_years"]
+            )
+
+            # Format failed never repeated modules
+            failed_modules = []
+            for module in student["failed_never_repeated"]:
+                failed_modules.append(f"{module['code']} - {module['name']}")
+            non_grad_ws.cell(
+                row=row,
+                column=8,
+                value="; ".join(failed_modules) if failed_modules else "None",
+            )
+
+            # Format never attempted modules
+            never_attempted_modules = []
+            for module in student["never_attempted"]:
+                never_attempted_modules.append(f"{module['code']} - {module['name']}")
+            non_grad_ws.cell(
+                row=row,
+                column=9,
+                value=(
+                    "; ".join(never_attempted_modules)
+                    if never_attempted_modules
+                    else "None"
+                ),
+            )
+
+        # Auto-size columns for non-graduating sheet
+        for col in range(1, len(non_grad_headers) + 1):
+            column_letter = get_column_letter(col)
+            max_length = 0
+            for row_cells in non_grad_ws[column_letter]:
+                try:
+                    if len(str(row_cells.value)) > max_length:
+                        max_length = len(str(row_cells.value))
+                except:
+                    pass
+            adjusted_width = min(
+                max_length + 2, 80
+            )  # Allow wider columns for issue descriptions
+            non_grad_ws.column_dimensions[column_letter].width = adjusted_width
+
+    # Create graduation statistics sheet
+    stats_ws = wb.create_sheet("Graduation Statistics")
+
+    # Set up headers for statistics
+    stats_headers = [
+        "Program Level",
+        "Expected Graduates",
+        "Graduating",
+        "Non-Graduating",
+        "Graduation Rate (%)",
+    ]
+
+    for col, header in enumerate(stats_headers, 1):
+        cell = stats_ws.cell(row=1, column=col)
+        cell.value = header
+        cell.font = header_font
+        cell.fill = PatternFill(
+            start_color="2E8B57", end_color="2E8B57", fill_type="solid"
+        )  # Sea green
+
+    # Add statistics data
+    row = 2
+    for level, stats in graduation_stats.items():
+        if level != "overall":  # Handle overall separately
+            stats_ws.cell(row=row, column=1, value=level.title())
+            stats_ws.cell(row=row, column=2, value=stats["expected"])
+            stats_ws.cell(row=row, column=3, value=stats["graduating"])
+            stats_ws.cell(row=row, column=4, value=stats["non_graduating"])
+            stats_ws.cell(row=row, column=5, value=f"{stats['percentage']:.1f}%")
+            row += 1
+
+    # Add overall statistics with different formatting
+    if "overall" in graduation_stats:
+        overall_stats = graduation_stats["overall"]
+
+        # Add a separator row
+        row += 1
+
+        # Add overall row with bold formatting
+        stats_ws.cell(row=row, column=1, value="OVERALL")
+        stats_ws.cell(row=row, column=2, value=overall_stats["expected"])
+        stats_ws.cell(row=row, column=3, value=overall_stats["graduating"])
+        stats_ws.cell(row=row, column=4, value=overall_stats["non_graduating"])
+        stats_ws.cell(row=row, column=5, value=f"{overall_stats['percentage']:.1f}%")
+
+        for col in range(1, 6):
+            cell = stats_ws.cell(row=row, column=col)
+            cell.font = Font(bold=True, color="FFFFFF")
+            cell.fill = PatternFill(
+                start_color="000000", end_color="000000", fill_type="solid"
+            )
+
+    # Auto-size columns for statistics sheet
+    for col in range(1, len(stats_headers) + 1):
+        column_letter = get_column_letter(col)
+        max_length = 0
+        for row_cells in stats_ws[column_letter]:
+            try:
+                if len(str(row_cells.value)) > max_length:
+                    max_length = len(str(row_cells.value))
+            except:
+                pass
+        adjusted_width = min(max_length + 2, 40)
+        stats_ws.column_dimensions[column_letter].width = adjusted_width
+
     # Save the file
     wb.save(excel_path)
 
@@ -647,6 +1007,15 @@ def export_graduating_students(
     click.echo(
         f"- Students meeting both criteria: {len(approved_std_nos & qualifying_semester_std_nos)}"
     )
+    click.echo(
+        f"- Non-graduating students (should have graduated but have pending issues): {len(non_graduating_students)}"
+    )
+
+    if "overall" in graduation_stats:
+        overall_stats = graduation_stats["overall"]
+        click.echo(
+            f"- Overall graduation rate: {overall_stats['percentage']:.1f}% ({overall_stats['graduating']}/{overall_stats['expected']})"
+        )
 
     # Show breakdown by school
     from collections import Counter
