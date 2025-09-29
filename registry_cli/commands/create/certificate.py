@@ -68,7 +68,9 @@ def create_student_certificate(db: Session, std_no: int) -> Optional[str]:
         click.secho("Program not found", fg="red")
         return None
 
-    path = generate_certificate(student.name, program.name)
+    path = generate_certificate(
+        student.name, program.name, program.code, student.std_no
+    )
     if path:
         click.secho(f"Certificate generated: {path}", fg="green")
     else:

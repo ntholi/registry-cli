@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Optional
 
 import qrcode
-from nanoid import generate
 from PIL import Image
 from PyPDF2 import PdfReader, PdfWriter
 from reportlab.lib.colors import HexColor
@@ -213,7 +212,9 @@ def _build_overlay(
     c.save()
 
 
-def generate_certificate(name: str, program_name: str) -> Optional[str]:
+def generate_certificate(
+    name: str, program_name: str, program_code: str, std_no: int
+) -> Optional[str]:
     """Generate a graduation certificate PDF based on sample template.
 
     This overlays the student's name and program on the first page of sample.pdf.
@@ -234,8 +235,8 @@ def generate_certificate(name: str, program_name: str) -> Optional[str]:
 
     # Create overlay
     overlay_path = OUTPUT_DIR / "_overlay_temp.pdf"
-    # Generate unique reference for the certificate
-    reference = f"LSO{generate(size=12).upper()}"
+    # Generate reference using program code and student number
+    reference = f"LSO{program_code}{std_no}"
     _build_overlay(name, program_name, reference, issue_date, overlay_path)
 
     try:

@@ -23,7 +23,6 @@ from registry_cli.utils.certificate_generator import (
     TEMPLATE_PATH,
     OUTPUT_DIR,
     _build_overlay,
-    generate,
 )
 
 
@@ -78,6 +77,7 @@ def _get_student_details(db: Session, std_no: int) -> Optional[dict]:
         db.query(
             Student.std_no,
             Student.name.label("student_name"),
+            Program.code.label("program_code"),
             Program.name.label("program_name"),
             School.name.label("school_name"),
         )
@@ -94,6 +94,7 @@ def _get_student_details(db: Session, std_no: int) -> Optional[dict]:
         return {
             "std_no": query.std_no,
             "student_name": query.student_name,
+            "program_code": query.program_code,
             "program_name": query.program_name,
             "school_name": query.school_name,
         }
@@ -101,7 +102,7 @@ def _get_student_details(db: Session, std_no: int) -> Optional[dict]:
 
 
 def _generate_single_certificate_overlay(
-    name: str, program_name: str, temp_dir: Path
+    name: str, program_name: str, program_code: str, std_no: int, temp_dir: Path
 ) -> Optional[Path]:
     """
     Generate a single certificate overlay for a student.
@@ -109,6 +110,8 @@ def _generate_single_certificate_overlay(
     Args:
         name: Student's name
         program_name: Program name
+        program_code: Program code
+        std_no: Student number
         temp_dir: Temporary directory to store the overlay
         
     Returns:
@@ -116,7 +119,7 @@ def _generate_single_certificate_overlay(
     """
     try:
         issue_date = datetime.now().strftime("%d %B %Y")
-        reference = f"LSO{generate(size=12).upper()}"
+        reference = f"LSO{program_code}{std_no}"
         
         # Create temporary overlay file
         overlay_path = temp_dir / f"overlay_{name.replace(' ', '_')}.pdf"
@@ -163,12 +166,13 @@ def _combine_certificates_to_multi_page_pdf(
         for i, student in enumerate(students_data, 1):
             name = student['student_name']
             program_name = student['program_name']
+            program_code = student['program_code']
             std_no = student['std_no']
             
             click.echo(f"  [{i:3d}/{len(students_data)}] Adding {std_no} - {name}...")
             
             # Generate overlay for this student
-            overlay_path = _generate_single_certificate_overlay(name, program_name, temp_dir)
+            overlay_path = _generate_single_certificate_overlay(name, program_name, program_code, std_no, temp_dir)
             
             if overlay_path and overlay_path.exists():
                 try:
@@ -214,6 +218,7 @@ def _combine_certificates_to_multi_page_pdf(
     except Exception as e:
         click.secho(f"❌ Error creating multi-page PDF: {str(e)}", fg="red")
         return None
+    
 def generate_certificates_for_cleared_students(
     db: Session, 
     limit: Optional[int] = None,
