@@ -28,6 +28,73 @@ CENTER_X = PAGE_WIDTH / 2  # Should be ~297.638 points from left edge
 PRIMARY_COLOR = HexColor("#000000")
 
 
+def expand_program_name(program_name: str) -> str:
+    """Expand abbreviated degree names to their full forms.
+
+    Args:
+        program_name: The original program name (e.g., "BA in Interior Architecture")
+
+    Returns:
+        The expanded program name (e.g., "Bachelor of Arts in Interior Architecture")
+    """
+    # Dictionary mapping abbreviations to full degree names
+    degree_expansions = {
+        "BA": "Bachelor of Arts",
+        "BSc": "Bachelor of Science",
+        "B Bus": "Bachelor of Business",
+        "BCom": "Bachelor of Commerce",
+        "BEd": "Bachelor of Education",
+        "BEng": "Bachelor of Engineering",
+        "BFA": "Bachelor of Fine Arts",
+        "BIT": "Bachelor of Information Technology",
+        "BN": "Bachelor of Nursing",
+        "LLB": "Bachelor of Laws",
+        "MA": "Master of Arts",
+        "MSc": "Master of Science",
+        "MBA": "Master of Business Administration",
+        "MEd": "Master of Education",
+        "MEng": "Master of Engineering",
+        "MFA": "Master of Fine Arts",
+        "MIT": "Master of Information Technology",
+        "LLM": "Master of Laws",
+        "PhD": "Doctor of Philosophy",
+        "DBA": "Doctor of Business Administration",
+        "EdD": "Doctor of Education",
+    }
+
+    # Check for (Hons) pattern and handle it specially
+    has_hons = "(Hons)" in program_name
+
+    # Remove (Hons) temporarily for processing, but preserve exact spacing
+    working_name = program_name.replace(" (Hons)", "").replace("(Hons)", "").strip()
+
+    # Try to find and replace degree abbreviations
+    for abbrev, full_name in degree_expansions.items():
+        # Case 1: Exact match (e.g., "MBA" -> "Master of Business Administration")
+        if working_name.strip() == abbrev:
+            result = full_name
+            if has_hons:
+                result = result + " (Hons)"
+            return result
+
+        # Case 2: Match at the start followed by a space (e.g., "BA in...")
+        elif working_name.startswith(abbrev + " "):
+            # Replace the abbreviation with the full name
+            expanded = working_name.replace(abbrev + " ", full_name + " ", 1)
+            # Add back (Hons) if it was present, placing it after the degree name
+            if has_hons:
+                # Insert (Hons) after the degree name but before "in"
+                if " in " in expanded:
+                    parts = expanded.split(" in ", 1)
+                    expanded = parts[0] + " (Hons) in " + parts[1]
+                else:
+                    expanded = expanded + " (Hons)"
+            return expanded
+
+    # If no abbreviation found, return original name
+    return program_name
+
+
 def _register_font(font_path: Path, font_name: str) -> bool:
     """Register a font if the file exists.
 
@@ -224,6 +291,9 @@ def generate_certificate(
     if not TEMPLATE_PATH.exists():
         return None
 
+    # Expand abbreviated program name to full form
+    expanded_program_name = expand_program_name(program_name)
+
     issue_date = datetime.now().strftime("%d %B %Y")
 
     # Prepare output filename
@@ -237,7 +307,7 @@ def generate_certificate(
     overlay_path = OUTPUT_DIR / "_overlay_temp.pdf"
     # Generate reference using program code and student number
     reference = f"LSO{program_code}{std_no}"
-    _build_overlay(name, program_name, reference, issue_date, overlay_path)
+    _build_overlay(name, expanded_program_name, reference, issue_date, overlay_path)
 
     try:
         base_reader = PdfReader(str(TEMPLATE_PATH))

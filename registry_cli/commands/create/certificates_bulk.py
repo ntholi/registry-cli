@@ -23,6 +23,7 @@ from registry_cli.utils.certificate_generator import (
     TEMPLATE_PATH,
     OUTPUT_DIR,
     _build_overlay,
+    expand_program_name,
 )
 
 
@@ -118,13 +119,16 @@ def _generate_single_certificate_overlay(
         Path to the generated overlay PDF or None if failed
     """
     try:
+        # Expand abbreviated program name to full form
+        expanded_program_name = expand_program_name(program_name)
+        
         issue_date = datetime.now().strftime("%d %B %Y")
         reference = f"LSO{program_code}{std_no}"
         
         # Create temporary overlay file
         overlay_path = temp_dir / f"overlay_{name.replace(' ', '_')}.pdf"
         
-        _build_overlay(name, program_name, reference, issue_date, overlay_path)
+        _build_overlay(name, expanded_program_name, reference, issue_date, overlay_path)
         
         return overlay_path if overlay_path.exists() else None
         
