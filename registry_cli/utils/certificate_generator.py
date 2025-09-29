@@ -256,8 +256,8 @@ def _build_overlay(
         program_name,
         snell_roundhand,
         603,
-        42,
-        2.5,
+        40,
+        1.6,
     )
 
     draw_text(
