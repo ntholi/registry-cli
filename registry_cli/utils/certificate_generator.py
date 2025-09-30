@@ -20,12 +20,11 @@ SNELL_FONT_PATH = Path("fonts/Roundhand Bold.ttf")  # Custom Snell Roundhand fon
 OUTPUT_DIR = Path("certificates")
 OUTPUT_DIR.mkdir(exist_ok=True)
 
-# Get page dimensions for proper centering
-PAGE_WIDTH, PAGE_HEIGHT = A4  # A4 is 595.276 x 841.89 points
-CENTER_X = PAGE_WIDTH / 2  # Should be ~297.638 points from left edge
-
-
 PRIMARY_COLOR = HexColor("#000000")
+
+DEFAULT_PAGE_WIDTH, DEFAULT_PAGE_HEIGHT = A4
+REFERENCE_RIGHT_MARGIN = 36
+TEXT_HORIZONTAL_MARGIN = 60
 
 
 def expand_program_name(program_name: str) -> str:
@@ -143,12 +142,19 @@ def _generate_qr_code(reference: str) -> ImageReader:
 
 
 def _build_overlay(
-    name: str, program_name: str, reference: str, issue_date: str, tmp_path: Path
+    name: str,
+    program_name: str,
+    reference: str,
+    issue_date: str,
+    tmp_path: Path,
+    *,
+    page_width: float,
+    page_height: float,
 ) -> None:
-    c = canvas.Canvas(str(tmp_path), pagesize=A4)
+    c = canvas.Canvas(str(tmp_path), pagesize=(page_width, page_height))
     c.setFillColor(PRIMARY_COLOR)
 
-    perfect_center_x = (PAGE_WIDTH / 2) + 30
+    perfect_center_x = page_width / 2
 
     def draw_text(
         text: str,
@@ -156,10 +162,16 @@ def _build_overlay(
         y_axis: float,
         font_size: float,
         letter_spacing_reduction: float = 0.0,
-        max_width: float = 550.0,
+        max_width: Optional[float] = None,
         line_spacing: float = 1.2,
     ) -> None:
         c.setFont(font_name, font_size)
+
+        effective_max_width = (
+            max_width
+            if max_width is not None
+            else page_width - (2 * TEXT_HORIZONTAL_MARGIN)
+        )
 
         def get_text_width(text_segment: str) -> float:
             """Calculate width of text considering letter spacing reduction."""
@@ -186,7 +198,7 @@ def _build_overlay(
                 current_x += char_width - letter_spacing_reduction
 
         # Check if text fits in one line
-        if get_text_width(text) <= max_width:
+        if get_text_width(text) <= effective_max_width:
             draw_line(text, y_axis)
             return
 
@@ -198,7 +210,7 @@ def _build_overlay(
         for word in words:
             test_line = current_line + (" " if current_line else "") + word
 
-            if get_text_width(test_line) <= max_width:
+            if get_text_width(test_line) <= effective_max_width:
                 current_line = test_line
             else:
                 if current_line:
@@ -206,11 +218,11 @@ def _build_overlay(
                     current_line = word
                 else:
                     # Single word is too long, break it by characters
-                    if get_text_width(word) > max_width:
+                    if get_text_width(word) > effective_max_width:
                         char_line = ""
                         for char in word:
                             test_char_line = char_line + char
-                            if get_text_width(test_char_line) <= max_width:
+                            if get_text_width(test_char_line) <= effective_max_width:
                                 char_line = test_char_line
                             else:
                                 if char_line:
@@ -242,7 +254,7 @@ def _build_overlay(
 
     c.setFont(palatino, 8)
     text_width = c.stringWidth(reference, palatino, 8)
-    c.drawString(PAGE_WIDTH - text_width, 772, reference)
+    c.drawString(page_width - REFERENCE_RIGHT_MARGIN - text_width, 772, reference)
 
     draw_text(
         name,
@@ -252,13 +264,7 @@ def _build_overlay(
         1,
     )
 
-    draw_text(
-        program_name,
-        snell_roundhand,
-        603,
-        40,
-        1.6,
-    )
+    draw_text(program_name, snell_roundhand, 603, 40, 1.6, 550)
 
     draw_text(
         issue_date,
@@ -303,14 +309,36 @@ def generate_certificate(
         / f"certificate_{safe_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
     )
 
+    try:
+        base_reader = PdfReader(str(TEMPLATE_PATH))
+    except Exception:
+        return None
+
+    if not base_reader.pages:
+        return None
+
+    media_box = base_reader.pages[0].mediabox
+    page_width = float(media_box[2]) - float(media_box[0])
+    page_height = float(media_box[3]) - float(media_box[1])
+
+    if not page_width or not page_height:
+        page_width, page_height = DEFAULT_PAGE_WIDTH, DEFAULT_PAGE_HEIGHT
+
     # Create overlay
     overlay_path = OUTPUT_DIR / "_overlay_temp.pdf"
     # Generate reference using program code and student number
     reference = f"LSO{program_code}{std_no}"
-    _build_overlay(name, expanded_program_name, reference, issue_date, overlay_path)
+    _build_overlay(
+        name,
+        expanded_program_name,
+        reference,
+        issue_date,
+        overlay_path,
+        page_width=page_width,
+        page_height=page_height,
+    )
 
     try:
-        base_reader = PdfReader(str(TEMPLATE_PATH))
         overlay_reader = PdfReader(str(overlay_path))
         writer = PdfWriter()
 
