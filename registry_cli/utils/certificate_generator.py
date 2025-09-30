@@ -109,7 +109,7 @@ def _register_font(font_path: Path, font_name: str) -> bool:
 
 
 def _generate_qr_code(reference: str) -> ImageReader:
-    """Generate a QR code for the certificate verification URL.
+    """Generate a QR code for the certificate verification URL with a centered logo.
 
     Args:
         reference: The certificate reference number
@@ -119,10 +119,10 @@ def _generate_qr_code(reference: str) -> ImageReader:
     """
     verification_url = f"http://portal.co.ls/verify/certificate/{reference}"
 
-    # Create QR code instance
+    # Create QR code instance with higher error correction to accommodate logo
     qr = qrcode.QRCode(
         version=1,  # Controls the size of the QR Code
-        error_correction=qrcode.ERROR_CORRECT_L,  # About 7% or less errors can be corrected
+        error_correction=qrcode.ERROR_CORRECT_H,  # High error correction (~30%) to accommodate center logo
         box_size=10,  # Controls how many pixels each "box" of the QR code is
         border=4,  # Controls how many boxes thick the border should be
     )
@@ -130,8 +130,41 @@ def _generate_qr_code(reference: str) -> ImageReader:
     qr.add_data(verification_url)
     qr.make(fit=True)
 
-    # Create QR code image
-    qr_img = qr.make_image(fill_color="black", back_color="white")
+    # Create QR code image and get the underlying PIL Image
+    qr_code_img = qr.make_image(fill_color="black", back_color="white")
+    qr_img = qr_code_img.get_image().convert("RGBA")
+
+    # Load the center logo
+    logo_path = Path("images/fly400x400.jpeg")
+    if logo_path.exists():
+        # Open and resize the logo
+        logo = Image.open(logo_path).convert("RGBA")
+
+        qr_width, qr_height = qr_img.size
+        base_size = int(min(qr_width, qr_height) * 0.15)
+        if base_size > 0:
+            # Resize logo maintaining aspect ratio
+            logo = logo.resize((base_size, base_size), Image.Resampling.LANCZOS)
+
+            # Create a padded background to give the logo breathing room inside the QR modules
+            padding = max(4, int(base_size * 0.2))
+            padded_size = base_size + (padding * 2)
+            logo_background = Image.new(
+                "RGBA",
+                (padded_size, padded_size),
+                (255, 255, 255, 255),
+            )
+            logo_background.paste(logo, (padding, padding), logo)
+
+            # Calculate position to center the padded logo
+            logo_x = (qr_width - padded_size) // 2
+            logo_y = (qr_height - padded_size) // 2
+
+            # Paste the padded logo onto the QR code
+            qr_img.paste(logo_background, (logo_x, logo_y), logo_background)
+
+    # Convert back to RGB for saving as PNG
+    qr_img = qr_img.convert("RGB")
 
     # Convert PIL image to ImageReader for reportlab
     img_buffer = io.BytesIO()
