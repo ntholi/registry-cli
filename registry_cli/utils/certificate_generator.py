@@ -359,7 +359,7 @@ def generate_certificate(
 
     # Create overlay
     overlay_path = OUTPUT_DIR / "_overlay_temp.pdf"
-    # Generate reference using program code and student number
+    program_code = _prepend_program_level(program_name, program_code)
     reference = f"LSO{program_code}{std_no}"
     _build_overlay(
         name,
@@ -398,3 +398,9 @@ def generate_certificate(
                 overlay_path.unlink()
             except Exception:
                 pass
+
+
+def _prepend_program_level(program_name: str, program_code: str) -> str:
+    if program_name.startswith("Associate"):
+        return "AD" + program_code
+    return program_code
