@@ -141,7 +141,7 @@ def _generate_qr_code(reference: str) -> ImageReader:
         logo = Image.open(logo_path).convert("RGBA")
 
         qr_width, qr_height = qr_img.size
-        base_size = int(min(qr_width, qr_height) * 0.15)
+        base_size = int(min(qr_width, qr_height) * 0.18)
         if base_size > 0:
             # Resize logo maintaining aspect ratio
             logo = logo.resize((base_size, base_size), Image.Resampling.LANCZOS)
