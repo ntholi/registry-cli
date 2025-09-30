@@ -78,7 +78,7 @@ def export_approved_graduation_students(db: Session) -> None:
             GraduationRequest.id,
             StudentProgram.std_no,
             Student.name,
-            School.name,
+            School.code,
             Program.name,
             PaymentReceipt.receipt_no,
             PaymentReceipt.payment_type,
@@ -170,8 +170,14 @@ def export_approved_graduation_students(db: Session) -> None:
         f"Found {len(approved_students)} students with full departmental approval"
     )
 
-    # Sort students by graduation request ID
-    approved_students.sort(key=lambda x: x["graduation_request_id"])
+    # Sort students by faculty (school code), program name, then student name (case-insensitive)
+    approved_students.sort(
+        key=lambda x: (
+            x.get("faculty") or "",
+            (x.get("program_name") or "").lower(),
+            (x.get("student_name") or "").lower(),
+        )
+    )
 
     # Export to Excel
     output_dir = "exports"
@@ -201,13 +207,14 @@ def export_approved_graduation_students(db: Session) -> None:
     ]
 
     header_font = Font(bold=True, color="FFFFFF")
+    # Use black header fill to match graduating_students.py
     header_fill = PatternFill(
-        start_color="366092", end_color="366092", fill_type="solid"
+        start_color="000000", end_color="000000", fill_type="solid"
     )
 
     for col, header in enumerate(headers, 1):
-        cell = ws.cell(row=1, column=col)
-        cell.value = header
+        # assign value directly to avoid MergedCell .value assignment issues
+        cell = ws.cell(row=1, column=col, value=header)
         cell.font = header_font
         cell.fill = header_fill
 
@@ -234,6 +241,86 @@ def export_approved_graduation_students(db: Session) -> None:
                 pass
         adjusted_width = min(max_length + 2, 50)
         ws.column_dimensions[column_letter].width = adjusted_width
+
+    # Create School & Program Breakdown sheet (program counts per faculty)
+    breakdown_ws = wb.create_sheet("School & Program Breakdown")
+
+    from collections import defaultdict
+
+    school_program_stats = defaultdict(lambda: defaultdict(int))
+    school_totals = defaultdict(int)
+
+    for student in approved_students:
+        school = student["faculty"]
+        program = student["program_name"]
+        school_program_stats[school][program] += 1
+        school_totals[school] += 1
+
+    # Set up breakdown sheet headers
+    breakdown_headers = ["School/Faculty", "Program", "Student Count"]
+    breakdown_widths = [len(h) for h in breakdown_headers]
+    for col, header in enumerate(breakdown_headers, 1):
+        cell = breakdown_ws.cell(row=1, column=col, value=header)
+        cell.font = header_font
+        # ensure breakdown header uses black fill
+        cell.fill = header_fill
+
+    # Add breakdown data grouped by school
+    row = 2
+    for school in sorted(school_program_stats.keys()):
+        # Add school header row spanning three columns
+        for col in range(1, 4):
+            if col == 1:
+                cell = breakdown_ws.cell(row=row, column=col, value=school)
+                breakdown_widths[0] = max(breakdown_widths[0], len(str(school)))
+            else:
+                cell = breakdown_ws.cell(row=row, column=col)
+            cell.font = Font(bold=True, color="FFFFFF")
+            cell.fill = PatternFill(
+                start_color="444444", end_color="444444", fill_type="solid"
+            )
+        row += 1
+
+        # Add programs for this school
+        programs = sorted(school_program_stats[school].keys())
+        for program in programs:
+            count = school_program_stats[school][program]
+            breakdown_ws.cell(row=row, column=1, value="")
+            breakdown_ws.cell(row=row, column=2, value=program)
+            breakdown_ws.cell(row=row, column=3, value=count)
+            breakdown_widths[1] = max(breakdown_widths[1], len(str(program)))
+            breakdown_widths[2] = max(breakdown_widths[2], len(str(count)))
+            row += 1
+
+        # Add school total
+        total_cell = breakdown_ws.cell(row=row, column=2, value="Total")
+        total_cell.font = Font(bold=True, color="444444")
+
+        total_count_cell = breakdown_ws.cell(
+            row=row, column=3, value=school_totals[school]
+        )
+        total_count_cell.font = Font(bold=True, color="444444")
+        breakdown_widths[1] = max(breakdown_widths[1], len("Total"))
+        breakdown_widths[2] = max(breakdown_widths[2], len(str(school_totals[school])))
+
+        row += 2
+
+    # Add grand total
+    grand_total_row = row
+    breakdown_ws.cell(row=grand_total_row, column=2, value="GRAND TOTAL")
+    breakdown_ws.cell(row=grand_total_row, column=3, value=len(approved_students))
+    breakdown_widths[1] = max(breakdown_widths[1], len("GRAND TOTAL"))
+    breakdown_widths[2] = max(breakdown_widths[2], len(str(len(approved_students))))
+
+    for col in [2, 3]:
+        cell = breakdown_ws.cell(row=grand_total_row, column=col)
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = header_fill
+
+    # Auto-size breakdown columns
+    for idx, width in enumerate(breakdown_widths, 1):
+        adjusted_width = min(width + 2, 60)
+        breakdown_ws.column_dimensions[get_column_letter(idx)].width = adjusted_width
 
     # Save the file
     wb.save(excel_path)
