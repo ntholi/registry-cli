@@ -7,7 +7,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill
 from openpyxl.utils import get_column_letter
 from sqlalchemy import and_, or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from registry_cli.commands.approve.academic_graduation import (
     get_outstanding_from_structure,
@@ -76,7 +76,7 @@ def get_non_graduating_students(db: Session) -> List[Dict]:
     - Diploma students: intake in Jun-Sep exactly 3 years ago
     - Degree students: intake in Jun-Sep exactly 4 years ago
     """
-    non_graduating_students = []
+    non_graduating_students: List[Dict] = []
     current_date = datetime.now()
 
     # Define expected graduation years by program level
@@ -85,115 +85,69 @@ def get_non_graduating_students(db: Session) -> List[Dict]:
     click.echo("Finding students who should have graduated but have pending issues...")
 
     for level, years in expected_years.items():
-        # Calculate target year (intake should be this many years ago)
+        # Calculate target intake window (June to September of the target year)
         target_year = current_date.year - years
+        start_date = f"{target_year}-06-01"
+        end_date = f"{target_year}-09-30"
 
-        # Create date patterns for typical intake months (June, July, August, September)
-        intake_months = [6, 7, 8, 9]  # June to September
-
-        # Build list of possible intake dates for this program level
-        possible_intake_dates = []
-        for month in intake_months:
-            # Try different days that are commonly used for intake dates
-            for day in [1, 15, 30, 31]:  # Common start dates
-                try:
-                    if month == 2 and day > 28:  # Skip invalid February dates
-                        continue
-                    if (
-                        month in [4, 6, 9, 11] and day == 31
-                    ):  # Skip invalid 31st for certain months
-                        continue
-                    intake_date = datetime(target_year, month, day)
-                    possible_intake_dates.append(intake_date.strftime("%Y-%m-%d"))
-                except ValueError:
-                    continue  # Skip invalid dates
-
-        # Find students with active programs at this level with intake dates in target months/year
         students_query = (
             db.query(
                 StudentProgram.std_no,
                 StudentProgram.intake_date,
-                Program.level,
-                Program.name,
+                Program.level.label("program_level"),
+                Program.name.label("program_name"),
                 School.name.label("school_name"),
+                Student.name.label("student_name"),
             )
             .join(Structure, StudentProgram.structure_id == Structure.id)
             .join(Program, Structure.program_id == Program.id)
             .join(School, Program.school_id == School.id)
+            .join(Student, StudentProgram.std_no == Student.std_no)
             .filter(
                 and_(
                     StudentProgram.status == "Active",
                     Program.level == level,
                     StudentProgram.intake_date.isnot(None),
+                    StudentProgram.intake_date.between(start_date, end_date),
                 )
             )
             .all()
         )
 
-        # Filter for students with intake dates in the target year and intake months (June-September)
-        filtered_students = []
-        for student_data in students_query:
-            intake_date_str = student_data[1]  # intake_date
-            if intake_date_str:
-                try:
-                    intake_date = datetime.strptime(intake_date_str, "%Y-%m-%d")
-                    # Check if intake is in target year and in months 6-9 (June-September)
-                    if (
-                        intake_date.year == target_year
-                        and intake_date.month in intake_months
-                    ):
-                        filtered_students.append(student_data)
-                except ValueError:
-                    continue  # Skip invalid date formats
-
         click.echo(
-            f"Found {len(filtered_students)} {level} students with intake in {target_year} Jun-Sep ({years} years ago)"
+            f"Found {len(students_query)} {level} students with intake in {target_year} Jun-Sep ({years} years ago)"
         )
 
-        # Use filtered students for processing
-        students_query = filtered_students
-
         # Check each student for pending issues
-        for i, (
-            std_no,
-            intake_date,
-            program_level,
-            program_name,
-            school_name,
-        ) in enumerate(students_query, 1):
-            if i % 50 == 0:
-                click.echo(f"Checked {i}/{len(students_query)} {level} students...")
+        for index, student_data in enumerate(students_query, 1):
+            if index % 50 == 0:
+                click.echo(f"Checked {index}/{len(students_query)} {level} students...")
 
-            # Skip students who are already graduating (have no pending issues)
-            if has_no_pending_issues(db, std_no):
-                continue
+            std_no = student_data.std_no
 
-            # Get detailed pending issues
+            # Get detailed pending issues once to avoid redundant computations
             pending_issues = get_pending_issues_details(db, std_no)
 
             # Only include if they actually have pending issues
-            if (
-                len(pending_issues["failedNeverRepeated"]) > 0
-                or len(pending_issues["neverAttempted"]) > 0
-            ):
-                # Get student details
-                student = db.query(Student).filter(Student.std_no == std_no).first()
-                if student:
-                    non_graduating_students.append(
-                        {
-                            "student_number": std_no,
-                            "student_name": student.name,
-                            "school_name": school_name,
-                            "program_name": program_name,
-                            "program_level": program_level,
-                            "intake_date": intake_date,
-                            "expected_graduation_years": years,
-                            "failed_never_repeated": pending_issues[
-                                "failedNeverRepeated"
-                            ],
-                            "never_attempted": pending_issues["neverAttempted"],
-                        }
-                    )
+            failed_never_repeated = pending_issues.get("failedNeverRepeated", [])
+            never_attempted = pending_issues.get("neverAttempted", [])
+
+            if not failed_never_repeated and not never_attempted:
+                continue
+
+            non_graduating_students.append(
+                {
+                    "student_number": std_no,
+                    "student_name": student_data.student_name,
+                    "school_name": student_data.school_name,
+                    "program_name": student_data.program_name,
+                    "program_level": student_data.program_level,
+                    "intake_date": student_data.intake_date,
+                    "expected_graduation_years": years,
+                    "failed_never_repeated": failed_never_repeated,
+                    "never_attempted": never_attempted,
+                }
+            )
 
     click.echo(
         f"Found {len(non_graduating_students)} students with pending issues who should have graduated"
@@ -350,17 +304,21 @@ def calculate_cgpa_and_classification_for_program(
         if final_cgpa == 0:
             return None, "No Valid Grades"
 
+        # Round CGPA first to avoid floating-point precision issues
+        # Classification should be based on the rounded value that students see
+        rounded_cgpa = round(final_cgpa, 2)
+
         # Determine classification based on CGPA using grade descriptions
-        if final_cgpa >= 3.5:  # A+, A, A- range (Pass with Distinction)
+        if rounded_cgpa >= 3.5:  # A+, A, A- range (Pass with Distinction)
             classification = "Distinction"
-        elif final_cgpa >= 3.0:  # B+, B, B- range (Pass with Merit)
+        elif rounded_cgpa >= 3.0:  # B+, B, B- range (Pass with Merit)
             classification = "Merit"
-        elif final_cgpa >= 1.7:  # C+, C, C- range (Pass)
+        elif rounded_cgpa >= 1.7:  # C+, C, C- range (Pass)
             classification = "Pass"
         else:
             classification = "Failed"
 
-        return round(final_cgpa, 2), classification
+        return rounded_cgpa, classification
 
     except Exception as e:
         click.echo(f"Error calculating CGPA for student {std_no}: {str(e)}")
@@ -441,17 +399,21 @@ def calculate_cgpa_and_classification(
         if final_cgpa == 0:
             return None, "No Valid Grades"
 
+        # Round CGPA first to avoid floating-point precision issues
+        # Classification should be based on the rounded value that students see
+        rounded_cgpa = round(final_cgpa, 2)
+
         # Determine classification based on CGPA using grade descriptions
-        if final_cgpa >= 3.5:  # A+, A, A- range (Pass with Distinction)
+        if rounded_cgpa >= 3.5:  # A+, A, A- range (Pass with Distinction)
             classification = "Distinction"
-        elif final_cgpa >= 3.0:  # B+, B, B- range (Pass with Merit)
+        elif rounded_cgpa >= 3.0:  # B+, B, B- range (Pass with Merit)
             classification = "Merit"
-        elif final_cgpa >= 1.7:  # C+, C, C- range (Pass)
+        elif rounded_cgpa >= 1.7:  # C+, C, C- range (Pass)
             classification = "Pass"
         else:
             classification = "Failed"
 
-        return round(final_cgpa, 2), classification
+        return rounded_cgpa, classification
 
     except Exception as e:
         click.echo(f"Error calculating CGPA for student {std_no}: {str(e)}")
@@ -571,82 +533,102 @@ def export_graduating_students(
         click.secho("No graduating students found.", fg="yellow")
         return
 
+    graduating_std_list = list(all_graduating_std_nos)
+
     # Get detailed information for all graduating students
     click.echo("Collecting student details...")
 
-    for i, std_no in enumerate(all_graduating_std_nos, 1):
+    # Preload student names for faster lookups
+    student_names = (
+        db.query(Student.std_no, Student.name)
+        .filter(Student.std_no.in_(graduating_std_list))
+        .all()
+    )
+    student_name_map = {row.std_no: row.name for row in student_names}
+
+    # Prepare eager loading of related program data
+    program_loader = (
+        joinedload(StudentProgram.structure)
+        .joinedload(Structure.program)
+        .joinedload(Program.school)
+    )
+
+    # Preload active programs for all candidates
+    active_program_rows = (
+        db.query(StudentProgram)
+        .options(program_loader)
+        .filter(
+            and_(
+                StudentProgram.std_no.in_(graduating_std_list),
+                StudentProgram.status == "Active",
+            )
+        )
+        .order_by(StudentProgram.std_no, StudentProgram.created_at.desc())
+        .all()
+    )
+    active_program_map: Dict[int, StudentProgram] = {}
+    for program in active_program_rows:
+        active_program_map.setdefault(program.std_no, program)
+
+    # Preload approved programs using graduation requests
+    approved_program_map: Dict[int, StudentProgram] = {}
+    if approved_std_nos:
+        approved_program_rows = (
+            db.query(StudentProgram, GraduationRequest.created_at)
+            .options(program_loader)
+            .join(
+                GraduationRequest,
+                StudentProgram.id == GraduationRequest.student_program_id,
+            )
+            .join(
+                GraduationClearance,
+                GraduationRequest.id == GraduationClearance.graduation_request_id,
+            )
+            .join(Clearance, GraduationClearance.clearance_id == Clearance.id)
+            .filter(
+                and_(
+                    StudentProgram.std_no.in_(graduating_std_list),
+                    Clearance.department == "academic",
+                    Clearance.status == "approved",
+                )
+            )
+            .order_by(StudentProgram.std_no, GraduationRequest.created_at.desc())
+            .all()
+        )
+
+        latest_request_per_student: Dict[int, int] = {}
+        for program, created_at in approved_program_rows:
+            created_at_value = created_at or 0
+            std_no = program.std_no
+            if (
+                std_no not in latest_request_per_student
+                or created_at_value > latest_request_per_student[std_no]
+            ):
+                approved_program_map[std_no] = program
+                latest_request_per_student[std_no] = created_at_value
+
+    for i, std_no in enumerate(graduating_std_list, 1):
         if i % 50 == 0:
             click.echo(f"Processed {i}/{len(all_graduating_std_nos)} students...")
 
         try:
-            # Get student basic info
-            student = db.query(Student).filter(Student.std_no == std_no).first()
-            if not student:
+            student_name = student_name_map.get(std_no)
+            if not student_name:
                 continue
 
-            # Check if student has an approved graduation request
-            graduation_request_program = None
-            if std_no in approved_std_nos:
-                graduation_request_program = (
-                    db.query(StudentProgram)
-                    .join(Structure, StudentProgram.structure_id == Structure.id)
-                    .join(Program, Structure.program_id == Program.id)
-                    .join(School, Program.school_id == School.id)
-                    .join(
-                        GraduationRequest,
-                        StudentProgram.id == GraduationRequest.student_program_id,
-                    )
-                    .join(
-                        GraduationClearance,
-                        GraduationRequest.id
-                        == GraduationClearance.graduation_request_id,
-                    )
-                    .join(Clearance, GraduationClearance.clearance_id == Clearance.id)
-                    .filter(
-                        and_(
-                            StudentProgram.std_no == std_no,
-                            Clearance.department == "academic",
-                            Clearance.status == "approved",
-                        )
-                    )
-                    .order_by(
-                        GraduationRequest.created_at.desc()
-                    )  # Get the most recent approved request
-                    .first()
-                )
-
-            # Use graduation request program if available, otherwise get active program
-            if graduation_request_program:
-                target_program = graduation_request_program
-            else:
-                target_program = (
-                    db.query(StudentProgram)
-                    .join(Structure, StudentProgram.structure_id == Structure.id)
-                    .join(Program, Structure.program_id == Program.id)
-                    .join(School, Program.school_id == School.id)
-                    .filter(
-                        and_(
-                            StudentProgram.std_no == std_no,
-                            StudentProgram.status == "Active",
-                        )
-                    )
-                    .first()
-                )
-
+            # Prefer approved program if available, otherwise fall back to active program
+            target_program = approved_program_map.get(std_no) or active_program_map.get(
+                std_no
+            )
             if not target_program:
                 continue
 
-            program_name = (
-                target_program.structure.program.name
-                if target_program.structure
-                else "Unknown Program"
-            )
+            structure = target_program.structure
+            program = structure.program if structure else None
+            school = program.school if program and program.school else None
 
-            school_name = (
-                target_program.structure.program.school.name
-                if target_program.structure and target_program.structure.program.school
-                else "Unknown School"
-            )
+            program_name = program.name if program else "Unknown Program"
+            school_name = school.name if school else "Unknown School"
 
             # Calculate CGPA using the target program (graduation request program or active program)
             cgpa, classification = calculate_cgpa_and_classification_for_program(
@@ -665,7 +647,7 @@ def export_graduating_students(
             graduating_students.append(
                 {
                     "student_number": std_no,
-                    "student_name": student.name,
+                    "student_name": student_name,
                     "school_name": school_name,
                     "program_name": program_name,
                     "cgpa": cgpa if cgpa is not None else "N/A",
@@ -749,34 +731,33 @@ def export_graduating_students(
         start_color="000000", end_color="000000", fill_type="solid"
     )
 
+    header_widths = [len(header) for header in headers]
     for col, header in enumerate(headers, 1):
-        cell = ws.cell(row=1, column=col)
-        cell.value = header
+        cell = ws.cell(row=1, column=col, value=header)
         cell.font = header_font
         cell.fill = header_fill
 
     # Add data rows
     for row, student in enumerate(graduating_students, 2):
-        ws.cell(row=row, column=1, value=student["student_number"])
-        ws.cell(row=row, column=2, value=student["student_name"])
-        ws.cell(row=row, column=3, value=student["school_name"])
-        ws.cell(row=row, column=4, value=student["program_name"])
-        ws.cell(row=row, column=5, value=student["cgpa"])
-        ws.cell(row=row, column=6, value=student["classification"])
-        ws.cell(row=row, column=7, value=student["criteria_met"])
+        row_values = [
+            student["student_number"],
+            student["student_name"],
+            student["school_name"],
+            student["program_name"],
+            student["cgpa"],
+            student["classification"],
+            student["criteria_met"],
+        ]
+        for col_index, value in enumerate(row_values, 1):
+            ws.cell(row=row, column=col_index, value=value)
+            if value is not None:
+                header_widths[col_index - 1] = max(
+                    header_widths[col_index - 1], len(str(value))
+                )
 
-    # Auto-size columns
-    for col in range(1, len(headers) + 1):
-        column_letter = get_column_letter(col)
-        max_length = 0
-        for row in ws[column_letter]:
-            try:
-                if len(str(row.value)) > max_length:
-                    max_length = len(str(row.value))
-            except:
-                pass
-        adjusted_width = min(max_length + 2, 50)
-        ws.column_dimensions[column_letter].width = adjusted_width
+    for idx, width in enumerate(header_widths, 1):
+        adjusted_width = min(width + 2, 50)
+        ws.column_dimensions[get_column_letter(idx)].width = adjusted_width
 
     # Create breakdown sheet
     breakdown_ws = wb.create_sheet("School & Program Breakdown")
@@ -794,24 +775,24 @@ def export_graduating_students(
         school_program_stats[school][program] += 1
         school_totals[school] += 1
 
-    # Set up breakdown sheet headers
+    # Set up breakdown sheet headers (use the same black header_fill)
     breakdown_headers = ["School/Faculty", "Program", "Student Count"]
+    breakdown_widths = [len(header) for header in breakdown_headers]
     for col, header in enumerate(breakdown_headers, 1):
-        cell = breakdown_ws.cell(row=1, column=col)
-        cell.value = header
+        cell = breakdown_ws.cell(row=1, column=col, value=header)
         cell.font = header_font
-        cell.fill = PatternFill(
-            start_color="000000", end_color="000000", fill_type="solid"
-        )
+        cell.fill = header_fill
 
     # Add breakdown data
     row = 2
     for school in sorted(school_program_stats.keys()):
         # Add school header row spanning three columns
         for col in range(1, 4):  # Columns 1, 2, 3
-            cell = breakdown_ws.cell(row=row, column=col)
             if col == 1:
-                cell.value = school
+                cell = breakdown_ws.cell(row=row, column=col, value=school)
+                breakdown_widths[0] = max(breakdown_widths[0], len(str(school)))
+            else:
+                cell = breakdown_ws.cell(row=row, column=col)
             cell.font = Font(bold=True, color="FFFFFF")
             cell.fill = PatternFill(
                 start_color="444444", end_color="444444", fill_type="solid"
@@ -825,16 +806,20 @@ def export_graduating_students(
             breakdown_ws.cell(row=row, column=1, value="")  # Indent for program
             breakdown_ws.cell(row=row, column=2, value=program)
             breakdown_ws.cell(row=row, column=3, value=count)
+            breakdown_widths[1] = max(breakdown_widths[1], len(str(program)))
+            breakdown_widths[2] = max(breakdown_widths[2], len(str(count)))
             row += 1
 
         # Add school total
-        total_cell = breakdown_ws.cell(row=row, column=2)
-        total_cell.value = f"Total"
+        total_cell = breakdown_ws.cell(row=row, column=2, value="Total")
         total_cell.font = Font(bold=True, color="444444")
+        breakdown_widths[1] = max(breakdown_widths[1], len("Total"))
 
-        total_count_cell = breakdown_ws.cell(row=row, column=3)
-        total_count_cell.value = school_totals[school]
+        total_count_cell = breakdown_ws.cell(
+            row=row, column=3, value=school_totals[school]
+        )
         total_count_cell.font = Font(bold=True, color="444444")
+        breakdown_widths[2] = max(breakdown_widths[2], len(str(school_totals[school])))
 
         row += 2  # Add space between schools
 
@@ -842,26 +827,17 @@ def export_graduating_students(
     grand_total_row = row
     breakdown_ws.cell(row=grand_total_row, column=2, value="GRAND TOTAL")
     breakdown_ws.cell(row=grand_total_row, column=3, value=len(graduating_students))
+    breakdown_widths[1] = max(breakdown_widths[1], len("GRAND TOTAL"))
+    breakdown_widths[2] = max(breakdown_widths[2], len(str(len(graduating_students))))
 
     for col in [2, 3]:
         cell = breakdown_ws.cell(row=grand_total_row, column=col)
         cell.font = Font(bold=True, color="FFFFFF")
-        cell.fill = PatternFill(
-            start_color="000000", end_color="000000", fill_type="solid"
-        )
+        cell.fill = header_fill
 
-    # Auto-size columns for breakdown sheet
-    for col in range(1, len(breakdown_headers) + 1):
-        column_letter = get_column_letter(col)
-        max_length = 0
-        for row_cells in breakdown_ws[column_letter]:
-            try:
-                if len(str(row_cells.value)) > max_length:
-                    max_length = len(str(row_cells.value))
-            except:
-                pass
-        adjusted_width = min(max_length + 2, 60)  # Slightly wider for school names
-        breakdown_ws.column_dimensions[column_letter].width = adjusted_width
+    for idx, width in enumerate(breakdown_widths, 1):
+        adjusted_width = min(width + 2, 60)
+        breakdown_ws.column_dimensions[get_column_letter(idx)].width = adjusted_width
 
     # Create non-graduating students sheet
     if non_graduating_students:
@@ -880,69 +856,54 @@ def export_graduating_students(
             "Never Attempted",
         ]
 
+        non_grad_widths = [len(header) for header in non_grad_headers]
         for col, header in enumerate(non_grad_headers, 1):
-            cell = non_grad_ws.cell(row=1, column=col)
-            cell.value = header
+            cell = non_grad_ws.cell(row=1, column=col, value=header)
             cell.font = header_font
-            cell.fill = PatternFill(
-                start_color="8B0000", end_color="8B0000", fill_type="solid"
-            )  # Dark red
+            cell.fill = header_fill
 
         # Add non-graduating student data
         for row, student in enumerate(non_graduating_students, 2):
-            non_grad_ws.cell(row=row, column=1, value=student["student_number"])
-            non_grad_ws.cell(row=row, column=2, value=student["student_name"])
-            non_grad_ws.cell(row=row, column=3, value=student["school_name"])
-            non_grad_ws.cell(row=row, column=4, value=student["program_name"])
-            non_grad_ws.cell(row=row, column=5, value=student["program_level"].title())
-            non_grad_ws.cell(row=row, column=6, value=student["intake_date"])
-            non_grad_ws.cell(
-                row=row, column=7, value=student["expected_graduation_years"]
-            )
+            failed_modules = [
+                f"{module['code']} - {module['name']}"
+                for module in student["failed_never_repeated"]
+            ]
+            never_attempted_modules = [
+                f"{module['code']} - {module['name']}"
+                for module in student["never_attempted"]
+            ]
 
-            # Format failed never repeated modules
-            failed_modules = []
-            for module in student["failed_never_repeated"]:
-                failed_modules.append(f"{module['code']} - {module['name']}")
-            non_grad_ws.cell(
-                row=row,
-                column=8,
-                value="; ".join(failed_modules) if failed_modules else "None",
-            )
-
-            # Format never attempted modules
-            never_attempted_modules = []
-            for module in student["never_attempted"]:
-                never_attempted_modules.append(f"{module['code']} - {module['name']}")
-            non_grad_ws.cell(
-                row=row,
-                column=9,
-                value=(
+            row_values = [
+                student["student_number"],
+                student["student_name"],
+                student["school_name"],
+                student["program_name"],
+                student["program_level"].title(),
+                student["intake_date"],
+                student["expected_graduation_years"],
+                "; ".join(failed_modules) if failed_modules else "None",
+                (
                     "; ".join(never_attempted_modules)
                     if never_attempted_modules
                     else "None"
                 ),
-            )
+            ]
 
-        # Auto-size columns for non-graduating sheet
-        for col in range(1, len(non_grad_headers) + 1):
-            column_letter = get_column_letter(col)
-            max_length = 0
-            for row_cells in non_grad_ws[column_letter]:
-                try:
-                    if len(str(row_cells.value)) > max_length:
-                        max_length = len(str(row_cells.value))
-                except:
-                    pass
-            adjusted_width = min(
-                max_length + 2, 80
-            )  # Allow wider columns for issue descriptions
-            non_grad_ws.column_dimensions[column_letter].width = adjusted_width
+            for col_index, value in enumerate(row_values, 1):
+                non_grad_ws.cell(row=row, column=col_index, value=value)
+                if value is not None:
+                    non_grad_widths[col_index - 1] = max(
+                        non_grad_widths[col_index - 1], len(str(value))
+                    )
+
+        for idx, width in enumerate(non_grad_widths, 1):
+            adjusted_width = min(width + 2, 80)
+            non_grad_ws.column_dimensions[get_column_letter(idx)].width = adjusted_width
 
     # Create graduation statistics sheet
     stats_ws = wb.create_sheet("Graduation Statistics")
 
-    # Set up headers for statistics breakdown
+    # Set up headers for statistics breakdown (use black header_fill)
     stats_headers = [
         "School/Faculty",
         "Program",
@@ -953,12 +914,9 @@ def export_graduating_students(
     ]
 
     for col, header in enumerate(stats_headers, 1):
-        cell = stats_ws.cell(row=1, column=col)
-        cell.value = header
+        cell = stats_ws.cell(row=1, column=col, value=header)
         cell.font = header_font
-        cell.fill = PatternFill(
-            start_color="2E8B57", end_color="2E8B57", fill_type="solid"
-        )  # Sea green
+        cell.fill = header_fill
 
     # Add statistics breakdown data
     row = 2
@@ -966,12 +924,16 @@ def export_graduating_students(
     school_totals = graduation_stats["school_totals"]
     overall_stats = graduation_stats["overall_stats"]
 
+    stats_widths = [len(header) for header in stats_headers]
+
     for school in sorted(school_program_stats.keys()):
         # Add school header row spanning all columns
         for col in range(1, 7):  # Columns 1-6
-            cell = stats_ws.cell(row=row, column=col)
             if col == 1:
-                cell.value = school
+                cell = stats_ws.cell(row=row, column=col, value=school)
+                stats_widths[0] = max(stats_widths[0], len(str(school)))
+            else:
+                cell = stats_ws.cell(row=row, column=col)
             cell.font = Font(bold=True, color="FFFFFF")
             cell.fill = PatternFill(
                 start_color="444444", end_color="444444", fill_type="solid"
@@ -988,25 +950,38 @@ def export_graduating_students(
             stats_ws.cell(row=row, column=4, value=stats["graduating"])
             stats_ws.cell(row=row, column=5, value=stats["non_graduating"])
             stats_ws.cell(row=row, column=6, value=f"{stats['percentage']:.1f}%")
+            stats_widths[1] = max(stats_widths[1], len(str(program)))
+            stats_widths[2] = max(stats_widths[2], len(str(stats["expected"])))
+            stats_widths[3] = max(stats_widths[3], len(str(stats["graduating"])))
+            stats_widths[4] = max(stats_widths[4], len(str(stats["non_graduating"])))
+            stats_widths[5] = max(stats_widths[5], len(f"{stats['percentage']:.1f}%"))
             row += 1
 
         # Add school total
         school_stats = school_totals[school]
-        total_cell = stats_ws.cell(row=row, column=2)
-        total_cell.value = f"Total"
+        total_cell = stats_ws.cell(row=row, column=2, value="Total")
         total_cell.font = Font(bold=True, color="444444")
 
         stats_ws.cell(row=row, column=3, value=school_stats["expected"])
         stats_ws.cell(row=row, column=4, value=school_stats["graduating"])
         stats_ws.cell(row=row, column=5, value=school_stats["non_graduating"])
 
-        rate_cell = stats_ws.cell(row=row, column=6)
-        rate_cell.value = f"{school_stats['percentage']:.1f}%"
+        rate_cell = stats_ws.cell(
+            row=row, column=6, value=f"{school_stats['percentage']:.1f}%"
+        )
         rate_cell.font = Font(bold=True, color="444444")
 
         for col in [3, 4, 5]:
             cell = stats_ws.cell(row=row, column=col)
             cell.font = Font(bold=True, color="444444")
+
+        stats_widths[1] = max(stats_widths[1], len("Total"))
+        stats_widths[2] = max(stats_widths[2], len(str(school_stats["expected"])))
+        stats_widths[3] = max(stats_widths[3], len(str(school_stats["graduating"])))
+        stats_widths[4] = max(stats_widths[4], len(str(school_stats["non_graduating"])))
+        stats_widths[5] = max(
+            stats_widths[5], len(f"{school_stats['percentage']:.1f}%")
+        )
 
         row += 2  # Add space between schools
 
@@ -1020,25 +995,21 @@ def export_graduating_students(
         row=grand_total_row, column=6, value=f"{overall_stats['percentage']:.1f}%"
     )
 
+    stats_widths[1] = max(stats_widths[1], len("GRAND TOTAL"))
+    stats_widths[2] = max(stats_widths[2], len(str(overall_stats["expected"])))
+    stats_widths[3] = max(stats_widths[3], len(str(overall_stats["graduating"])))
+    stats_widths[4] = max(stats_widths[4], len(str(overall_stats["non_graduating"])))
+    stats_widths[5] = max(stats_widths[5], len(f"{overall_stats['percentage']:.1f}%"))
+
     for col in [2, 3, 4, 5, 6]:
         cell = stats_ws.cell(row=grand_total_row, column=col)
         cell.font = Font(bold=True, color="FFFFFF")
-        cell.fill = PatternFill(
-            start_color="000000", end_color="000000", fill_type="solid"
-        )
+        cell.fill = header_fill
 
     # Auto-size columns for statistics sheet
-    for col in range(1, len(stats_headers) + 1):
-        column_letter = get_column_letter(col)
-        max_length = 0
-        for row_cells in stats_ws[column_letter]:
-            try:
-                if len(str(row_cells.value)) > max_length:
-                    max_length = len(str(row_cells.value))
-            except:
-                pass
-        adjusted_width = min(max_length + 2, 60)  # Slightly wider for school names
-        stats_ws.column_dimensions[column_letter].width = adjusted_width
+    for idx, width in enumerate(stats_widths, 1):
+        adjusted_width = min(width + 2, 60)
+        stats_ws.column_dimensions[get_column_letter(idx)].width = adjusted_width
 
     # Save the file
     wb.save(excel_path)
