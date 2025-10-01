@@ -297,7 +297,7 @@ def _build_overlay(
         1,
     )
 
-    draw_text(program_name, snell_roundhand, 603, 40, 1.6, 550)
+    draw_text(program_name, snell_roundhand, 603, 42, 1.6, 550)
 
     draw_text(
         issue_date,
