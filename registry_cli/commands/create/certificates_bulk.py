@@ -137,7 +137,7 @@ def _generate_single_certificate_overlay(
         # Expand abbreviated program name to full form
         expanded_program_name = expand_program_name(program_name)
 
-        issue_date = datetime.now().strftime("%d %B %Y")
+        issue_date = "02 October 2025"
         reference = build_certificate_reference(program_name, program_code, std_no)
 
         if page_width is None or page_height is None:
@@ -330,11 +330,29 @@ def generate_certificates_for_cleared_students(
         cleared_students = cleared_students[:limit]
         click.echo(f"Processing first {limit} students due to limit")
 
+    # Filter to only one student per program (first encountered). Use program_code where possible.
+    def _unique_by_program(db: Session, std_nos: List[int]) -> List[int]:
+        seen_programs = set()
+        unique_std_nos = []
+        for std_no in std_nos:
+            details = _get_student_details(db, std_no)
+            if not details:
+                # keep students with missing details for separate reporting
+                unique_std_nos.append(std_no)
+                continue
+            program_key = details.get("program_code") or details.get("program_name")
+            if program_key not in seen_programs:
+                seen_programs.add(program_key)
+                unique_std_nos.append(std_no)
+        return unique_std_nos
+
+    # Reduce to one student per program
+    unique_cleared_students = _unique_by_program(db, cleared_students)
+
     if dry_run:
         click.echo("\n🔍 DRY RUN MODE - No certificates will be generated")
         click.echo("Students who would receive certificates:")
-
-        for i, std_no in enumerate(cleared_students, 1):
+        for i, std_no in enumerate(unique_cleared_students, 1):
             student_details = _get_student_details(db, std_no)
             if student_details:
                 click.echo(
@@ -345,7 +363,7 @@ def generate_certificates_for_cleared_students(
                 click.echo(f"{i:3d}. {std_no} - [Details not found]")
 
         click.echo(
-            f"\nTotal certificates that would be generated: {len(cleared_students)}"
+            f"\nTotal certificates that would be generated: {len(unique_cleared_students)}"
         )
         return
 
@@ -354,10 +372,10 @@ def generate_certificates_for_cleared_students(
     missing_details = []
 
     click.echo(
-        f"\n� Collecting student details for {len(cleared_students)} students..."
+        f"\n� Collecting student details for {len(unique_cleared_students)} students..."
     )
 
-    for i, std_no in enumerate(cleared_students, 1):
+    for i, std_no in enumerate(unique_cleared_students, 1):
         student_details = _get_student_details(db, std_no)
 
         if student_details:
