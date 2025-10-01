@@ -30,6 +30,20 @@ from registry_cli.utils.certificate_generator import (
 )
 
 
+def _slugify(text: str) -> str:
+    """Create a filesystem-safe slug from program name."""
+    if not text:
+        return ""
+    # Lowercase, replace spaces and non-alnum with hyphens, collapse hyphens
+    import re
+
+    text = text.lower()
+    # Replace non-word characters with hyphen
+    slug = re.sub(r"[^a-z0-9]+", "-", text)
+    slug = slug.strip("-")
+    return slug
+
+
 def _get_cleared_students(db: Session) -> List[int]:
     """
     Get all students who have approved clearances from academic, finance, and library departments.
@@ -182,7 +196,7 @@ def _generate_single_certificate_overlay(
 
 
 def _combine_certificates_to_multi_page_pdf(
-    students_data: List[dict], temp_dir: Path
+    students_data: List[dict], temp_dir: Path, output_name: Optional[str] = None
 ) -> Optional[str]:
     """
     Generate a single multi-page PDF containing all certificates.
@@ -219,9 +233,25 @@ def _combine_certificates_to_multi_page_pdf(
             page_width = DEFAULT_PAGE_WIDTH
             page_height = DEFAULT_PAGE_HEIGHT
 
-        # Create output filename
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_file = OUTPUT_DIR / f"bulk_certificates_{timestamp}.pdf"
+        # Determine output filename using optional output_name (sanitized),
+        # otherwise fall back to timestamped filename.
+        def _sanitize_name(name: str) -> str:
+            invalid_chars = '<>:"/\\|?*'
+            for ch in invalid_chars:
+                name = name.replace(ch, "_")
+            name = name.strip()
+            return name
+
+        if output_name:
+            safe_name = _sanitize_name(output_name)
+            if safe_name:
+                output_file = OUTPUT_DIR / f"{safe_name}.pdf"
+            else:
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                output_file = OUTPUT_DIR / f"bulk_certificates_{timestamp}.pdf"
+        else:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            output_file = OUTPUT_DIR / f"bulk_certificates_{timestamp}.pdf"
 
         # Ensure output directory exists
         OUTPUT_DIR.mkdir(exist_ok=True)
@@ -330,66 +360,51 @@ def generate_certificates_for_cleared_students(
         cleared_students = cleared_students[:limit]
         click.echo(f"Processing first {limit} students due to limit")
 
-    # Filter to only one student per program (first encountered). Use program_code where possible.
-    def _unique_by_program(db: Session, std_nos: List[int]) -> List[int]:
-        seen_programs = set()
-        unique_std_nos = []
-        for std_no in std_nos:
-            details = _get_student_details(db, std_no)
-            if not details:
-                # keep students with missing details for separate reporting
-                unique_std_nos.append(std_no)
-                continue
-            program_key = details.get("program_code") or details.get("program_name")
-            if program_key not in seen_programs:
-                seen_programs.add(program_key)
-                unique_std_nos.append(std_no)
-        return unique_std_nos
-
-    # Reduce to one student per program
-    unique_cleared_students = _unique_by_program(db, cleared_students)
-
-    if dry_run:
-        click.echo("\n🔍 DRY RUN MODE - No certificates will be generated")
-        click.echo("Students who would receive certificates:")
-        for i, std_no in enumerate(unique_cleared_students, 1):
-            student_details = _get_student_details(db, std_no)
-            if student_details:
-                click.echo(
-                    f"{i:3d}. {std_no} - {student_details['student_name']} "
-                    f"({student_details['program_name']}, {student_details['school_name']})"
-                )
-            else:
-                click.echo(f"{i:3d}. {std_no} - [Details not found]")
-
-        click.echo(
-            f"\nTotal certificates that would be generated: {len(unique_cleared_students)}"
-        )
-        return
-
-    # Collect student data for multi-page PDF generation
-    students_data = []
+    # Group cleared students by program so we print all certificates per program.
+    programs = {}
     missing_details = []
 
     click.echo(
-        f"\n� Collecting student details for {len(unique_cleared_students)} students..."
+        f"\nCollecting student details for {len(cleared_students)} cleared students..."
     )
 
-    for i, std_no in enumerate(unique_cleared_students, 1):
-        student_details = _get_student_details(db, std_no)
-
-        if student_details:
-            students_data.append(student_details)
-            click.echo(
-                f"[{i:3d}/{len(cleared_students)}] ✅ {std_no} - {student_details['student_name']}"
-            )
-        else:
+    for std_no in cleared_students:
+        details = _get_student_details(db, std_no)
+        if not details:
             missing_details.append(std_no)
-            click.echo(
-                f"[{i:3d}/{len(cleared_students)}] ❌ {std_no} - Details not found"
-            )
+            continue
 
-    if not students_data:
+        program_key = details.get("program_code") or details.get("program_name")
+        if program_key not in programs:
+            programs[program_key] = {
+                "program_name": details.get("program_name"),
+                "program_code": details.get("program_code"),
+                "school_name": details.get("school_name"),
+                "students": [],
+            }
+
+        programs[program_key]["students"].append(details)
+
+    if dry_run:
+        click.echo("\n🔍 DRY RUN MODE - No certificates will be generated")
+        click.echo("Students grouped by program who would receive certificates:")
+        for idx, (pkey, pdata) in enumerate(programs.items(), 1):
+            click.echo(
+                f"{idx:3d}. {pdata['program_name']} ({pkey}) - {len(pdata['students'])} students"
+            )
+            for i, s in enumerate(pdata["students"], 1):
+                click.echo(f"    {i:3d}. {s['std_no']} - {s['student_name']}")
+
+        if missing_details:
+            click.echo("\nStudents with missing details:")
+            for std in missing_details:
+                click.echo(f"  - {std}")
+
+        total = sum(len(p["students"]) for p in programs.values())
+        click.echo(f"\nTotal certificates that would be generated: {total}")
+        return
+
+    if not programs:
         click.secho(
             "❌ No student details found. Cannot generate certificates.", fg="red"
         )
@@ -402,49 +417,51 @@ def generate_certificates_for_cleared_students(
         for std_no in missing_details:
             click.echo(f"  - {std_no}")
 
-    # Generate multi-page PDF
+    # Generate multi-page PDFs grouped by program, prompting the user between programs
     click.echo(
-        f"\n📜 Generating multi-page PDF with {len(students_data)} certificates..."
+        f"\n📜 Generating certificates grouped by program for {len(programs)} programs..."
     )
 
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_path = Path(temp_dir)
 
-        try:
-            final_pdf_path = _combine_certificates_to_multi_page_pdf(
-                students_data, temp_path
+        for idx, (pkey, pdata) in enumerate(programs.items(), start=1):
+            students_data = pdata["students"]
+            click.echo(
+                f"\n📁 Program: {pdata['program_name']} ({pkey}) - {len(students_data)} students"
             )
 
-            if final_pdf_path:
-                click.echo(f"\n🎉 Success!")
+            try:
+                # Build numbered slug filename like '01-diploma-in-information-technology'
+                program_name_for_file = pdata.get("program_name") or pkey
+                slug = _slugify(program_name_for_file)
+                numbered_slug = f"{idx:02d}-{slug}"
+
+                final_pdf_path = _combine_certificates_to_multi_page_pdf(
+                    students_data, temp_path, output_name=numbered_slug
+                )
+
+                if final_pdf_path:
+                    click.secho(f"  ✅ Generated PDF: {final_pdf_path}", fg="green")
+                    click.echo(f"  Total certificates in PDF: {len(students_data)}")
+                else:
+                    click.secho(
+                        "  ❌ Failed to generate PDF for this program", fg="red"
+                    )
+
+            except Exception as e:
                 click.secho(
-                    f"Multi-page certificate PDF generated: {final_pdf_path}",
-                    fg="green",
-                )
-                click.echo(f"Total certificates in PDF: {len(students_data)}")
-
-                # Display summary by school/program
-                from collections import Counter
-
-                school_counts = Counter(
-                    student["school_name"] for student in students_data
-                )
-                program_counts = Counter(
-                    student["program_name"] for student in students_data
+                    f"  ❌ Error during PDF generation for program {pdata['program_name']}: {str(e)}",
+                    fg="red",
                 )
 
-                click.echo(f"\n📊 Summary by School:")
-                for school, count in school_counts.most_common():
-                    click.echo(f"  - {school}: {count} certificates")
-
-                click.echo(f"\n📊 Summary by Program:")
-                for program, count in program_counts.most_common():
-                    click.echo(f"  - {program}: {count} certificates")
-            else:
-                click.secho("❌ Failed to generate multi-page PDF", fg="red")
-
-        except Exception as e:
-            click.secho(f"❌ Error during PDF generation: {str(e)}", fg="red")
+            # Pause between programs so operator can handle printed output or files
+            try:
+                click.pause(info="Press any key to continue")
+            except Exception:
+                # Fallback for environments where click.pause might not behave as expected
+                click.echo("Press Enter to continue...")
+                input()
 
 
 @click.command(name="certificates-bulk")
