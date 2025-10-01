@@ -359,8 +359,7 @@ def generate_certificate(
 
     # Create overlay
     overlay_path = OUTPUT_DIR / "_overlay_temp.pdf"
-    program_code = _prepend_program_level(program_name, program_code)
-    reference = f"LSO{program_code}{std_no}"
+    reference = build_certificate_reference(program_name, program_code, std_no)
     _build_overlay(
         name,
         expanded_program_name,
@@ -404,3 +403,10 @@ def _prepend_program_level(program_name: str, program_code: str) -> str:
     if program_name.startswith("Associate"):
         return "AD" + program_code
     return program_code
+
+
+def build_certificate_reference(
+    program_name: str, program_code: str, std_no: int
+) -> str:
+    normalized_program_code = _prepend_program_level(program_name, program_code)
+    return f"LSO{normalized_program_code}{std_no}"

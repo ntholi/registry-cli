@@ -20,9 +20,12 @@ from registry_cli.models import (
     StudentProgram,
 )
 from registry_cli.utils.certificate_generator import (
+    DEFAULT_PAGE_HEIGHT,
+    DEFAULT_PAGE_WIDTH,
     OUTPUT_DIR,
     TEMPLATE_PATH,
     _build_overlay,
+    build_certificate_reference,
     expand_program_name,
 )
 
@@ -108,7 +111,14 @@ def _get_student_details(db: Session, std_no: int) -> Optional[dict]:
 
 
 def _generate_single_certificate_overlay(
-    name: str, program_name: str, program_code: str, std_no: int, temp_dir: Path
+    name: str,
+    program_name: str,
+    program_code: str,
+    std_no: int,
+    temp_dir: Path,
+    *,
+    page_width: Optional[float] = None,
+    page_height: Optional[float] = None,
 ) -> Optional[Path]:
     """
     Generate a single certificate overlay for a student.
@@ -128,12 +138,41 @@ def _generate_single_certificate_overlay(
         expanded_program_name = expand_program_name(program_name)
 
         issue_date = datetime.now().strftime("%d %B %Y")
-        reference = f"LSO{program_code}{std_no}"
+        reference = build_certificate_reference(program_name, program_code, std_no)
+
+        if page_width is None or page_height is None:
+            try:
+                template_reader = PdfReader(str(TEMPLATE_PATH))
+                if template_reader.pages:
+                    mediabox = template_reader.pages[0].mediabox
+                    calculated_width = float(mediabox[2]) - float(mediabox[0])
+                    calculated_height = float(mediabox[3]) - float(mediabox[1])
+                    page_width = calculated_width if page_width is None else page_width
+                    page_height = (
+                        calculated_height if page_height is None else page_height
+                    )
+            except Exception as e:
+                click.secho(
+                    f"    ❌ Error reading template for overlay sizing: {str(e)}",
+                    fg="red",
+                )
+                return None
+
+        page_width = page_width or DEFAULT_PAGE_WIDTH
+        page_height = page_height or DEFAULT_PAGE_HEIGHT
 
         # Create temporary overlay file
         overlay_path = temp_dir / f"overlay_{name.replace(' ', '_')}.pdf"
 
-        _build_overlay(name, expanded_program_name, reference, issue_date, overlay_path)
+        _build_overlay(
+            name,
+            expanded_program_name,
+            reference,
+            issue_date,
+            overlay_path,
+            page_width=page_width,
+            page_height=page_height,
+        )
 
         return overlay_path if overlay_path.exists() else None
 
@@ -160,6 +199,26 @@ def _combine_certificates_to_multi_page_pdf(
             click.secho("❌ Template PDF not found", fg="red")
             return None
 
+        try:
+            template_reader = PdfReader(str(TEMPLATE_PATH))
+        except Exception as e:
+            click.secho(
+                f"❌ Error reading template PDF for page sizing: {str(e)}", fg="red"
+            )
+            return None
+
+        if not template_reader.pages:
+            click.secho("❌ Template PDF has no pages", fg="red")
+            return None
+
+        mediabox = template_reader.pages[0].mediabox
+        page_width = float(mediabox[2]) - float(mediabox[0])
+        page_height = float(mediabox[3]) - float(mediabox[1])
+
+        if not page_width or not page_height:
+            page_width = DEFAULT_PAGE_WIDTH
+            page_height = DEFAULT_PAGE_HEIGHT
+
         # Create output filename
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_file = OUTPUT_DIR / f"bulk_certificates_{timestamp}.pdf"
@@ -182,7 +241,13 @@ def _combine_certificates_to_multi_page_pdf(
 
             # Generate overlay for this student
             overlay_path = _generate_single_certificate_overlay(
-                name, program_name, program_code, std_no, temp_dir
+                name,
+                program_name,
+                program_code,
+                std_no,
+                temp_dir,
+                page_width=page_width,
+                page_height=page_height,
             )
 
             if overlay_path and overlay_path.exists():
