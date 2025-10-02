@@ -329,7 +329,7 @@ def _combine_certificates_to_multi_page_pdf(
 
 
 def generate_certificates_for_cleared_students(
-    db: Session, limit: Optional[int] = None, dry_run: bool = False
+    db: Session, limit: Optional[int] = None, dry_run: bool = False, start_at: int = 1
 ) -> None:
     """
     Generate graduation certificates for all students who have been cleared by
@@ -339,6 +339,7 @@ def generate_certificates_for_cleared_students(
         db: Database session
         limit: Optional limit on number of certificates to generate
         dry_run: If True, only show which students would get certificates without generating them
+        start_at: Skip the first N-1 programs and start processing from the Nth program
     """
     click.echo("Finding students with approved graduation clearances...")
 
@@ -386,9 +387,43 @@ def generate_certificates_for_cleared_students(
         programs[program_key]["students"].append(details)
 
     if dry_run:
+        # Validate start_at parameter for dry run
+        total_programs = len(programs)
+        if start_at > total_programs:
+            click.secho(
+                f"❌ Error: --start-at {start_at} is greater than the total number of programs ({total_programs})",
+                fg="red",
+            )
+            return
+        elif start_at < 1:
+            click.secho(
+                f"❌ Error: --start-at must be 1 or greater, got {start_at}", fg="red"
+            )
+            return
+
         click.echo("\n🔍 DRY RUN MODE - No certificates will be generated")
         click.echo("Students grouped by program who would receive certificates:")
-        for idx, (pkey, pdata) in enumerate(programs.items(), 1):
+
+        # Convert to list to enable slicing for skipping programs
+        programs_list = list(programs.items())
+
+        # Skip programs based on start_at (1-indexed, so subtract 1 for 0-indexed slicing)
+        programs_to_process = programs_list[start_at - 1 :]
+
+        if start_at > 1:
+            click.echo(
+                f"Skipping first {start_at - 1} program(s) due to --start-at {start_at}"
+            )
+
+            # Show the skipped programs
+            skipped_programs = programs_list[: start_at - 1]
+            click.echo("Skipped programs:")
+            for idx, (pkey, pdata) in enumerate(skipped_programs, start=1):
+                click.echo(
+                    f"  {idx:02d}. {pdata['program_name']} ({pkey}) - {len(pdata['students'])} students"
+                )
+
+        for idx, (pkey, pdata) in enumerate(programs_to_process, start=start_at):
             click.echo(
                 f"{idx:3d}. {pdata['program_name']} ({pkey}) - {len(pdata['students'])} students"
             )
@@ -400,13 +435,27 @@ def generate_certificates_for_cleared_students(
             for std in missing_details:
                 click.echo(f"  - {std}")
 
-        total = sum(len(p["students"]) for p in programs.values())
+        total = sum(len(p["students"]) for _, p in programs_to_process)
         click.echo(f"\nTotal certificates that would be generated: {total}")
         return
 
     if not programs:
         click.secho(
             "❌ No student details found. Cannot generate certificates.", fg="red"
+        )
+        return
+
+    # Validate start_at parameter
+    total_programs = len(programs)
+    if start_at > total_programs:
+        click.secho(
+            f"❌ Error: --start-at {start_at} is greater than the total number of programs ({total_programs})",
+            fg="red",
+        )
+        return
+    elif start_at < 1:
+        click.secho(
+            f"❌ Error: --start-at must be 1 or greater, got {start_at}", fg="red"
         )
         return
 
@@ -425,7 +474,28 @@ def generate_certificates_for_cleared_students(
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_path = Path(temp_dir)
 
-        for idx, (pkey, pdata) in enumerate(programs.items(), start=1):
+        # Convert to list to enable slicing for skipping programs
+        programs_list = list(programs.items())
+
+        # Skip programs based on start_at (1-indexed, so subtract 1 for 0-indexed slicing)
+        programs_to_process = programs_list[start_at - 1 :]
+
+        if start_at > 1:
+            click.echo(
+                f"Skipping first {start_at - 1} program(s) due to --start-at {start_at}"
+            )
+
+            # Show the skipped programs
+            skipped_programs = programs_list[: start_at - 1]
+            click.echo("Skipped programs:")
+            for idx, (pkey, pdata) in enumerate(skipped_programs, start=1):
+                click.echo(
+                    f"  {idx:02d}. {pdata['program_name']} ({pkey}) - {len(pdata['students'])} students"
+                )
+
+            click.echo(f"Will process {len(programs_to_process)} program(s)")
+
+        for idx, (pkey, pdata) in enumerate(programs_to_process, start=start_at):
             students_data = pdata["students"]
             click.echo(
                 f"\n📁 Program: {pdata['program_name']} ({pkey}) - {len(students_data)} students"
@@ -455,13 +525,13 @@ def generate_certificates_for_cleared_students(
                     fg="red",
                 )
 
-            # Pause between programs so operator can handle printed output or files
-            try:
-                click.pause(info="Press any key to continue")
-            except Exception:
-                # Fallback for environments where click.pause might not behave as expected
-                click.echo("Press Enter to continue...")
-                input()
+            # # Pause between programs so operator can handle printed output or files
+            # try:
+            #     click.pause(info="Press any key to continue")
+            # except Exception:
+            #     # Fallback for environments where click.pause might not behave as expected
+            #     click.echo("Press Enter to continue...")
+            #     input()
 
 
 @click.command(name="certificates-bulk")
@@ -475,7 +545,13 @@ def generate_certificates_for_cleared_students(
     is_flag=True,
     help="Show which students would get certificates without actually generating them",
 )
-def certificates_bulk_cmd(limit: Optional[int], dry_run: bool) -> None:
+@click.option(
+    "--start-at",
+    type=int,
+    default=1,
+    help="Skip the first N-1 programs and start generating from the Nth program (e.g., --start-at 2 will skip the first program and start with the second)",
+)
+def certificates_bulk_cmd(limit: Optional[int], dry_run: bool, start_at: int) -> None:
     """
     Generate a single multi-page PDF containing graduation certificates for all
     students who have been cleared by academic, finance, and library departments.
@@ -491,12 +567,19 @@ def certificates_bulk_cmd(limit: Optional[int], dry_run: bool) -> None:
 
     Use --limit to restrict the number of certificates generated (useful for testing).
 
+    Use --start-at to skip the first N-1 programs and start processing from the Nth program
+    (e.g., --start-at 2 will skip the first program and start with the second).
+
     Examples:
       registry-cli create certificates-bulk --dry-run
       registry-cli create certificates-bulk --limit 10
+      registry-cli create certificates-bulk --start-at 2  # Skip first program
+      registry-cli create certificates-bulk --start-at 3  # Skip first 2 programs
       registry-cli create certificates-bulk
     """
     from registry_cli.main import get_db
 
     db = get_db()
-    generate_certificates_for_cleared_students(db, limit=limit, dry_run=dry_run)
+    generate_certificates_for_cleared_students(
+        db, limit=limit, dry_run=dry_run, start_at=start_at
+    )
