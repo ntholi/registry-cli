@@ -5,6 +5,9 @@ from pathlib import Path
 from typing import List, Optional
 
 import click
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill
+from openpyxl.utils import get_column_letter
 from PyPDF2 import PdfReader, PdfWriter
 from sqlalchemy import and_, func
 from sqlalchemy.orm import Session
@@ -122,6 +125,95 @@ def _get_student_details(db: Session, std_no: int) -> Optional[dict]:
             "school_name": query.school_name,
         }
     return None
+
+
+def _export_certificates_to_excel(programs: dict) -> str:
+    """
+    Export certificate data to Excel file ordered by program.
+
+    Args:
+        programs: Dictionary of programs and their students
+
+    Returns:
+        Path to the exported Excel file
+    """
+    # Ensure exports directory exists
+    output_dir = "exports"
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Create filename with timestamp
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    excel_filename = f"certificates_bulk_{timestamp}.xlsx"
+    excel_path = os.path.join(output_dir, excel_filename)
+
+    # Create workbook and worksheet
+    wb = Workbook()
+    ws = wb.active
+    if ws is None:
+        ws = wb.create_sheet("Certificates")
+    else:
+        ws.title = "Certificates"
+
+    # Define headers
+    headers = ["Reference Number", "Student Name", "Program", "Issue Date"]
+
+    # Style headers
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill(
+        start_color="366092", end_color="366092", fill_type="solid"
+    )
+
+    # Write headers
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col)
+        cell.value = header
+        cell.font = header_font
+        cell.fill = header_fill
+
+    # Issue date for all certificates
+    issue_date = "02 October 2025"
+
+    # Write data rows
+    row = 2
+
+    # Sort programs by program name for consistent ordering
+    sorted_programs = sorted(programs.items(), key=lambda x: x[1]["program_name"])
+
+    for program_key, program_data in sorted_programs:
+        # Sort students within each program by name
+        students = sorted(program_data["students"], key=lambda x: x["student_name"])
+
+        for student in students:
+            # Generate reference number
+            reference = build_certificate_reference(
+                student["program_name"], student["program_code"], student["std_no"]
+            )
+
+            # Write row data
+            ws.cell(row=row, column=1, value=reference)
+            ws.cell(row=row, column=2, value=student["student_name"])
+            ws.cell(row=row, column=3, value=student["program_name"])
+            ws.cell(row=row, column=4, value=issue_date)
+
+            row += 1
+
+    # Auto-adjust column widths
+    for col in range(1, len(headers) + 1):
+        column_letter = get_column_letter(col)
+        max_length = 0
+        for cell in ws[column_letter]:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except:
+                pass
+        adjusted_width = min(max_length + 2, 50)
+        ws.column_dimensions[column_letter].width = adjusted_width
+
+    # Save the workbook
+    wb.save(excel_path)
+
+    return excel_path
 
 
 def _generate_single_certificate_overlay(
@@ -329,7 +421,10 @@ def _combine_certificates_to_multi_page_pdf(
 
 
 def generate_certificates_for_cleared_students(
-    db: Session, limit: Optional[int] = None, dry_run: bool = False, start_at: int = 1
+    db: Session,
+    limit: Optional[int] = None,
+    export_excel: bool = False,
+    start_at: int = 1,
 ) -> None:
     """
     Generate graduation certificates for all students who have been cleared by
@@ -338,7 +433,7 @@ def generate_certificates_for_cleared_students(
     Args:
         db: Database session
         limit: Optional limit on number of certificates to generate
-        dry_run: If True, only show which students would get certificates without generating them
+        export_excel: If True, export certificate data to Excel without generating PDFs
         start_at: Skip the first N-1 programs and start processing from the Nth program
     """
     click.echo("Finding students with approved graduation clearances...")
@@ -386,8 +481,8 @@ def generate_certificates_for_cleared_students(
 
         programs[program_key]["students"].append(details)
 
-    if dry_run:
-        # Validate start_at parameter for dry run
+    if export_excel:
+        # Validate start_at parameter for export
         total_programs = len(programs)
         if start_at > total_programs:
             click.secho(
@@ -401,7 +496,9 @@ def generate_certificates_for_cleared_students(
             )
             return
 
-        click.echo("\n🔍 DRY RUN MODE - No certificates will be generated")
+        click.echo(
+            "\n� EXPORT EXCEL MODE - Generating certificate data for Excel export"
+        )
         click.echo("Students grouped by program who would receive certificates:")
 
         # Convert to list to enable slicing for skipping programs
@@ -437,6 +534,24 @@ def generate_certificates_for_cleared_students(
 
         total = sum(len(p["students"]) for _, p in programs_to_process)
         click.echo(f"\nTotal certificates that would be generated: {total}")
+
+        # Export to Excel
+        try:
+            click.echo("\n📊 Exporting certificate data to Excel...")
+            excel_path = _export_certificates_to_excel(programs)
+            click.secho(
+                f"✅ Successfully exported certificate data to: {excel_path}",
+                fg="green",
+            )
+
+            # Show summary of export
+            total_certificates = sum(len(p["students"]) for p in programs.values())
+            click.echo(
+                f"📋 Excel export contains {total_certificates} certificates across {len(programs)} programs"
+            )
+        except Exception as e:
+            click.secho(f"❌ Error exporting to Excel: {str(e)}", fg="red")
+
         return
 
     if not programs:
@@ -541,9 +656,9 @@ def generate_certificates_for_cleared_students(
     help="Limit the number of certificates to generate (useful for testing)",
 )
 @click.option(
-    "--dry-run",
+    "--export-excel",
     is_flag=True,
-    help="Show which students would get certificates without actually generating them",
+    help="Export certificate data to Excel without generating PDFs",
 )
 @click.option(
     "--start-at",
@@ -551,7 +666,9 @@ def generate_certificates_for_cleared_students(
     default=1,
     help="Skip the first N-1 programs and start generating from the Nth program (e.g., --start-at 2 will skip the first program and start with the second)",
 )
-def certificates_bulk_cmd(limit: Optional[int], dry_run: bool, start_at: int) -> None:
+def certificates_bulk_cmd(
+    limit: Optional[int], export_excel: bool, start_at: int
+) -> None:
     """
     Generate a single multi-page PDF containing graduation certificates for all
     students who have been cleared by academic, finance, and library departments.
@@ -562,8 +679,9 @@ def certificates_bulk_cmd(limit: Optional[int], dry_run: bool, start_at: int) ->
     2. Generate a single PDF file with multiple pages, one certificate per page
     3. Provide a summary of the generated certificates and organize by school/program
 
-    Use --dry-run to see which students would receive certificates without
-    actually generating them.
+    Use --export-excel to export certificate data to Excel without generating PDFs.
+    In export mode, certificate data will be exported to Excel with reference
+    numbers, student names, programs, and issue dates.
 
     Use --limit to restrict the number of certificates generated (useful for testing).
 
@@ -571,7 +689,7 @@ def certificates_bulk_cmd(limit: Optional[int], dry_run: bool, start_at: int) ->
     (e.g., --start-at 2 will skip the first program and start with the second).
 
     Examples:
-      registry-cli create certificates-bulk --dry-run
+      registry-cli create certificates-bulk --export-excel
       registry-cli create certificates-bulk --limit 10
       registry-cli create certificates-bulk --start-at 2  # Skip first program
       registry-cli create certificates-bulk --start-at 3  # Skip first 2 programs
@@ -581,5 +699,5 @@ def certificates_bulk_cmd(limit: Optional[int], dry_run: bool, start_at: int) ->
 
     db = get_db()
     generate_certificates_for_cleared_students(
-        db, limit=limit, dry_run=dry_run, start_at=start_at
+        db, limit=limit, export_excel=export_excel, start_at=start_at
     )
