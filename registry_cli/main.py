@@ -47,6 +47,9 @@ from registry_cli.commands.update.student_module_module_id import (
 )
 from registry_cli.commands.update.student_module_refs import update_student_module_refs
 from registry_cli.commands.update.student_modules import update_student_modules
+from registry_cli.commands.update.student_program_status import (
+    mark_programs_as_completed,
+)
 from registry_cli.commands.update.student_semester import (
     update_multiple_students_semester_numbers,
     update_student_semester_number,
@@ -664,6 +667,58 @@ def update_semester_numbers_cmd(std_nos: tuple[int, ...], reset: bool) -> None:
     """
     db = get_db()
     update_multiple_students_semester_numbers(db, list(std_nos), reset)
+
+
+@update.command(name="complete-programs")
+@click.argument("std_nos", type=int, nargs=-1)
+@click.option(
+    "--file",
+    "-f",
+    type=click.Path(exists=True, readable=True),
+    help="File containing student numbers (one per line or comma/space separated)",
+)
+@click.argument("graduation_date", type=str)
+def complete_programs_cmd(
+    std_nos: tuple[int, ...], file: str, graduation_date: str
+) -> None:
+    """
+    Mark student programs as Completed with a graduation date.
+
+    This command updates Active student programs to Completed status and sets
+    the graduation date. If a student has multiple active programs, the user
+    will be prompted to select which one to mark as completed.
+
+    Both the database and website (r_stdprogramedit.php) are updated.
+
+    STD_NOS: Optional list of student numbers (space-separated)
+    GRADUATION_DATE: Graduation date in YYYY-MM-DD format (e.g. "2011-08-20")
+
+    Examples:
+      registry-cli update complete-programs 901001234 901005678 2025-11-15
+      registry-cli update complete-programs --file student_numbers.txt 2025-11-15
+    """
+    db = get_db()
+
+    # Combine student numbers from arguments and file
+    combined_std_nos = list(std_nos) if std_nos else []
+
+    if file:
+        try:
+            file_std_nos = read_student_numbers_from_file(file)
+            combined_std_nos.extend(file_std_nos)
+            click.echo(f"Loaded {len(file_std_nos)} student numbers from {file}")
+        except Exception as e:
+            click.secho(f"Error reading file {file}: {str(e)}", fg="red")
+            return
+
+    if not combined_std_nos:
+        click.secho(
+            "Error: No student numbers provided. Use STD_NOS or --file option.",
+            fg="red",
+        )
+        return
+
+    mark_programs_as_completed(db, combined_std_nos, graduation_date)
 
 
 @cli.group()

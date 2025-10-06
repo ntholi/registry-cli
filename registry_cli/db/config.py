@@ -34,7 +34,7 @@ def get_engine(use_local: bool = True) -> Engine:
     print("Using local database" if use_local else "Using production database")
     if use_local:
         engine = create_engine(
-            "sqlite:///local.db",
+            "sqlite:///../registry-web/local.db",
             connect_args={"check_same_thread": False, "timeout": TIMEOUT_SECONDS},
             echo=False,
             pool_pre_ping=True,
