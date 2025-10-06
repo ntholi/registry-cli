@@ -45,34 +45,36 @@ def mark_programs_as_completed(
         processed += 1
         click.echo(f"[{processed}/{total_students}] Processing student {std_no}...")
 
-        # Get active programs for this student
-        active_programs = (
+        # Get all Active and Completed programs for this student
+        all_programs = (
             db.query(StudentProgram)
-            .filter(StudentProgram.std_no == std_no, StudentProgram.status == "Active")
+            .filter(
+                StudentProgram.std_no == std_no,
+                StudentProgram.status.in_(["Active", "Completed"]),
+            )
             .all()
         )
 
-        if not active_programs:
-            click.secho(
-                f"  ✗ No active programs found for student {std_no}", fg="yellow"
-            )
+        if not all_programs:
+            click.secho(f"  ✗ No programs found for student {std_no}", fg="yellow")
             skip_count += 1
             continue
 
-        if len(active_programs) > 1:
+        if len(all_programs) > 1:
             click.secho(
-                f"  ! Student {std_no} has {len(active_programs)} active programs:",
+                f"  ! Student {std_no} has {len(all_programs)} programs:",
                 fg="yellow",
             )
-            for i, program in enumerate(active_programs, 1):
+            for i, program in enumerate(all_programs, 1):
                 structure_code = program.structure.code if program.structure else "N/A"
                 program_name = (
                     program.structure.program.name
                     if program.structure and program.structure.program
                     else "Unknown"
                 )
+                status = program.status or "Unknown"
                 click.echo(
-                    f"    {i}. ID: {program.id} - {program_name} ({structure_code})"
+                    f"    {i}. ID: {program.id} - {program_name} ({structure_code}) - Status: {status}"
                 )
 
             # Ask user which one to mark as completed
@@ -87,8 +89,8 @@ def mark_programs_as_completed(
                     break
                 try:
                     index = int(choice) - 1
-                    if 0 <= index < len(active_programs):
-                        selected_program = active_programs[index]
+                    if 0 <= index < len(all_programs):
+                        selected_program = all_programs[index]
                         success = _update_program_status(
                             db, browser, selected_program, graduation_date
                         )
@@ -107,13 +109,13 @@ def mark_programs_as_completed(
                         break
                     else:
                         click.echo(
-                            f"  Invalid choice. Please enter 1-{len(active_programs)}"
+                            f"  Invalid choice. Please enter 1-{len(all_programs)}"
                         )
                 except ValueError:
                     click.echo("  Invalid input. Please enter a number or 's' to skip")
         else:
-            # Single active program - update it directly
-            program = active_programs[0]
+            # Single program - update it directly
+            program = all_programs[0]
             success = _update_program_status(db, browser, program, graduation_date)
             if success:
                 click.secho(
