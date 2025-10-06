@@ -73,8 +73,17 @@ def mark_programs_as_completed(
                     else "Unknown"
                 )
                 status = program.status or "Unknown"
+
+                # Color the status: green for Completed, yellow for Active, cyan for others
+                if status.lower() == "completed":
+                    status_colored = click.style(status, fg="green")
+                elif status.lower() == "active":
+                    status_colored = click.style(status, fg="yellow")
+                else:
+                    status_colored = click.style(status, fg="cyan")
+
                 click.echo(
-                    f"    {i}. ID: {program.id} - {program_name} ({structure_code}) - Status: {status}"
+                    f"    {i}. ID: {program.id} - {program_name} ({structure_code}) - Status: {status_colored}"
                 )
 
             # Ask user which one to mark as completed
