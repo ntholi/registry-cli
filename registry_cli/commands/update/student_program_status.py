@@ -60,6 +60,15 @@ def mark_programs_as_completed(
             skip_count += 1
             continue
 
+        # If all returned programs are already Completed, skip this student
+        if all(p.status and p.status.lower() == "completed" for p in all_programs):
+            click.secho(
+                f"  ⊘ All programs for student {std_no} are already Completed. Skipping.",
+                fg="yellow",
+            )
+            skip_count += 1
+            continue
+
         if len(all_programs) > 1:
             click.secho(
                 f"  ! Student {std_no} has {len(all_programs)} programs:",
@@ -83,7 +92,7 @@ def mark_programs_as_completed(
                     status_colored = click.style(status, fg="cyan")
 
                 click.echo(
-                    f"    {i}. ID: {program.id} - {program_name} ({structure_code}) - Status: {status_colored}"
+                    f"    {i}. ID: {program.id} - {program_name} ({program.intake_date}) - Status: {status_colored}"
                 )
 
             # Ask user which one to mark as completed
