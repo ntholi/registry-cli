@@ -50,6 +50,7 @@ from registry_cli.commands.update.student_modules import update_student_modules
 from registry_cli.commands.update.student_program_status import (
     mark_graduated_programs_as_completed,
     mark_programs_as_completed,
+    repair_student_programs,
 )
 from registry_cli.commands.update.student_semester import (
     update_multiple_students_semester_numbers,
@@ -737,6 +738,85 @@ def mark_graduated_complete_cmd() -> None:
     """
     db = get_db()
     mark_graduated_programs_as_completed(db)
+
+
+@update.command(name="repair-student-programs")
+@click.argument("std_nos", type=int, nargs=-1)
+@click.option(
+    "--file",
+    "-f",
+    type=click.Path(exists=True, readable=True),
+    help="File containing student numbers (one per line or comma/space separated)",
+)
+@click.option(
+    "--limit",
+    "-l",
+    type=int,
+    help="Limit the number of students to process (useful for testing)",
+)
+def repair_student_programs_cmd(
+    std_nos: tuple[int, ...], file: str, limit: int
+) -> None:
+    """
+    Repair student programs by re-syncing them with the website.
+
+    This command goes through each student's programs and ensures the website
+    has the correct data by submitting the complete form with ALL fields including:
+    - x_StdProgramID (program ID)
+    - x_StudentID (student number)
+    - x_ProgramIntakeDate (intake date)
+    - And all other program fields from the database
+
+    This is essential for fixing data corruption where programs were incorrectly
+    associated with the wrong students due to missing form fields.
+
+    STD_NOS: Optional list of student numbers (space-separated)
+
+    Examples:
+      registry-cli update repair-student-programs 901001234 901005678
+      registry-cli update repair-student-programs --file student_numbers.txt
+      registry-cli update repair-student-programs --file student_numbers.txt --limit 2
+    """
+    db = get_db()
+
+    # Combine student numbers from arguments and file
+    combined_std_nos = list(std_nos) if std_nos else []
+
+    if file:
+        try:
+            file_std_nos = read_student_numbers_from_file(file)
+            combined_std_nos.extend(file_std_nos)
+            click.echo(f"Loaded {len(file_std_nos)} student numbers from {file}")
+        except Exception as e:
+            click.secho(f"Error reading file {file}: {str(e)}", fg="red")
+            return
+
+    if not combined_std_nos:
+        click.secho(
+            "Error: No student numbers provided. Use STD_NOS or --file option.",
+            fg="red",
+        )
+        return
+
+    # Apply limit if specified
+    if limit and limit > 0:
+        original_count = len(combined_std_nos)
+        combined_std_nos = combined_std_nos[:limit]
+        click.echo(
+            f"Limiting to first {limit} students (out of {original_count} total)"
+        )
+
+    # Show confirmation
+    click.echo(
+        f"\nYou are about to repair programs for {len(combined_std_nos)} students."
+    )
+    click.echo("This will re-sync all their program data with the website.")
+
+    if not click.confirm("\nDo you want to proceed?"):
+        click.secho("Operation cancelled.", fg="yellow")
+        return
+
+    repair_student_programs(db, combined_std_nos)
 
 
 @cli.group()

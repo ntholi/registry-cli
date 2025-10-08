@@ -501,6 +501,247 @@ def mark_graduated_programs_as_completed(db: Session) -> None:
     click.echo("=" * 60)
 
 
+def repair_student_programs(db: Session, std_nos: List[int]) -> None:
+    """
+    Repair student programs by re-syncing them with the website.
+
+    This command goes through each student's programs and ensures the website
+    has the correct data by submitting the complete form with ALL fields including:
+    - x_StdProgramID (program ID)
+    - x_StudentID (student number)
+    - x_ProgramIntakeDate (intake date)
+    - And all other program fields
+
+    This is useful for fixing data corruption issues where programs were incorrectly
+    associated with the wrong students.
+
+    Args:
+        db: Database session
+        std_nos: List of student numbers to repair
+    """
+    browser = Browser()
+
+    total_students = len(std_nos)
+    processed = 0
+    success_count = 0
+    error_count = 0
+    total_programs = 0
+
+    click.echo(f"\nRepairing student programs for {total_students} students...")
+    click.echo("This will re-sync all program data with the website.\n")
+
+    for std_no in std_nos:
+        processed += 1
+        click.echo(f"[{processed}/{total_students}] Processing student {std_no}...")
+
+        # Get all programs for this student
+        programs = (
+            db.query(StudentProgram).filter(StudentProgram.std_no == std_no).all()
+        )
+
+        if not programs:
+            click.secho(f"  ⊘ No programs found for student {std_no}", fg="red")
+            continue
+
+        click.echo(f"  Found {len(programs)} program(s)")
+
+        for program in programs:
+            total_programs += 1
+
+            # Get program details for display
+            program_name = (
+                program.structure.program.name
+                if program.structure and program.structure.program
+                else "Unknown"
+            )
+
+            click.echo(f"  → Program ID {program.id}: {program_name}")
+            click.echo(f"     Status: {program.status}")
+            click.echo(f"     Intake Date: {program.intake_date or 'N/A'}")
+            click.echo(f"     Graduation Date: {program.graduation_date or 'N/A'}")
+
+            # Repair this program on the website
+            success = _repair_program_on_website(browser, program)
+
+            if success:
+                click.secho(
+                    f"  ✓ Successfully repaired program {program.id}", fg="green"
+                )
+                success_count += 1
+            else:
+                click.secho(f"  ✗ Failed to repair program {program.id}", fg="red")
+                error_count += 1
+
+            # Small delay between updates
+            time.sleep(0.3)
+
+        # Delay between students
+        time.sleep(0.5)
+
+    # Summary
+    click.echo("\n" + "=" * 60)
+    click.echo("SUMMARY")
+    click.echo("=" * 60)
+    click.secho(f"Total students processed: {total_students}", fg="cyan")
+    click.secho(f"Total programs processed: {total_programs}", fg="cyan")
+    click.secho(f"Successfully repaired: {success_count}", fg="green")
+    click.secho(f"Errors: {error_count}", fg="red")
+    click.echo("=" * 60)
+
+
+def _repair_program_on_website(browser: Browser, program: StudentProgram) -> bool:
+    """
+    Repair a single student program by re-submitting all its data to the website.
+
+    This fetches the current form, extracts all fields, and re-submits them
+    with explicit values for critical fields to ensure data integrity.
+
+    Args:
+        browser: Browser instance
+        program: StudentProgram instance to repair
+
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    try:
+        # Fetch the edit form
+        url = f"{BASE_URL}/r_stdprogramedit.php?StdProgramID={program.id}"
+        response = browser.fetch(url)
+        soup = BeautifulSoup(response.text, "html.parser")
+
+        # Find the form
+        form = soup.find("form", {"name": "fr_stdprogramedit"})
+        if not form or not isinstance(form, Tag):
+            click.secho(f"  Form not found for program {program.id}", fg="red")
+            return False
+
+        # Get all form data - this extracts all hidden inputs
+        form_data = get_form_payload(form)
+
+        # Extract all input fields (text, hidden, checkbox) and their values
+        all_inputs = form.find_all("input")
+        for input_field in all_inputs:
+            if not isinstance(input_field, Tag):
+                continue
+
+            input_name = input_field.get("name")
+            input_type = input_field.get("type", "text")
+
+            if not input_name:
+                continue
+
+            # Skip submit button
+            if input_name == "btnAction":
+                continue
+
+            if input_type == "hidden":
+                # Already handled by get_form_payload
+                continue
+            elif input_type == "checkbox":
+                # Only include if checked (has 'checked' attribute)
+                if input_field.get("checked"):
+                    form_data[input_name] = input_field.get("value", "Y")
+            elif input_type in ["text", "number", "date"]:
+                # Get the value attribute
+                value = input_field.get("value", "")
+                form_data[input_name] = value
+
+        # Extract all select fields and their selected values
+        all_selects = form.find_all("select")
+        for select_field in all_selects:
+            if not isinstance(select_field, Tag):
+                continue
+
+            select_name = select_field.get("name")
+            if not select_name:
+                continue
+
+            # Find the selected option
+            selected_option = select_field.find("option", selected=True)
+            if selected_option and isinstance(selected_option, Tag):
+                form_data[select_name] = selected_option.get("value", "")
+
+        # Extract all textarea fields
+        all_textareas = form.find_all("textarea")
+        for textarea in all_textareas:
+            if not isinstance(textarea, Tag):
+                continue
+
+            textarea_name = textarea.get("name")
+            if textarea_name:
+                form_data[textarea_name] = textarea.get_text(strip=False)
+
+        # CRITICAL: Now explicitly set all the important fields from our database
+        # to ensure they match and are correct
+        form_data["a_edit"] = "U"  # Update action
+        form_data["x_StdProgramID"] = str(program.id)
+        form_data["x_StudentID"] = str(program.std_no)
+
+        # Set all program fields from the database using CORRECT field names from the HTML form
+        if program.intake_date:
+            form_data["x_ProgramIntakeDate"] = program.intake_date
+        if program.reg_date:
+            form_data["x_StdProgRegDate"] = (
+                program.reg_date
+            )  # CORRECT: x_StdProgRegDate, NOT x_RegDate
+        if program.start_term:
+            form_data["x_TermCode"] = (
+                program.start_term
+            )  # CORRECT: x_TermCode, NOT x_StartTerm
+        if program.stream:
+            form_data["x_ProgStreamCode"] = (
+                program.stream
+            )  # CORRECT: x_ProgStreamCode, NOT x_Stream
+        if program.graduation_date:
+            form_data["x_GraduationDate"] = program.graduation_date
+        if program.status:
+            form_data["x_ProgramStatus"] = program.status
+        if program.assist_provider:
+            form_data["x_AssistProviderCode"] = (
+                program.assist_provider
+            )  # CORRECT: x_AssistProviderCode, NOT x_AssistProvider
+
+        # Set structure ID
+        form_data["x_StructureID"] = str(program.structure_id)
+
+        # Debug output to verify what's being sent
+        click.echo(
+            f"     → Syncing: Student={program.std_no}, ProgramID={program.id}, Status={program.status}"
+        )
+
+        # Submit the form
+        post_url = f"{BASE_URL}/r_stdprogramedit.php"
+        post_response = browser.post(post_url, form_data)
+
+        if post_response.status_code == 200:
+            # Check for success indicators in the response
+            response_text = post_response.text.lower()
+            if "successfully" in response_text or "updated" in response_text:
+                return True
+
+            # Check for error messages
+            response_soup = BeautifulSoup(post_response.text, "html.parser")
+            error_message = response_soup.find("div", class_="error")
+            if error_message:
+                click.secho(
+                    f"  Website error: {error_message.get_text(strip=True)}", fg="red"
+                )
+                return False
+
+            # If no explicit success/error message, assume success if status is 200
+            return True
+        else:
+            click.secho(
+                f"  HTTP error {post_response.status_code} repairing program {program.id}",
+                fg="red",
+            )
+            return False
+
+    except Exception as e:
+        click.secho(f"  Exception repairing program {program.id}: {str(e)}", fg="red")
+        return False
+
+
 def _validate_date_format(date_string: str) -> bool:
     """
     Validate that a date string is in YYYY-MM-DD format.
