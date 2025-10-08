@@ -70,67 +70,100 @@ def mark_programs_as_completed(
             continue
 
         if len(all_programs) > 1:
-            click.secho(
-                f"  ! Student {std_no} has {len(all_programs)} programs:",
-                fg="yellow",
-            )
-            for i, program in enumerate(all_programs, 1):
-                structure_code = program.structure.code if program.structure else "N/A"
-                program_name = (
-                    program.structure.program.name
-                    if program.structure and program.structure.program
-                    else "Unknown"
-                )
-                status = program.status or "Unknown"
+            # Check if any programs meet auto-completion criteria
+            auto_complete_programs = [
+                p
+                for p in all_programs
+                if p.status
+                and p.status.lower() == "active"
+                and _should_auto_complete(p)
+            ]
 
-                # Color the status: green for Completed, yellow for Active, cyan for others
-                if status.lower() == "completed":
-                    status_colored = click.style(status, fg="green")
-                elif status.lower() == "active":
-                    status_colored = click.style(status, fg="yellow")
-                else:
-                    status_colored = click.style(status, fg="cyan")
-
-                click.echo(
-                    f"    {i}. ID: {program.id} - {program_name} ({program.intake_date}) - Status: {status_colored}"
+            if auto_complete_programs:
+                # Automatically mark programs that meet criteria
+                click.secho(
+                    f"  ! Student {std_no} has {len(auto_complete_programs)} program(s) meeting auto-completion criteria",
+                    fg="cyan",
                 )
 
-            # Ask user which one to mark as completed
-            while True:
-                choice = click.prompt(
-                    "  Which program should be marked as completed? Enter number (or 's' to skip)",
-                    type=str,
-                )
-                if choice.lower() == "s":
-                    click.echo(f"  ⊘ Skipped student {std_no}")
-                    skip_count += 1
-                    break
-                try:
-                    index = int(choice) - 1
-                    if 0 <= index < len(all_programs):
-                        selected_program = all_programs[index]
-                        success = _update_program_status(
-                            db, browser, selected_program, graduation_date
+                for program in auto_complete_programs:
+                    program_name = (
+                        program.structure.program.name
+                        if program.structure and program.structure.program
+                        else "Unknown"
+                    )
+                    level = (
+                        program.structure.program.level
+                        if program.structure and program.structure.program
+                        else "Unknown"
+                    )
+                    semester_count = len(program.semesters)
+
+                    click.echo(
+                        f"    Auto-completing: {program_name} ({level}, {semester_count} semesters)"
+                    )
+
+                    success = _update_program_status(
+                        db, browser, program, graduation_date
+                    )
+                    if success:
+                        click.secho(
+                            f"  ✓ Successfully marked program {program.id} as completed",
+                            fg="green",
                         )
-                        if success:
-                            click.secho(
-                                f"  ✓ Successfully marked program {selected_program.id} as completed",
-                                fg="green",
-                            )
-                            success_count += 1
-                        else:
-                            click.secho(
-                                f"  ✗ Failed to update program {selected_program.id}",
-                                fg="red",
-                            )
-                            error_count += 1
-                        break
+                        success_count += 1
                     else:
-                        click.echo(
-                            f"  Invalid choice. Please enter 1-{len(all_programs)}"
+                        click.secho(
+                            f"  ✗ Failed to update program {program.id}",
+                            fg="red",
                         )
-                except ValueError:
-                    click.echo("  Invalid input. Please enter a number or 's' to skip")
+                        error_count += 1
+            else:
+                # No programs meet auto-completion criteria - check if any are active
+                active_programs = [
+                    p for p in all_programs if p.status and p.status.lower() == "active"
+                ]
+
+                if not active_programs:
+                    # All programs are already completed or in other status
+                    click.secho(
+                        f"  ⊘ Student {std_no} has no active programs to complete. Skipping.",
+                        fg="yellow",
+                    )
+                    skip_count += 1
+                else:
+                    # There are active programs but none meet auto-completion criteria
+                    # Display the programs for information, then auto-skip
+                    click.secho(
+                        f"  ⊘ Student {std_no} has {len(all_programs)} programs, but none meet auto-completion criteria. Auto-skipping.",
+                        fg="yellow",
+                    )
+                    for i, program in enumerate(all_programs, 1):
+                        program_name = (
+                            program.structure.program.name
+                            if program.structure and program.structure.program
+                            else "Unknown"
+                        )
+                        status = program.status or "Unknown"
+                        semester_count = len(program.semesters)
+                        level = (
+                            program.structure.program.level
+                            if program.structure and program.structure.program
+                            else "Unknown"
+                        )
+
+                        # Color the status
+                        if status.lower() == "completed":
+                            status_colored = click.style(status, fg="green")
+                        elif status.lower() == "active":
+                            status_colored = click.style(status, fg="yellow")
+                        else:
+                            status_colored = click.style(status, fg="cyan")
+
+                        click.echo(
+                            f"    {i}. {program_name} ({level}, {semester_count} semesters) - Status: {status_colored}"
+                        )
+                    skip_count += 1
         else:
             # Single program - update it directly
             program = all_programs[0]
@@ -318,6 +351,38 @@ def _update_program_on_website(
             f"  Exception updating program {std_program_id}: {str(e)}", fg="red"
         )
         return False
+
+
+def _should_auto_complete(program: StudentProgram) -> bool:
+    """
+    Check if a program should be automatically marked as completed based on criteria.
+
+    Criteria:
+    - Certificate: 2 or more semesters
+    - Diploma: 6 or more semesters
+    - Degree: exactly 3 OR 8 or more semesters
+
+    Args:
+        program: StudentProgram instance to check
+
+    Returns:
+        bool: True if program meets auto-completion criteria, False otherwise
+    """
+    if not program.structure or not program.structure.program:
+        return False
+
+    level = program.structure.program.level.lower()
+    semester_count = len(program.semesters)
+
+    if level == "certificate":
+        return semester_count >= 2
+    elif level == "diploma":
+        return semester_count >= 6
+    elif level == "degree":
+        # Degree must be either 3 semesters (short program) or 8+ semesters (full program)
+        return semester_count == 3 or semester_count >= 8
+
+    return False
 
 
 def _validate_date_format(date_string: str) -> bool:
