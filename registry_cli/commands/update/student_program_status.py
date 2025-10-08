@@ -76,7 +76,7 @@ def mark_programs_as_completed(
                 for p in all_programs
                 if p.status
                 and p.status.lower() == "active"
-                and _should_auto_complete(p)
+                and _should_auto_complete(p, all_programs)
             ]
 
             if auto_complete_programs:
@@ -353,17 +353,20 @@ def _update_program_on_website(
         return False
 
 
-def _should_auto_complete(program: StudentProgram) -> bool:
+def _should_auto_complete(
+    program: StudentProgram, all_programs: List[StudentProgram]
+) -> bool:
     """
     Check if a program should be automatically marked as completed based on criteria.
 
     Criteria:
     - Certificate: 2 or more semesters
     - Diploma: 6 or more semesters
-    - Degree: exactly 3 OR 8 or more semesters
+    - Degree: 3 semesters (only if student has completed diploma) OR 8 or more semesters
 
     Args:
         program: StudentProgram instance to check
+        all_programs: All programs for this student (to check for completed diploma)
 
     Returns:
         bool: True if program meets auto-completion criteria, False otherwise
@@ -379,8 +382,22 @@ def _should_auto_complete(program: StudentProgram) -> bool:
     elif level == "diploma":
         return semester_count >= 6
     elif level == "degree":
-        # Degree must be either 3 semesters (short program) or 8+ semesters (full program)
-        return semester_count == 3 or semester_count >= 8
+        # For 3-semester degree (top-up), only auto-complete if student has a completed diploma
+        if semester_count == 3:
+            has_completed_diploma = any(
+                p.structure
+                and p.structure.program
+                and p.structure.program.level.lower() == "diploma"
+                and p.status
+                and p.status.lower() == "completed"
+                for p in all_programs
+            )
+            return has_completed_diploma
+        # For full degree programs (8+ semesters), always auto-complete
+        elif semester_count >= 8:
+            return True
+        else:
+            return False
 
     return False
 
