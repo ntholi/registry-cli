@@ -402,6 +402,94 @@ def _should_auto_complete(
     return False
 
 
+def mark_graduated_programs_as_completed(db: Session) -> None:
+    """
+    Mark all Active student programs with a graduation_date as Completed.
+
+    This command finds all student programs that:
+    - Have status = "Active"
+    - Have a graduation_date set
+
+    And updates them to status = "Completed" in both the database and website.
+
+    Args:
+        db: Database session
+    """
+    browser = Browser()
+
+    # Query for all Active programs with a graduation_date
+    programs_to_complete = (
+        db.query(StudentProgram)
+        .filter(
+            StudentProgram.status == "Active",
+            StudentProgram.graduation_date.isnot(None),
+            StudentProgram.graduation_date != "",
+        )
+        .all()
+    )
+
+    total_programs = len(programs_to_complete)
+
+    if total_programs == 0:
+        click.secho("\nNo Active programs with graduation dates found.", fg="yellow")
+        return
+
+    click.echo(
+        f"\nFound {total_programs} Active program(s) with graduation dates to mark as Completed.\n"
+    )
+
+    # Confirm before proceeding
+    if not click.confirm("Do you want to proceed?"):
+        click.secho("Operation cancelled.", fg="yellow")
+        return
+
+    processed = 0
+    success_count = 0
+    error_count = 0
+
+    for program in programs_to_complete:
+        processed += 1
+        graduation_date = program.graduation_date or ""
+
+        # Get student and program info for display
+        student_name = program.student.name if program.student else "Unknown"
+        program_name = (
+            program.structure.program.name
+            if program.structure and program.structure.program
+            else "Unknown"
+        )
+
+        click.echo(
+            f"[{processed}/{total_programs}] Processing: {program.std_no} - {student_name}"
+        )
+        click.echo(f"  Program: {program_name}")
+        click.echo(f"  Graduation Date: {graduation_date}")
+
+        success = _update_program_status(db, browser, program, graduation_date)
+
+        if success:
+            click.secho(
+                f"  ✓ Successfully marked program {program.id} as Completed",
+                fg="green",
+            )
+            success_count += 1
+        else:
+            click.secho(f"  ✗ Failed to update program {program.id}", fg="red")
+            error_count += 1
+
+        # Small delay between updates
+        time.sleep(0.5)
+
+    # Summary
+    click.echo("\n" + "=" * 60)
+    click.echo("SUMMARY")
+    click.echo("=" * 60)
+    click.secho(f"Total programs processed: {total_programs}", fg="cyan")
+    click.secho(f"Successfully updated: {success_count}", fg="green")
+    click.secho(f"Errors: {error_count}", fg="red")
+    click.echo("=" * 60)
+
+
 def _validate_date_format(date_string: str) -> bool:
     """
     Validate that a date string is in YYYY-MM-DD format.

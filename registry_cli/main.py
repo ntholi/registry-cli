@@ -48,6 +48,7 @@ from registry_cli.commands.update.student_module_module_id import (
 from registry_cli.commands.update.student_module_refs import update_student_module_refs
 from registry_cli.commands.update.student_modules import update_student_modules
 from registry_cli.commands.update.student_program_status import (
+    mark_graduated_programs_as_completed,
     mark_programs_as_completed,
 )
 from registry_cli.commands.update.student_semester import (
@@ -719,6 +720,23 @@ def complete_programs_cmd(
         return
 
     mark_programs_as_completed(db, combined_std_nos, graduation_date)
+
+
+@update.command(name="mark-graduated-complete")
+def mark_graduated_complete_cmd() -> None:
+    """
+    Mark all Active programs with graduation dates as Completed.
+
+    This command finds all student programs that are currently Active
+    but have a graduation_date set, and updates them to Completed status.
+
+    Both the database and website (r_stdprogramedit.php) are updated.
+
+    Example:
+      registry-cli update mark-graduated-complete
+    """
+    db = get_db()
+    mark_graduated_programs_as_completed(db)
 
 
 @cli.group()
