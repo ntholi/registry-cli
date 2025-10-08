@@ -210,7 +210,9 @@ def _update_program_status(
         bool: True if successful, False otherwise
     """
     # Update on website first
-    website_success = _update_program_on_website(browser, program.id, graduation_date)
+    website_success = _update_program_on_website(
+        browser, program.id, program.std_no, graduation_date
+    )
 
     if not website_success:
         click.secho(f"  Failed to update website for program {program.id}", fg="red")
@@ -229,7 +231,7 @@ def _update_program_status(
 
 
 def _update_program_on_website(
-    browser: Browser, std_program_id: int, graduation_date: str
+    browser: Browser, std_program_id: int, std_no: int, graduation_date: str
 ) -> bool:
     """
     Update student program status to Completed on the website.
@@ -237,6 +239,7 @@ def _update_program_on_website(
     Args:
         browser: Browser instance
         std_program_id: Student program ID
+        std_no: Student number
         graduation_date: Graduation date in YYYY-MM-DD format
 
     Returns:
@@ -317,6 +320,14 @@ def _update_program_on_website(
         form_data["a_edit"] = "U"  # Update action
         form_data["x_ProgramStatus"] = "Completed"
         form_data["x_GraduationDate"] = graduation_date
+        # CRITICAL: Explicitly set these IDs to ensure we're updating the correct program for the correct student
+        form_data["x_StdProgramID"] = str(std_program_id)
+        form_data["x_StudentID"] = str(std_no)
+
+        # Debug output to verify the correct IDs are being sent
+        click.echo(
+            f"  → Sending update: StudentID={std_no}, ProgramID={std_program_id}, Status=Completed, Date={graduation_date}"
+        )
 
         # Submit the form
         post_url = f"{BASE_URL}/r_stdprogramedit.php"
