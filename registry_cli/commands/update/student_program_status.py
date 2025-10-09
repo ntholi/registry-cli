@@ -59,10 +59,16 @@ def mark_programs_as_completed(
             skip_count += 1
             continue
 
-        # If all returned programs are already Completed, skip this student
-        if all(p.status and p.status.lower() == "completed" for p in all_programs):
+        # If all returned programs are already Completed AND have a graduation_date set, skip this student
+        if all(
+            p.status
+            and p.status.lower() == "completed"
+            and p.graduation_date
+            and p.graduation_date.strip()
+            for p in all_programs
+        ):
             click.secho(
-                f"  ⊘ All programs for student {std_no} are already Completed. Skipping.",
+                f"  ⊘ All programs for student {std_no} are already Completed with graduation dates set. Skipping.",
                 fg="yellow",
             )
             skip_count += 1
@@ -124,12 +130,53 @@ def mark_programs_as_completed(
                 ]
 
                 if not active_programs:
-                    # All programs are already completed or in other status
-                    click.secho(
-                        f"  ⊘ Student {std_no} has no active programs to complete. Skipping.",
-                        fg="yellow",
-                    )
-                    skip_count += 1
+                    # All programs are completed or in other status
+                    # Check if any completed programs are missing graduation dates
+                    completed_without_date = [
+                        p
+                        for p in all_programs
+                        if p.status
+                        and p.status.lower() == "completed"
+                        and (not p.graduation_date or not p.graduation_date.strip())
+                    ]
+
+                    if completed_without_date:
+                        # Don't skip - these completed programs need graduation dates
+                        click.secho(
+                            f"  ! Student {std_no} has {len(completed_without_date)} completed program(s) missing graduation dates",
+                            fg="cyan",
+                        )
+
+                        for program in completed_without_date:
+                            program_name = (
+                                program.structure.program.name
+                                if program.structure and program.structure.program
+                                else "Unknown"
+                            )
+                            click.echo(f"    Updating: {program_name}")
+
+                            success = _update_program_status(
+                                db, browser, program, graduation_date
+                            )
+                            if success:
+                                click.secho(
+                                    f"  ✓ Successfully updated program {program.id} with graduation date",
+                                    fg="green",
+                                )
+                                success_count += 1
+                            else:
+                                click.secho(
+                                    f"  ✗ Failed to update program {program.id}",
+                                    fg="red",
+                                )
+                                error_count += 1
+                    else:
+                        # All programs have graduation dates set, skip
+                        click.secho(
+                            f"  ⊘ Student {std_no} has no active programs and all completed programs have graduation dates. Skipping.",
+                            fg="yellow",
+                        )
+                        skip_count += 1
                 else:
                     # There are active programs but none meet auto-completion criteria
                     # Display the programs for information, then auto-skip
