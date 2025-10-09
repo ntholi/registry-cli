@@ -20,7 +20,6 @@ def mark_programs_as_completed(
         std_nos: List of student numbers
         graduation_date: Graduation date in YYYY-MM-DD format (e.g. "2011-08-20")
     """
-    # Validate graduation date format
     if not _validate_date_format(graduation_date):
         click.secho(
             f"Invalid graduation date format: {graduation_date}. Expected YYYY-MM-DD (e.g. '2011-08-20')",
@@ -259,7 +258,6 @@ def _update_program_on_website(
             )
             return False
 
-        # Get all form data - this extracts all hidden inputs
         form_data = get_form_payload(form)
 
         # Extract all input fields (text, hidden, checkbox) and their values
@@ -279,15 +277,11 @@ def _update_program_on_website(
                 continue
 
             if input_type == "hidden":
-                # Already handled by get_form_payload
                 continue
             elif input_type == "checkbox":
-                # Only include if checked (has 'checked' attribute)
                 if input_field.get("checked"):
                     form_data[input_name] = input_field.get("value", "Y")
-                # If not checked, don't include in form data
             elif input_type in ["text", "number"]:
-                # Get the value attribute
                 value = input_field.get("value", "")
                 form_data[input_name] = value
 
@@ -371,9 +365,9 @@ def _should_auto_complete(
     Check if a program should be automatically marked as completed based on criteria.
 
     Criteria:
-    - Certificate: 2 or more semesters
-    - Diploma: 6 or more semesters
-    - Degree: 3 semesters (only if student has completed diploma) OR 8 or more semesters
+    - Certificate: Must have semester 1 AND semester 2 (not just any 2 semesters)
+    - Diploma: Must have semesters 1, 2, 3, 4, 5, AND 6 (consecutive from 1 to 6)
+    - Degree: Must have semesters 1-8 (consecutive) OR if only 3 semesters, must have semesters 6, 7, AND 8
 
     Args:
         program: StudentProgram instance to check
@@ -386,15 +380,29 @@ def _should_auto_complete(
         return False
 
     level = program.structure.program.level.lower()
-    semester_count = len(program.semesters)
+
+    # Get the set of semester numbers for this program
+    semester_numbers = {
+        sem.semester_number
+        for sem in program.semesters
+        if sem.semester_number is not None
+    }
 
     if level == "certificate":
-        return semester_count >= 2
+        # Must have semester 1 AND semester 2
+        required_semesters = {1, 2}
+        return required_semesters.issubset(semester_numbers)
+
     elif level == "diploma":
-        return semester_count >= 6
+        # Must have semesters 1, 2, 3, 4, 5, and 6
+        required_semesters = {1, 2, 3, 4, 5, 6}
+        return required_semesters.issubset(semester_numbers)
+
     elif level == "degree":
-        # For 3-semester degree (top-up), only auto-complete if student has a completed diploma
-        if semester_count == 3:
+        # Check if it's a 3-semester top-up degree (semesters 6, 7, 8)
+        topup_semesters = {6, 7, 8}
+        if topup_semesters.issubset(semester_numbers) and len(semester_numbers) == 3:
+            # For top-up degrees, verify student has a completed diploma
             has_completed_diploma = any(
                 p.structure
                 and p.structure.program
@@ -404,11 +412,10 @@ def _should_auto_complete(
                 for p in all_programs
             )
             return has_completed_diploma
-        # For full degree programs (8+ semesters), always auto-complete
-        elif semester_count >= 8:
-            return True
-        else:
-            return False
+
+        # Check for full degree (semesters 1-8)
+        full_degree_semesters = {1, 2, 3, 4, 5, 6, 7, 8}
+        return full_degree_semesters.issubset(semester_numbers)
 
     return False
 
