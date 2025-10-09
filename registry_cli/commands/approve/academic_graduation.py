@@ -240,10 +240,10 @@ def get_outstanding_from_structure(
     db: Session, programs: List[StudentProgram]
 ) -> Dict[str, List[Dict[str, Any]]]:
     """
-    Get outstanding modules from structure based on student's active program.
+    Get outstanding modules from structure based on student's active or latest completed program.
     Returns failed never repeated and never attempted modules.
     """
-    # Find active program
+    # Find active program first, if not found get latest completed program
     program = None
     for p in programs:
         if p.status == "Active":
@@ -251,7 +251,15 @@ def get_outstanding_from_structure(
             break
 
     if not program:
-        raise Exception("No active program found for student")
+        # Try to get the latest completed program
+        completed_programs = [p for p in programs if p.status == "Completed"]
+        if completed_programs:
+            # Sort by created_at descending to get the latest
+            completed_programs.sort(key=lambda x: x.created_at or "", reverse=True)
+            program = completed_programs[0]
+
+    if not program:
+        raise Exception("No active or completed program found for student")
 
     # Get structure modules (only visible ones)
     structure_modules = get_visible_modules_for_structure(db, program.structure_id)

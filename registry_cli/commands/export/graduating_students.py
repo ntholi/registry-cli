@@ -112,7 +112,7 @@ def get_students_expected_to_graduate(
             .join(Student, StudentProgram.std_no == Student.std_no)
             .filter(
                 and_(
-                    StudentProgram.status == "Active",
+                    StudentProgram.status.in_(["Active", "Completed"]),
                     Program.level == level,
                     StudentProgram.reg_date.isnot(None),
                 )
@@ -171,7 +171,7 @@ def get_students_expected_to_graduate(
             .join(Student, StudentProgram.std_no == Student.std_no)
             .filter(
                 and_(
-                    StudentProgram.status == "Active",
+                    StudentProgram.status.in_(["Active", "Completed"]),
                     StudentSemester.term.in_(completion_terms),
                 )
             )
@@ -450,14 +450,14 @@ def calculate_cgpa_and_classification(
     db: Session, std_no: int
 ) -> Tuple[Optional[float], str]:
     """
-    Calculate CGPA and determine classification for a student based on their active program.
+    Calculate CGPA and determine classification for a student based on their active or latest completed program.
     Uses the same logic as the JavaScript implementation.
 
     Returns:
         Tuple of (CGPA, Classification)
     """
     try:
-        # Get active program
+        # Get active program first, if not found get latest completed program
         active_program = (
             db.query(StudentProgram)
             .filter(
@@ -467,7 +467,21 @@ def calculate_cgpa_and_classification(
         )
 
         if not active_program:
-            return None, "No Active Program"
+            # Try to get the latest completed program
+            active_program = (
+                db.query(StudentProgram)
+                .filter(
+                    and_(
+                        StudentProgram.std_no == std_no,
+                        StudentProgram.status == "Completed",
+                    )
+                )
+                .order_by(StudentProgram.created_at.desc())
+                .first()
+            )
+
+        if not active_program:
+            return None, "No Active or Completed Program"
 
         # Get all semesters for the active program (excluding deleted/deferred/etc)
         semesters = (
@@ -663,22 +677,31 @@ def export_graduating_students(
         .joinedload(Program.school)
     )
 
-    # Preload active programs for all candidates
-    active_program_rows = (
+    # Preload active and completed programs for all candidates
+    # For students with multiple completed programs, we'll select the latest one
+    program_rows = (
         db.query(StudentProgram)
         .options(program_loader)
         .filter(
             and_(
                 StudentProgram.std_no.in_(graduating_std_list),
-                StudentProgram.status == "Active",
+                StudentProgram.status.in_(["Active", "Completed"]),
             )
         )
         .order_by(StudentProgram.std_no, StudentProgram.created_at.desc())
         .all()
     )
+
+    # Build maps for active and latest completed programs
     active_program_map: Dict[int, StudentProgram] = {}
-    for program in active_program_rows:
-        active_program_map.setdefault(program.std_no, program)
+    completed_program_map: Dict[int, StudentProgram] = {}
+
+    for program in program_rows:
+        if program.status == "Active":
+            active_program_map.setdefault(program.std_no, program)
+        elif program.status == "Completed":
+            # Only store the latest completed program (already sorted by created_at desc)
+            completed_program_map.setdefault(program.std_no, program)
 
     # Preload approved programs using graduation requests
     approved_program_map: Dict[int, StudentProgram] = {}
@@ -726,10 +749,14 @@ def export_graduating_students(
             if not student_name:
                 continue
 
-            # Prefer approved program if available, otherwise fall back to active program
-            target_program = approved_program_map.get(std_no) or active_program_map.get(
-                std_no
-            )
+            # Prefer approved program if available, otherwise prefer active over completed
+            # For completed programs, use the latest one
+            target_program = approved_program_map.get(std_no)
+            if not target_program:
+                target_program = active_program_map.get(std_no)
+            if not target_program:
+                target_program = completed_program_map.get(std_no)
+
             if not target_program:
                 continue
 
