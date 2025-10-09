@@ -874,16 +874,26 @@ def approved_graduation_clearance() -> None:
     "--completion-terms",
     "-t",
     type=str,
+    required=True,
     help="Comma-separated completion terms (e.g., 2025-02,2024-07)",
 )
-def graduating_students(graduation_year: int, completion_terms: str) -> None:
+@click.option(
+    "--levels",
+    "-l",
+    type=str,
+    required=True,
+    help="Comma-separated program levels: certificate, diploma, degree (e.g., diploma,degree)",
+)
+def graduating_students(
+    graduation_year: int, completion_terms: str, levels: str
+) -> None:
     """Export graduating students to Excel file.
 
     Graduating students are determined by:
     1. Students with approved academic graduation clearances (100% graduating), OR
     2. Students expected to graduate based on:
        - Registration date: certificate (1 year), diploma (3 years), degree (4 years)
-       - Completion terms (optional): students with specified terms who have completed all required semesters
+       - Completion terms: students with specified terms who have completed all required semesters
          * Certificate: semesters 1-2
          * Diploma: semesters 1-6
          * Degree: semesters 1-8 OR semesters 6-8
@@ -901,18 +911,36 @@ def graduating_students(graduation_year: int, completion_terms: str) -> None:
     GRADUATION_YEAR: Year for graduation (e.g., 2025)
 
     Examples:
-      registry export graduating-students 2025
-      registry export graduating-students 2025 --completion-terms 2025-02,2024-07
+      registry export graduating-students 2025 -t 2025-02,2024-07 -l diploma,degree
+      registry export graduating-students 2025 -t 2025-02 -l certificate,diploma,degree
     """
     db = get_db()
 
-    # Parse completion terms if provided
-    terms_list = None
-    if completion_terms:
-        terms_list = [term.strip() for term in completion_terms.split(",")]
-        click.echo(f"Using completion terms: {', '.join(terms_list)}")
+    # Parse and validate completion terms
+    terms_list = [term.strip() for term in completion_terms.split(",")]
+    click.echo(f"Using completion terms: {', '.join(terms_list)}")
 
-    export_graduating_students(db, graduation_year, terms_list)
+    # Parse and validate program levels
+    valid_levels = {"certificate", "diploma", "degree"}
+    levels_list = [level.strip().lower() for level in levels.split(",")]
+
+    # Validate each level
+    invalid_levels = [level for level in levels_list if level not in valid_levels]
+    if invalid_levels:
+        click.secho(
+            f"Error: Invalid program levels: {', '.join(invalid_levels)}. "
+            f"Valid options are: certificate, diploma, degree",
+            fg="red",
+        )
+        return
+
+    if not levels_list:
+        click.secho("Error: At least one program level must be specified.", fg="red")
+        return
+
+    click.echo(f"Using program levels: {', '.join(levels_list)}")
+
+    export_graduating_students(db, graduation_year, terms_list, levels_list)
 
 
 if __name__ == "__main__":

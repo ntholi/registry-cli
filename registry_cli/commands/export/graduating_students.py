@@ -70,7 +70,10 @@ def get_pending_issues_details(db: Session, std_no: int) -> Dict[str, List[Dict]
 
 
 def get_students_expected_to_graduate(
-    db: Session, graduation_year: int, completion_terms: Optional[List[str]] = None
+    db: Session,
+    graduation_year: int,
+    completion_terms: List[str],
+    program_levels: List[str],
 ) -> List[Dict]:
     """
     Get all students expected to graduate based on:
@@ -78,10 +81,12 @@ def get_students_expected_to_graduate(
        - Certificate: 1 year duration
        - Diploma: 3 years duration
        - Degree: 4 years duration
-    2. Completion terms (optional): students with specified terms who completed required semesters
+    2. Completion terms: students with specified terms who completed required semesters
        - Certificate: must have semesters 1-2
        - Diploma: must have semesters 1-6
        - Degree: must have semesters 1-8 OR semesters 6-8 (for 3-year programs)
+
+    Only students in the specified program_levels are included.
 
     Returns list of student dictionaries with basic info.
     """
@@ -95,6 +100,10 @@ def get_students_expected_to_graduate(
     expected_years = {"certificate": 1, "diploma": 3, "degree": 4}
 
     for level, years in expected_years.items():
+        # Skip levels not in the specified program_levels
+        if level not in program_levels:
+            continue
+
         target_year = graduation_year - years
 
         students_query = (
@@ -139,90 +148,91 @@ def get_students_expected_to_graduate(
             f"{level} students with reg_date year {target_year}"
         )
 
-    # Method 2: Based on completion terms (if provided)
-    if completion_terms:
-        click.echo(
-            f"Finding students with completion terms: {', '.join(completion_terms)}..."
+    # Method 2: Based on completion terms
+    click.echo(
+        f"Finding students with completion terms: {', '.join(completion_terms)}..."
+    )
+
+    # Define semester requirements by level
+    semester_requirements = {
+        "certificate": {1, 2},
+        "diploma": {1, 2, 3, 4, 5, 6},
+        "degree": [{1, 2, 3, 4, 5, 6, 7, 8}, {6, 7, 8}],  # Either full 8 or last 3
+    }
+
+    # Get all students with the specified terms and program levels
+    students_with_terms = (
+        db.query(
+            StudentProgram.std_no,
+            StudentProgram.id.label("program_id"),
+            Program.level.label("program_level"),
+            Program.name.label("program_name"),
+            School.name.label("school_name"),
+            Student.name.label("student_name"),
         )
-
-        # Define semester requirements by level
-        semester_requirements = {
-            "certificate": {1, 2},
-            "diploma": {1, 2, 3, 4, 5, 6},
-            "degree": [{1, 2, 3, 4, 5, 6, 7, 8}, {6, 7, 8}],  # Either full 8 or last 3
-        }
-
-        # Get all students with the specified terms
-        students_with_terms = (
-            db.query(
-                StudentProgram.std_no,
-                StudentProgram.id.label("program_id"),
-                Program.level.label("program_level"),
-                Program.name.label("program_name"),
-                School.name.label("school_name"),
-                Student.name.label("student_name"),
+        .join(StudentSemester, StudentProgram.id == StudentSemester.student_program_id)
+        .join(Structure, StudentProgram.structure_id == Structure.id)
+        .join(Program, Structure.program_id == Program.id)
+        .join(School, Program.school_id == School.id)
+        .join(Student, StudentProgram.std_no == Student.std_no)
+        .filter(
+            and_(
+                StudentProgram.status.in_(["Active", "Completed"]),
+                StudentSemester.term.in_(completion_terms),
+                Program.level.in_(program_levels),  # Filter by specified program levels
             )
-            .join(
-                StudentSemester, StudentProgram.id == StudentSemester.student_program_id
-            )
-            .join(Structure, StudentProgram.structure_id == Structure.id)
-            .join(Program, Structure.program_id == Program.id)
-            .join(School, Program.school_id == School.id)
-            .join(Student, StudentProgram.std_no == Student.std_no)
+        )
+        .distinct()
+        .all()
+    )
+
+    click.echo(
+        f"Found {len(students_with_terms)} students with specified completion terms and program levels"
+    )
+
+    # Check each student's semester completion
+    for student_data in students_with_terms:
+        level = student_data.program_level
+
+        # Skip if level is not in the specified program_levels (extra safety check)
+        if level not in program_levels:
+            continue
+
+        # Get all semesters for this student's program
+        semesters = (
+            db.query(StudentSemester.semester_number)
+            .filter(StudentSemester.student_program_id == student_data.program_id)
             .filter(
-                and_(
-                    StudentProgram.status.in_(["Active", "Completed"]),
-                    StudentSemester.term.in_(completion_terms),
+                StudentSemester.status.notin_(
+                    ["Deleted", "Deferred", "DroppedOut", "Withdrawn"]
                 )
             )
-            .distinct()
             .all()
         )
 
-        click.echo(
-            f"Found {len(students_with_terms)} students with specified completion terms"
-        )
+        semester_numbers = {s.semester_number for s in semesters if s.semester_number}
 
-        # Check each student's semester completion
-        for student_data in students_with_terms:
-            # Get all semesters for this student's program
-            semesters = (
-                db.query(StudentSemester.semester_number)
-                .filter(StudentSemester.student_program_id == student_data.program_id)
-                .filter(
-                    StudentSemester.status.notin_(
-                        ["Deleted", "Deferred", "DroppedOut", "Withdrawn"]
-                    )
-                )
-                .all()
+        # Check if student meets semester requirements
+        meets_requirements = False
+        if level in ["certificate", "diploma"]:
+            required_semesters = semester_requirements[level]
+            meets_requirements = required_semesters.issubset(semester_numbers)
+        elif level == "degree":
+            # Check either full 8 semesters or last 3 semesters (6-8)
+            option1, option2 = semester_requirements["degree"]
+            meets_requirements = option1.issubset(semester_numbers) or option2.issubset(
+                semester_numbers
             )
 
-            semester_numbers = {
-                s.semester_number for s in semesters if s.semester_number
+        if meets_requirements:
+            expected_students_map[student_data.std_no] = {
+                "std_no": student_data.std_no,
+                "student_name": student_data.student_name,
+                "school_name": student_data.school_name,
+                "program_name": student_data.program_name,
+                "program_level": student_data.program_level,
+                "criteria": f"Completion terms {', '.join(completion_terms)}",
             }
-            level = student_data.program_level
-
-            # Check if student meets semester requirements
-            meets_requirements = False
-            if level in ["certificate", "diploma"]:
-                required_semesters = semester_requirements[level]
-                meets_requirements = required_semesters.issubset(semester_numbers)
-            elif level == "degree":
-                # Check either full 8 semesters or last 3 semesters (6-8)
-                option1, option2 = semester_requirements["degree"]
-                meets_requirements = option1.issubset(
-                    semester_numbers
-                ) or option2.issubset(semester_numbers)
-
-            if meets_requirements:
-                expected_students_map[student_data.std_no] = {
-                    "std_no": student_data.std_no,
-                    "student_name": student_data.student_name,
-                    "school_name": student_data.school_name,
-                    "program_name": student_data.program_name,
-                    "program_level": student_data.program_level,
-                    "criteria": f"Completion terms {', '.join(completion_terms)}",
-                }
 
     click.echo(f"Total expected students: {len(expected_students_map)}")
     return list(expected_students_map.values())
@@ -566,7 +576,10 @@ def get_student_classification(db: Session, std_no: int) -> Optional[str]:
 
 
 def export_graduating_students(
-    db: Session, graduation_year: int, completion_terms: Optional[List[str]] = None
+    db: Session,
+    graduation_year: int,
+    completion_terms: List[str],
+    program_levels: List[str],
 ) -> None:
     """
     Export graduating students to Excel file.
@@ -584,11 +597,13 @@ def export_graduating_students(
     Args:
         db: Database session
         graduation_year: Year for graduation (e.g., 2025)
-        completion_terms: Optional list of completion terms to check (e.g., ["2025-02", "2024-07"])
+        completion_terms: List of completion terms to check (e.g., ["2025-02", "2024-07"])
+        program_levels: List of program levels to include (e.g., ["diploma", "degree"])
     """
     graduating_students = []
 
     # Step 1: Get students with approved academic graduation clearances (100% graduating)
+    # Filter by program levels
     click.echo("Finding students with approved academic graduation clearances...")
 
     approved_graduation_students = (
@@ -602,8 +617,14 @@ def export_graduating_students(
             GraduationRequest.id == GraduationClearance.graduation_request_id,
         )
         .join(Clearance, GraduationClearance.clearance_id == Clearance.id)
+        .join(Structure, StudentProgram.structure_id == Structure.id)
+        .join(Program, Structure.program_id == Program.id)
         .filter(
-            and_(Clearance.department == "academic", Clearance.status == "approved")
+            and_(
+                Clearance.department == "academic",
+                Clearance.status == "approved",
+                Program.level.in_(program_levels),  # Filter by specified program levels
+            )
         )
         .all()
     )
@@ -615,7 +636,7 @@ def export_graduating_students(
 
     # Step 2: Get students expected to graduate
     expected_students = get_students_expected_to_graduate(
-        db, graduation_year, completion_terms
+        db, graduation_year, completion_terms, program_levels
     )
 
     # Step 3: Separate expected students into graduating vs non-graduating based on pending issues
