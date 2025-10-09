@@ -869,21 +869,28 @@ def approved_graduation_clearance() -> None:
 
 
 @export.command(name="graduating-students")
-@click.argument("std_nos", nargs=-1, type=int)
+@click.argument("graduation_year", type=int)
 @click.option(
-    "--file",
-    "-f",
-    type=click.Path(exists=True, readable=True),
-    help="File containing student numbers (one per line or comma/space separated)",
+    "--completion-terms",
+    "-t",
+    type=str,
+    help="Comma-separated completion terms (e.g., 2025-02,2024-07)",
 )
-def graduating_students(std_nos: tuple[int, ...], file: str) -> None:
+def graduating_students(graduation_year: int, completion_terms: str) -> None:
     """Export graduating students to Excel file.
 
-    Graduating students are those who either:
-    1. Have approved academic graduation clearances, OR
-    2. Have active programs with semesters containing '2024-07' or '2025-02' terms
-       AND have no pending academic issues (using approve_academic_graduation logic), OR
-    3. Are explicitly provided as arguments or in a file (bypassing the pending issues check)
+    Graduating students are determined by:
+    1. Students with approved academic graduation clearances (100% graduating), OR
+    2. Students expected to graduate based on:
+       - Registration date: certificate (1 year), diploma (3 years), degree (4 years)
+       - Completion terms (optional): students with specified terms who have completed all required semesters
+         * Certificate: semesters 1-2
+         * Diploma: semesters 1-6
+         * Degree: semesters 1-8 OR semesters 6-8
+
+    Expected students are then filtered by pending academic issues:
+    - No pending issues → Graduating Students
+    - Has pending issues → Non-Graduating Students
 
     The exported file includes: student number, name, program name, school name, CGPA, classification, and criteria met.
     Classification is calculated based on CGPA using grade definitions:
@@ -891,29 +898,21 @@ def graduating_students(std_nos: tuple[int, ...], file: str) -> None:
     - Merit: CGPA >= 3.0
     - Pass: CGPA >= 2.0
 
-    The export is sorted by: school name, program name, then CGPA (descending).
-
-    STD_NOS: Optional list of student numbers to include (space-separated)
+    GRADUATION_YEAR: Year for graduation (e.g., 2025)
 
     Examples:
-      registry-cli export graduating-students 901001234 901005678
-      registry-cli export graduating-students --file student_numbers.txt
+      registry export graduating-students 2025
+      registry export graduating-students 2025 --completion-terms 2025-02,2024-07
     """
     db = get_db()
 
-    # Combine student numbers from arguments and file
-    combined_std_nos = list(std_nos) if std_nos else []
+    # Parse completion terms if provided
+    terms_list = None
+    if completion_terms:
+        terms_list = [term.strip() for term in completion_terms.split(",")]
+        click.echo(f"Using completion terms: {', '.join(terms_list)}")
 
-    if file:
-        try:
-            file_std_nos = read_student_numbers_from_file(file)
-            combined_std_nos.extend(file_std_nos)
-            click.echo(f"Loaded {len(file_std_nos)} student numbers from {file}")
-        except Exception as e:
-            click.secho(f"Error reading file {file}: {str(e)}", fg="red")
-            return
-
-    export_graduating_students(db, combined_std_nos if combined_std_nos else None)
+    export_graduating_students(db, graduation_year, terms_list)
 
 
 if __name__ == "__main__":

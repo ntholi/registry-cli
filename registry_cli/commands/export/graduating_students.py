@@ -69,31 +69,38 @@ def get_pending_issues_details(db: Session, std_no: int) -> Dict[str, List[Dict]
         return {"failedNeverRepeated": [], "neverAttempted": []}
 
 
-def get_non_graduating_students(db: Session) -> List[Dict]:
+def get_students_expected_to_graduate(
+    db: Session, graduation_year: int, completion_terms: Optional[List[str]] = None
+) -> List[Dict]:
     """
-    Find students who should be graduating now but have pending issues.
-    - Certificate students: intake in Jun-Sep exactly 1 year ago
-    - Diploma students: intake in Jun-Sep exactly 3 years ago
-    - Degree students: intake in Jun-Sep exactly 4 years ago
-    """
-    non_graduating_students: List[Dict] = []
-    current_date = datetime.now()
+    Get all students expected to graduate based on:
+    1. Registration date: comparing reg_date year with graduation year
+       - Certificate: 1 year duration
+       - Diploma: 3 years duration
+       - Degree: 4 years duration
+    2. Completion terms (optional): students with specified terms who completed required semesters
+       - Certificate: must have semesters 1-2
+       - Diploma: must have semesters 1-6
+       - Degree: must have semesters 1-8 OR semesters 6-8 (for 3-year programs)
 
-    # Define expected graduation years by program level
+    Returns list of student dictionaries with basic info.
+    """
+    expected_students_map = {}  # Use dict to avoid duplicates by std_no
+
+    # Method 1: Based on registration date
+    click.echo(
+        f"Finding students expected to graduate in {graduation_year} based on registration date..."
+    )
+
     expected_years = {"certificate": 1, "diploma": 3, "degree": 4}
 
-    click.echo("Finding students who should have graduated but have pending issues...")
-
     for level, years in expected_years.items():
-        # Calculate target intake window (June to September of the target year)
-        target_year = current_date.year - years
-        start_date = f"{target_year}-06-01"
-        end_date = f"{target_year}-09-30"
+        target_year = graduation_year - years
 
         students_query = (
             db.query(
                 StudentProgram.std_no,
-                StudentProgram.intake_date,
+                StudentProgram.reg_date,
                 Program.level.label("program_level"),
                 Program.name.label("program_name"),
                 School.name.label("school_name"),
@@ -107,50 +114,164 @@ def get_non_graduating_students(db: Session) -> List[Dict]:
                 and_(
                     StudentProgram.status == "Active",
                     Program.level == level,
-                    StudentProgram.intake_date.isnot(None),
-                    StudentProgram.intake_date.between(start_date, end_date),
+                    StudentProgram.reg_date.isnot(None),
                 )
             )
             .all()
         )
 
+        # Filter by year only (not full date)
+        for student_data in students_query:
+            if student_data.reg_date:
+                reg_year = int(student_data.reg_date.split("-")[0])
+                if reg_year == target_year:
+                    expected_students_map[student_data.std_no] = {
+                        "std_no": student_data.std_no,
+                        "student_name": student_data.student_name,
+                        "school_name": student_data.school_name,
+                        "program_name": student_data.program_name,
+                        "program_level": student_data.program_level,
+                        "criteria": f"Reg date year {target_year} ({level}, {years} years)",
+                    }
+
         click.echo(
-            f"Found {len(students_query)} {level} students with intake in {target_year} Jun-Sep ({years} years ago)"
+            f"Found {sum(1 for s in expected_students_map.values() if s['program_level'] == level)} "
+            f"{level} students with reg_date year {target_year}"
         )
 
-        # Check each student for pending issues
-        for index, student_data in enumerate(students_query, 1):
-            if index % 50 == 0:
-                click.echo(f"Checked {index}/{len(students_query)} {level} students...")
+    # Method 2: Based on completion terms (if provided)
+    if completion_terms:
+        click.echo(
+            f"Finding students with completion terms: {', '.join(completion_terms)}..."
+        )
 
-            std_no = student_data.std_no
+        # Define semester requirements by level
+        semester_requirements = {
+            "certificate": {1, 2},
+            "diploma": {1, 2, 3, 4, 5, 6},
+            "degree": [{1, 2, 3, 4, 5, 6, 7, 8}, {6, 7, 8}],  # Either full 8 or last 3
+        }
 
-            # Get detailed pending issues once to avoid redundant computations
-            pending_issues = get_pending_issues_details(db, std_no)
+        # Get all students with the specified terms
+        students_with_terms = (
+            db.query(
+                StudentProgram.std_no,
+                StudentProgram.id.label("program_id"),
+                Program.level.label("program_level"),
+                Program.name.label("program_name"),
+                School.name.label("school_name"),
+                Student.name.label("student_name"),
+            )
+            .join(
+                StudentSemester, StudentProgram.id == StudentSemester.student_program_id
+            )
+            .join(Structure, StudentProgram.structure_id == Structure.id)
+            .join(Program, Structure.program_id == Program.id)
+            .join(School, Program.school_id == School.id)
+            .join(Student, StudentProgram.std_no == Student.std_no)
+            .filter(
+                and_(
+                    StudentProgram.status == "Active",
+                    StudentSemester.term.in_(completion_terms),
+                )
+            )
+            .distinct()
+            .all()
+        )
 
-            # Only include if they actually have pending issues
-            failed_never_repeated = pending_issues.get("failedNeverRepeated", [])
-            never_attempted = pending_issues.get("neverAttempted", [])
+        click.echo(
+            f"Found {len(students_with_terms)} students with specified completion terms"
+        )
 
-            if not failed_never_repeated and not never_attempted:
-                continue
+        # Check each student's semester completion
+        for student_data in students_with_terms:
+            # Get all semesters for this student's program
+            semesters = (
+                db.query(StudentSemester.semester_number)
+                .filter(StudentSemester.student_program_id == student_data.program_id)
+                .filter(
+                    StudentSemester.status.notin_(
+                        ["Deleted", "Deferred", "DroppedOut", "Withdrawn"]
+                    )
+                )
+                .all()
+            )
 
-            non_graduating_students.append(
-                {
-                    "student_number": std_no,
+            semester_numbers = {
+                s.semester_number for s in semesters if s.semester_number
+            }
+            level = student_data.program_level
+
+            # Check if student meets semester requirements
+            meets_requirements = False
+            if level in ["certificate", "diploma"]:
+                required_semesters = semester_requirements[level]
+                meets_requirements = required_semesters.issubset(semester_numbers)
+            elif level == "degree":
+                # Check either full 8 semesters or last 3 semesters (6-8)
+                option1, option2 = semester_requirements["degree"]
+                meets_requirements = option1.issubset(
+                    semester_numbers
+                ) or option2.issubset(semester_numbers)
+
+            if meets_requirements:
+                expected_students_map[student_data.std_no] = {
+                    "std_no": student_data.std_no,
                     "student_name": student_data.student_name,
                     "school_name": student_data.school_name,
                     "program_name": student_data.program_name,
                     "program_level": student_data.program_level,
-                    "intake_date": student_data.intake_date,
-                    "expected_graduation_years": years,
-                    "failed_never_repeated": failed_never_repeated,
-                    "never_attempted": never_attempted,
+                    "criteria": f"Completion terms {', '.join(completion_terms)}",
                 }
-            )
+
+    click.echo(f"Total expected students: {len(expected_students_map)}")
+    return list(expected_students_map.values())
+
+
+def get_non_graduating_students(
+    db: Session, expected_students: List[Dict]
+) -> List[Dict]:
+    """
+    From the list of expected students, identify those with pending academic issues.
+    These are students who should graduate but have:
+    - Failed modules that were never repeated
+    - Required modules that were never attempted
+    """
+    non_graduating_students = []
+
+    click.echo("Checking expected students for pending academic issues...")
+
+    for index, student in enumerate(expected_students, 1):
+        if index % 50 == 0:
+            click.echo(f"Checked {index}/{len(expected_students)} students...")
+
+        std_no = student["std_no"]
+
+        # Get detailed pending issues once to avoid redundant computations
+        pending_issues = get_pending_issues_details(db, std_no)
+
+        # Only include if they actually have pending issues
+        failed_never_repeated = pending_issues.get("failedNeverRepeated", [])
+        never_attempted = pending_issues.get("neverAttempted", [])
+
+        if not failed_never_repeated and not never_attempted:
+            continue
+
+        non_graduating_students.append(
+            {
+                "student_number": std_no,
+                "student_name": student["student_name"],
+                "school_name": student["school_name"],
+                "program_name": student["program_name"],
+                "program_level": student["program_level"],
+                "criteria": student.get("criteria", ""),
+                "failed_never_repeated": failed_never_repeated,
+                "never_attempted": never_attempted,
+            }
+        )
 
     click.echo(
-        f"Found {len(non_graduating_students)} students with pending issues who should have graduated"
+        f"Found {len(non_graduating_students)} expected students with pending issues"
     )
     return non_graduating_students
 
@@ -431,27 +552,29 @@ def get_student_classification(db: Session, std_no: int) -> Optional[str]:
 
 
 def export_graduating_students(
-    db: Session, additional_std_nos: Optional[List[int]] = None
+    db: Session, graduation_year: int, completion_terms: Optional[List[str]] = None
 ) -> None:
     """
     Export graduating students to Excel file.
 
-    Graduating students are those who either:
-    1. Have approved academic graduation clearances, OR
-    2. Have active programs with semesters containing '2024-07' or '2025-02' terms
-       AND have no pending academic issues (using approve_academic_graduation logic), OR
-    3. Are explicitly provided in additional_std_nos (bypassing the pending issues check)
+    Graduating students are determined by:
+    1. Students with approved academic graduation clearances (100% graduating), OR
+    2. Students expected to graduate (based on reg_date or completion terms)
+       who have NO pending academic issues
+
+    Students expected to graduate but WITH pending issues go to "Non-Graduating Students" sheet.
 
     The exported file includes: student number, name, program name, school name, CGPA, classification, and criteria met.
     CGPA and classification are calculated from student's module grades in their active program.
 
     Args:
         db: Database session
-        additional_std_nos: Optional list of student numbers to include without pending issues check
+        graduation_year: Year for graduation (e.g., 2025)
+        completion_terms: Optional list of completion terms to check (e.g., ["2025-02", "2024-07"])
     """
     graduating_students = []
 
-    # Criterion 1: Students with approved academic graduation clearances
+    # Step 1: Get students with approved academic graduation clearances (100% graduating)
     click.echo("Finding students with approved academic graduation clearances...")
 
     approved_graduation_students = (
@@ -473,59 +596,46 @@ def export_graduating_students(
 
     approved_std_nos = {row.std_no for row in approved_graduation_students}
     click.echo(
-        f"Found {len(approved_std_nos)} students with approved academic clearances"
+        f"Found {len(approved_std_nos)} students with approved academic clearances (100% graduating)"
     )
 
-    # Criterion 2: Students with active programs having 2024-07 or 2025-02 semesters and no pending issues
-    click.echo(
-        "Finding students with 2024-07 or 2025-02 semesters and no pending issues..."
+    # Step 2: Get students expected to graduate
+    expected_students = get_students_expected_to_graduate(
+        db, graduation_year, completion_terms
     )
 
-    semester_students = (
-        db.query(StudentSemester.id, StudentProgram.std_no)
-        .join(StudentProgram, StudentSemester.student_program_id == StudentProgram.id)
-        .filter(
-            and_(
-                StudentProgram.status == "Active",
-                or_(
-                    StudentSemester.term == "2024-07", StudentSemester.term == "2025-02"
-                ),
-            )
-        )
-        .all()
-    )
+    # Step 3: Separate expected students into graduating vs non-graduating based on pending issues
+    click.echo("Filtering expected students by pending academic issues...")
 
-    semester_std_nos = {row.std_no for row in semester_students}
-    click.echo(
-        f"Found {len(semester_std_nos)} students with 2024-07 or 2025-02 semesters"
-    )
+    expected_graduating = []
+    expected_with_issues = []
 
-    # Filter semester students by pending issues
-    qualifying_semester_std_nos = set()
-    click.echo("Checking for pending academic issues...")
+    for index, student in enumerate(expected_students, 1):
+        if index % 50 == 0:
+            click.echo(f"Checked {index}/{len(expected_students)} expected students...")
 
-    for i, std_no in enumerate(semester_std_nos, 1):
-        if i % 50 == 0:
-            click.echo(f"Checked {i}/{len(semester_std_nos)} students...")
+        std_no = student["std_no"]
 
+        # Skip if already approved (they're 100% graduating)
+        if std_no in approved_std_nos:
+            continue
+
+        # Check for pending issues
         if has_no_pending_issues(db, std_no):
-            qualifying_semester_std_nos.add(std_no)
+            expected_graduating.append(student)
+        else:
+            expected_with_issues.append(student)
 
-    click.echo(
-        f"Found {len(qualifying_semester_std_nos)} students with no pending issues"
-    )
+    click.echo(f"Expected students without pending issues: {len(expected_graduating)}")
+    click.echo(f"Expected students with pending issues: {len(expected_with_issues)}")
 
-    # Combine both sets of graduating students
-    all_graduating_std_nos = approved_std_nos | qualifying_semester_std_nos
+    # Get non-graduating students (those with pending issues)
+    non_graduating_students = get_non_graduating_students(db, expected_with_issues)
 
-    # Add additional student numbers if provided (these bypass pending issues check)
-    additional_std_nos_set = set()
-    if additional_std_nos:
-        additional_std_nos_set = set(additional_std_nos)
-        all_graduating_std_nos |= additional_std_nos_set
-        click.echo(
-            f"Additional student numbers provided: {len(additional_std_nos_set)}"
-        )
+    # Step 4: Combine all graduating students
+    all_graduating_std_nos = approved_std_nos | {
+        s["std_no"] for s in expected_graduating
+    }
 
     click.echo(f"Total graduating students: {len(all_graduating_std_nos)}")
 
@@ -639,10 +749,11 @@ def export_graduating_students(
             criteria_met = []
             if std_no in approved_std_nos:
                 criteria_met.append("Approved Clearance")
-            if std_no in qualifying_semester_std_nos:
-                criteria_met.append("2024-07/2025-02 + No Issues")
-            if std_no in additional_std_nos_set:
-                criteria_met.append("Provided List")
+            # Check if student is in expected graduating list
+            for expected_student in expected_graduating:
+                if expected_student["std_no"] == std_no:
+                    criteria_met.append(expected_student["criteria"])
+                    break
 
             graduating_students.append(
                 {
@@ -681,10 +792,7 @@ def export_graduating_students(
         )
         return
 
-    # Get non-graduating students (those who should have graduated but have pending issues)
-    non_graduating_students = get_non_graduating_students(db)
-
-    # Calculate graduation statistics
+    # Calculate graduation statistics (we already have non_graduating_students from earlier)
     graduation_stats = calculate_graduation_statistics(
         db, graduating_students, non_graduating_students
     )
@@ -850,8 +958,7 @@ def export_graduating_students(
             "School Name",
             "Program Name",
             "Program Level",
-            "Intake Date",
-            "Expected Years",
+            "Criteria",
             "Failed Never Repeated",
             "Never Attempted",
         ]
@@ -879,8 +986,7 @@ def export_graduating_students(
                 student["school_name"],
                 student["program_name"],
                 student["program_level"].title(),
-                student["intake_date"],
-                student["expected_graduation_years"],
+                student.get("criteria", ""),
                 "; ".join(failed_modules) if failed_modules else "None",
                 (
                     "; ".join(never_attempted_modules)
@@ -1027,17 +1133,12 @@ def export_graduating_students(
         click.echo(
             f"- Students excluded due to 'Failed' classification: {failed_count}"
         )
-    click.echo(f"- Students with approved clearances: {len(approved_std_nos)}")
+    click.echo(f"- Students with approved academic clearances: {len(approved_std_nos)}")
     click.echo(
-        f"- Students with 2025 semesters and no issues: {len(qualifying_semester_std_nos)}"
-    )
-    if additional_std_nos_set:
-        click.echo(f"- Students from provided list: {len(additional_std_nos_set)}")
-    click.echo(
-        f"- Students meeting both criteria: {len(approved_std_nos & qualifying_semester_std_nos)}"
+        f"- Expected students without pending issues: {len(expected_graduating)}"
     )
     click.echo(
-        f"- Non-graduating students (should have graduated but have pending issues): {len(non_graduating_students)}"
+        f"- Non-graduating students (expected but have pending issues): {len(non_graduating_students)}"
     )
 
     overall_stats = graduation_stats["overall_stats"]
