@@ -884,8 +884,14 @@ def approved_graduation_clearance() -> None:
     required=True,
     help="Comma-separated program levels: certificate, diploma, degree (e.g., diploma,degree)",
 )
+@click.option(
+    "--exclude-cleared",
+    is_flag=True,
+    default=False,
+    help="Exclude students whose graduation request has been cleared (approved academic clearance)",
+)
 def graduating_students(
-    graduation_year: int, completion_terms: str, levels: str
+    graduation_year: int, completion_terms: str, levels: str, exclude_cleared: bool
 ) -> None:
     """Export graduating students to Excel file.
 
@@ -902,6 +908,9 @@ def graduating_students(
     - No pending issues → Graduating Students
     - Has pending issues → Non-Graduating Students
 
+    The --exclude-cleared flag will exclude students with approved academic graduation clearances,
+    focusing only on students expected to graduate based on registration date or completion terms.
+
     The exported file includes: student number, name, program name, school name, CGPA, classification, and criteria met.
     Classification is calculated based on CGPA using grade definitions:
     - Distinction: CGPA >= 3.5
@@ -913,6 +922,7 @@ def graduating_students(
     Examples:
       registry export graduating-students 2025 -t 2025-02,2024-07 -l diploma,degree
       registry export graduating-students 2025 -t 2025-02 -l certificate,diploma,degree
+      registry export graduating-students 2025 -t 2025-02 -l degree --exclude-cleared
     """
     db = get_db()
 
@@ -940,7 +950,9 @@ def graduating_students(
 
     click.echo(f"Using program levels: {', '.join(levels_list)}")
 
-    export_graduating_students(db, graduation_year, terms_list, levels_list)
+    export_graduating_students(
+        db, graduation_year, terms_list, levels_list, exclude_cleared
+    )
 
 
 if __name__ == "__main__":

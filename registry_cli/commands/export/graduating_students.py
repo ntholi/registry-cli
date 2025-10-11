@@ -580,6 +580,7 @@ def export_graduating_students(
     graduation_year: int,
     completion_terms: List[str],
     program_levels: List[str],
+    exclude_cleared: bool = False,
 ) -> None:
     """
     Export graduating students to Excel file.
@@ -599,40 +600,49 @@ def export_graduating_students(
         graduation_year: Year for graduation (e.g., 2025)
         completion_terms: List of completion terms to check (e.g., ["2025-02", "2024-07"])
         program_levels: List of program levels to include (e.g., ["diploma", "degree"])
+        exclude_cleared: If True, exclude students with approved academic graduation clearances
     """
     graduating_students = []
 
     # Step 1: Get students with approved academic graduation clearances (100% graduating)
     # Filter by program levels
-    click.echo("Finding students with approved academic graduation clearances...")
+    if exclude_cleared:
+        click.echo(
+            "Skipping students with approved academic graduation clearances (--exclude-cleared flag set)..."
+        )
+        approved_std_nos = set()
+    else:
+        click.echo("Finding students with approved academic graduation clearances...")
 
-    approved_graduation_students = (
-        db.query(StudentProgram.std_no)
-        .join(
-            GraduationRequest,
-            StudentProgram.id == GraduationRequest.student_program_id,
-        )
-        .join(
-            GraduationClearance,
-            GraduationRequest.id == GraduationClearance.graduation_request_id,
-        )
-        .join(Clearance, GraduationClearance.clearance_id == Clearance.id)
-        .join(Structure, StudentProgram.structure_id == Structure.id)
-        .join(Program, Structure.program_id == Program.id)
-        .filter(
-            and_(
-                Clearance.department == "academic",
-                Clearance.status == "approved",
-                Program.level.in_(program_levels),  # Filter by specified program levels
+        approved_graduation_students = (
+            db.query(StudentProgram.std_no)
+            .join(
+                GraduationRequest,
+                StudentProgram.id == GraduationRequest.student_program_id,
             )
+            .join(
+                GraduationClearance,
+                GraduationRequest.id == GraduationClearance.graduation_request_id,
+            )
+            .join(Clearance, GraduationClearance.clearance_id == Clearance.id)
+            .join(Structure, StudentProgram.structure_id == Structure.id)
+            .join(Program, Structure.program_id == Program.id)
+            .filter(
+                and_(
+                    Clearance.department == "academic",
+                    Clearance.status == "approved",
+                    Program.level.in_(
+                        program_levels
+                    ),  # Filter by specified program levels
+                )
+            )
+            .all()
         )
-        .all()
-    )
 
-    approved_std_nos = {row.std_no for row in approved_graduation_students}
-    click.echo(
-        f"Found {len(approved_std_nos)} students with approved academic clearances (100% graduating)"
-    )
+        approved_std_nos = {row.std_no for row in approved_graduation_students}
+        click.echo(
+            f"Found {len(approved_std_nos)} students with approved academic clearances (100% graduating)"
+        )
 
     # Step 2: Get students expected to graduate
     expected_students = get_students_expected_to_graduate(
@@ -726,7 +736,7 @@ def export_graduating_students(
 
     # Preload approved programs using graduation requests
     approved_program_map: Dict[int, StudentProgram] = {}
-    if approved_std_nos:
+    if approved_std_nos and not exclude_cleared:
         approved_program_rows = (
             db.query(StudentProgram, GraduationRequest.created_at)
             .options(program_loader)
@@ -770,13 +780,21 @@ def export_graduating_students(
             if not student_name:
                 continue
 
-            # Prefer approved program if available, otherwise prefer active over completed
+            # Prefer approved program if available (unless exclude_cleared is True)
+            # Otherwise prefer active over completed
             # For completed programs, use the latest one
-            target_program = approved_program_map.get(std_no)
-            if not target_program:
+            if exclude_cleared:
+                # When excluding cleared students, ignore approved programs
                 target_program = active_program_map.get(std_no)
-            if not target_program:
-                target_program = completed_program_map.get(std_no)
+                if not target_program:
+                    target_program = completed_program_map.get(std_no)
+            else:
+                # Normal logic: prefer approved program
+                target_program = approved_program_map.get(std_no)
+                if not target_program:
+                    target_program = active_program_map.get(std_no)
+                if not target_program:
+                    target_program = completed_program_map.get(std_no)
 
             if not target_program:
                 continue
