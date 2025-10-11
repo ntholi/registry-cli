@@ -37,6 +37,7 @@ from registry_cli.commands.pull.students_range_parallel import (
     students_range_parallel_pull,
 )
 from registry_cli.commands.push.students import student_push
+from registry_cli.commands.push.term_modules import push_term_modules
 from registry_cli.commands.send.notifications import send_notifications
 from registry_cli.commands.send.proof import send_proof_registration
 from registry_cli.commands.update.marks import update_marks_from_excel
@@ -323,11 +324,46 @@ def academic_graduation() -> None:
     approve_academic_graduation(db)
 
 
-@cli.command()
+@cli.group()
+def push() -> None:
+    """Commands for pushing data to the website."""
+    pass
+
+
+@push.command(name="student")
 @click.argument("name", type=str)
-def push(name: str) -> None:
+def push_student(name: str) -> None:
+    """Push student data to the website."""
     db = get_db()
     student_push(db, name)
+
+
+@push.command(name="term-modules")
+@click.argument("term", type=str)
+@click.option(
+    "--std-no",
+    type=int,
+    help="Process only a specific student number",
+)
+@click.option(
+    "--reset",
+    is_flag=True,
+    help="Reset progress and start from beginning",
+)
+def push_term_modules_cmd(term: str, std_no: int | None, reset: bool) -> None:
+    """
+    Push all student modules for a term to the website and re-sync.
+
+    This command takes all existing student_modules for the specified term,
+    pushes them to the website, deletes them from the database, and then
+    re-syncs them from the website to get the correct IDs.
+
+    If --std-no is provided, only that specific student will be processed.
+
+    TERM: Academic term (e.g. 2025-02)
+    """
+    db = get_db()
+    push_term_modules(db, term, std_no, reset)
 
 
 @cli.group()
